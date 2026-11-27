@@ -373,7 +373,7 @@ test("every exercise that stands a card beside other cards asks for company", ()
      whose words change cannot be one of them — offers.ts reads that off
      this need rather than naming the three. */
   assert.deepEqual(TYPES.filter((t) => EX[t].needs.includes("mates")).sort(),
-    ["ar2pick", "ctx2pick", "en2pick", "img2pick", "match", "recmatch"]);
+    ["ar2pick", "ctx2pick", "def2pick", "en2pick", "img2pick", "match", "recmatch"]);
 });
 
 /* --- listening exercises --- */
@@ -710,7 +710,10 @@ test("the gentle types are read off the definitions, not kept beside them", () =
     "ex2en",
     /* And who a verb's form is about, chosen from the persons of its tense. */
     "vwho", "vwhorec",
-    "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "dlgwhole",
+    "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick",
+    /* And the word chosen for its description, in the language itself. */
+    "def2pick",
+    "dlgwhole",
     /* A word taken out of a scene and chosen back is the phrase gap-fill
        asked of a scene's own text. */
     "gap2pick",

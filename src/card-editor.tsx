@@ -57,6 +57,7 @@ import { agreeingBlanks, combosOf, mainFormOnly, EXAMPLES_CEILING, examplesOf, f
 import type { Value } from "./variables.ts";
 import { liftSubtypeTags } from "./subtype-tags.ts";
 import { basicCard, droppedByBasic, opensAdvanced } from "./basic-card.ts";
+import { DESC, DESC_EN, DESC_MAX, givenAway, storedDescription } from "./description.ts";
 import { subtypeTakesCapitals, tickCapitals } from "./capitals.ts";
 import { readSpan, spanTag } from "./numbers/spans.ts";
 import type { Span } from "./numbers/spans.ts";
@@ -3688,6 +3689,9 @@ export function initialForms(
       slowClips: word.slowClips || [],
       /* Its pictures — see ImageScreen. Only where it has some. */
       ...(Array.isArray(word.images) && word.images.length ? { images: word.images } : null),
+      /* And its description and that description's English, where it has
+         one (0.691) — read back, or the next save would drop them. */
+      ...storedDescription(word),
       /* Whether the card's own word is asked about. Carried only where it
          is off, which is what the field means everywhere else too. */
       ...(word.ask === false ? { ask: false } : null),
@@ -6997,6 +7001,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           )}
       </div>
     )}
+    {!advanced && !setOnly && !scene && <DescriptionBlock word={word} lang={lang} alone />}
 
     {/* ---- and where it goes ---- */}
     <div className="at-formblock at-mt5">
@@ -10739,6 +10744,63 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
 type CardTab = "overview" | "content" | "exercises" | "settings";
 
 /*
+ * The word's description, in the language itself (0.691) — see
+ * src/description.ts. On the Basic tab of a basic card and the Advanced tab
+ * of an advanced word or phrase; never on a sentence or a scene. Written on
+ * the card's own word, the same form both tabs write, so ticking "Build an
+ * advanced card" carries it over with nothing to copy.
+ */
+function DescriptionBlock({ word, lang, alone, className = "at-formblock at-mt5" }: {
+  word: WordDraft;
+  lang: Lang;
+  /** Whether the card is one form, which is when it is asked. */
+  alone: boolean;
+  className?: string;
+}) {
+  const f: Record<string, any> = word.forms[0] || {};
+  const set = (patch: Record<string, any>) => word.setForm(0, { ...f, ...patch });
+  const desc = String(f[DESC] || "");
+  const shown = givenAway(f, lang);
+  return (
+    <div className={className} data-el="editor-description">
+      <div className="at-formhead">
+        <span className="at-formnum">Description</span>
+        <span className="at-formrole">Students choose and write the word from it.</span>
+      </div>
+      <Field
+        label={`In ${lang.name}`}
+        optional
+        lede={`A few words in ${lang.name} saying what it is, without the word itself — no English.`}
+      >
+        <ScriptInput lang={lang} value={desc} label="Description" onChange={(v) => set({ [DESC]: v.slice(0, DESC_MAX) })} />
+      </Field>
+      {shown && (
+        <p className="at-formneed unmet" data-el="editor-description-gives-away">
+          The description uses the word itself (
+          <bdi lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack }}>{shown}</bdi>
+          ), which gives the answer away.
+        </p>
+      )}
+      {desc.trim() && !alone && (
+        <p className="at-formneed" data-el="editor-description-not-asked">
+          Not used in exercises while the card has more than one form.
+        </p>
+      )}
+      <Field label="In English" optional lede="Students can tap to see it, in courses that show English." className="at-mt3">
+        <input
+          className="at-input"
+          value={String(f[DESC_EN] || "")}
+          maxLength={DESC_MAX}
+          placeholder="For example: where you buy bread"
+          aria-label="Description in English"
+          onChange={(e) => set({ [DESC_EN]: e.target.value })}
+        />
+      </Field>
+    </div>
+  );
+}
+
+/*
  * What a save would send, cut by the tab each part of it is changed on —
  * so a tab can say it has a change on it, and the whole of it still says
  * whether the card has one. How each form is practised is written on the
@@ -11260,6 +11322,7 @@ export function CardEditor({ card, lang, modules, inModules, onCreateModule, all
                 The other meanings of its word and the clue that tells them
                 apart, how its English is capitalised, and how other cards'
                 blanks reach it. A scene has none of these. */}
+            {meanings && <DescriptionBlock word={word} lang={lang} alone={written().forms.length <= 1} />}
             {!scene && (
               <>
                 {meanings && (

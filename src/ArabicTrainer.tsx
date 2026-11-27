@@ -14424,7 +14424,10 @@ export default function ArabicTrainer() {
      "fill the gap" put both up under one press, and a learner reported
      being shown two hints. Without a meaning to give, the nudge is the
      pronunciation, as it always was. */
-  const hintValue = !phraseHint && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
+  /* A description's English is English, so a course that shows none
+     offers none behind the nudge either (0.691). */
+  const hintHidden = !!(spec && spec.hintField === "descEn" && englishModeFor(exercise ? String(exercise.id || "") : "") === "hidden");
+  const hintValue = !phraseHint && !hintHidden && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
   const hintAt = phraseHint || hintValue;
   const hintShown = !!hintAt && !!hintOpen;
   /* And the case that costs an answer its good mark: right, but written
@@ -14993,7 +14996,9 @@ export default function ArabicTrainer() {
    */
   const alsoField = useMemo(() => {
     if (!spec || !item) return "";
-    if (spec.hintField) return spec.hintField;
+    /* A description's English is about the description, not the word:
+       once answered, the word's own third field is the one worth having. */
+    if (spec.hintField && spec.hintField !== "descEn") return spec.hintField;
     return (
       ["lat", "en"].find(
         (f) => f !== spec.promptField && f !== spec.answerField && item[f],
@@ -16988,6 +16993,11 @@ export default function ArabicTrainer() {
                     ) : spec.promptField === "context" && checked && filledGap ? (
                       /* Put back, with the word that went in marked. */
                       <Filled parts={filledGap} lang={qLang} name="question-prompt-text" />
+                    ) : spec.promptField === "desc" ? (
+                      /* A description, in the language itself: a phrase
+                         in the script, set the way a phrase with a gap
+                         is (0.691). */
+                      <Field value={item.desc} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
                         /* The phrase can go between building the queue and

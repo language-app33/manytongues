@@ -4269,6 +4269,35 @@ test("anything that is not a picture, or too large a one, is refused as an image
   assert.equal(unnamed.json.error, "bad-hash");
 });
 
+/* A word's description in the language itself, and its English (0.691):
+   kept on the card's own word, trimmed and capped, and never on a
+   sentence. See src/description.ts. */
+test("a word keeps its description and its English on its own word, and a sentence keeps none", async () => {
+  const teacher = await anAdmin("Dalia");
+  const save = (/** @type {any} */ card) =>
+    api("/api/courses?action=save-card", { method: "POST", key: teacher.key, body: { card: { id: "", lang: "ar-PS", ...card }, decks: [] } });
+  const word = await save({
+    forms: [
+      { ar: "مخبز", en: "bakery", lat: "makhbaz", desc: "  محل بنشتري منه خبز  ", descEn: " where we buy bread " },
+      { ar: "مخابز", en: "bakeries", lat: "makhaabiz", desc: "not on a second form" },
+    ],
+  });
+  assert.equal(word.status, 200, word.text);
+  const forms = word.json.card.forms;
+  assert.equal(forms[0].desc, "محل بنشتري منه خبز", "trimmed");
+  assert.equal(forms[0].descEn, "where we buy bread");
+  assert.equal(forms[1].desc, undefined, "only on the card's own word");
+
+  const long = await save({ forms: [{ ar: "بيت", en: "house", lat: "beet", desc: "ب".repeat(500), descEn: "only with a description" }] });
+  assert.equal(long.json.card.forms[0].desc.length, 240, "capped");
+  const english = await save({ forms: [{ ar: "بيت", en: "house", lat: "beet", descEn: "no description" }] });
+  assert.equal(english.json.card.forms[0].descEn, undefined, "no English without a description");
+
+  const sentence = await save({ sentence: true, forms: [{ ar: "بدي {{x}}", en: "I want {{x}}", lat: "", desc: "جملة" }] });
+  assert.equal(sentence.status, 200, sentence.text);
+  assert.equal(sentence.json.card.forms[0].desc, undefined, "a sentence has none");
+});
+
 test("a card keeps up to four images on each form, and says when it cut some", async () => {
   const teacher = await anAdmin("Rawan");
   const img = (/** @type {number} */ n) => String(n).padStart(64, "a");

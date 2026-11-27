@@ -21,6 +21,7 @@
  * trainer); nothing else decides whether an exercise is allowed.
  */
 
+import { DESC_TYPES, descriptionAsked } from "./description.ts";
 import { EX, levelOf } from "./languages.ts";
 
 export type PracticeMode = "with" | "little" | "none" | "custom";
@@ -44,11 +45,11 @@ export const usesEnglish = (type: string): boolean => ENGLISH_TYPES.includes(typ
 
 /*
  * What can teach a word's meaning without English: a picture, a recording,
- * a phrase or a scene. A form whose only questions without English need
+ * a phrase, a scene, or a description in the language itself (0.691). A form whose only questions without English need
  * none of these (writing it from its transliteration, say) has nothing but
  * English to teach it, and in a *No translation* course is not asked.
  */
-const TEACHING_NEEDS = ["images", "recs", "contexts", "contextAudio", "dialog", "line"];
+const TEACHING_NEEDS = ["images", "recs", "contexts", "contextAudio", "dialog", "line", "desc"];
 const teaches = (type: string): boolean => {
   const spec = EX[type];
   return !!spec && (spec.needs || []).some((n: string) => TEACHING_NEEDS.includes(n));
@@ -141,7 +142,7 @@ type CardLike = {
   sentence?: boolean;
   lines?: unknown[];
   uses?: string[];
-  forms?: { ar?: string; en?: string; lat?: string; clips?: unknown[]; slowClips?: unknown[]; images?: unknown[] }[];
+  forms?: { ar?: string; en?: string; lat?: string; clips?: unknown[]; slowClips?: unknown[]; images?: unknown[]; desc?: string }[];
   subs?: unknown[];
 };
 
@@ -160,6 +161,7 @@ function roughlySupported(c: CardLike, usedByPhrase: boolean): string[] {
   if (any("clips")) out.push("recmatch", "rec2ar", ...(f.en ? ["rec2en"] : []), ...(any("images") ? ["rec2img"] : []));
   if (any("images")) out.push("img2pick", "img2ar");
   if (usedByPhrase) out.push("ctx2pick", "ctx2ar");
+  if (descriptionAsked(c)) out.push(...DESC_TYPES);
   return out;
 }
 

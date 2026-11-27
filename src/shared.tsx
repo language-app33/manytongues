@@ -5,6 +5,7 @@
  * being parsed by every student on every launch.
  */
 
+import { descriptionAsked, storedDescription } from "./description.ts";
 import { modulesForSystem } from "./number-modules.ts";
 import { installHow } from "./install-steps.ts";
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
@@ -5543,7 +5544,14 @@ export function cardToItem(card: Card, moduleTitle: string, courseId: string, mo
   }
   const forms = (lead ? [lead] : [])
     .concat(joined.forms.map(({ at, ...f }) => ({ f, id: String(at) })))
-    .map(({ f, id }) => ({ ...formOf(f, id), ...(copies[id] ? { joinedFrom: copies[id] } : null) }));
+    .map(({ f, id }) => ({
+      ...formOf(f, id),
+      ...(copies[id] ? { joinedFrom: copies[id] } : null),
+      /* The card's description and its English, on its own word, where it
+         is asked: a word or phrase with one form (0.691). Kept off a card
+         with more, which the editor says is not asked. */
+      ...(id === localIdFor(card.id) && descriptionAsked(card as any) ? storedDescription(f) : null),
+    }));
 
   /* A conversation's turns, which are forms with a speaker on them. Named
      the way the other forms are, so a line keeps its progress across a

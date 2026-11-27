@@ -34,6 +34,7 @@ import { partsNow } from "../../src/numbers/types.ts";
 import { migrateCards } from "../../src/numbers/migrate.ts";
 import { liftSubtypeTagsIn } from "../../src/subtype-tags.ts";
 import { tickCapitals } from "../../src/capitals.ts";
+import { storedDescription, takesDescription } from "../../src/description.ts";
 /* A course's path (0.613): every rule of it is in path.ts, read here the
    way the app reads it. */
 import { countingCards, drawsFrom, isLiveIn, neverAskedAlone, unitProblems } from "../../src/path.ts";
@@ -3504,7 +3505,7 @@ async function handle(req) {
            */
           forms: formsOf(card)
             .slice(0, 65)
-            .map((/** @type {Record<string, any>} */ f) => ({
+            .map((/** @type {Record<string, any>} */ f, /** @type {number} */ fi) => ({
               /* What this form is called, for as long as anything points at
                  it — a cell of the table it carries, and a student's
                  schedule for it. Stored where the client sends one and
@@ -3569,6 +3570,12 @@ async function handle(req) {
                  empty on a form with none, which is every form written before
                  a card could carry one. */
               ...(imageList(f.images).length ? { images: imageList(f.images) } : {}),
+              /* Its description in the language itself, and that
+                 description's English, where the teacher wrote one — see
+                 src/description.ts. On the card's own word, and only on a
+                 word or phrase: a sentence or a scene has none. Absent
+                 where empty, which is every form written before 0.691. */
+              ...(fi === 0 && takesDescription(card) ? storedDescription(f) : {}),
             })),
           /* Which word cards this one teaches by containing them. A phrase
              the teacher recorded is a context for the words inside it, and

@@ -8,6 +8,35 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.691 — 27 November 2026
+
+**A word can have a description, in the language itself.** A word or phrase
+card has a new Description box: on the Basic tab of a basic card, and on the
+Advanced tab of an advanced one (ticking "Build an advanced card" carries it
+across). Write a few words saying what the word is, without the word and
+without English: المكان اللي بنعيش فيه for بيت. Underneath, an optional
+English translation of the description. Sentences and scenes don't have one.
+
+- If the description uses the word itself, a line under it says it gives the
+  answer away. It can still be saved.
+- On a card with more than one form, such as a verb's table or a noun's
+  plural, the description is kept but not used in exercises, and the editor
+  says so.
+- Changing a description is a change like any other: students keep the
+  published card until the change is published.
+
+**Two new exercises use it.** *Description → choose*: the description is
+shown and the student picks the word out of four. It stands with the other
+"which word is it" exercises, on the second level. *Description → Arabic*
+(or Vietnamese): the student writes the word, at the top level beside
+English → Arabic. In both, the ? button shows the description's English, if
+there is one and the course shows English, and taking it costs nothing. In
+a course set to No translation, a description counts as teaching the word,
+so a word with one is still asked.
+
+To check on a phone: how a long description wraps above the four choices,
+and with the keyboard open on the writing exercise.
+
 ## 0.690 — 26 November 2026
 
 **Three dots open the same panel everywhere.** The three dots on a module's
