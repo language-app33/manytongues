@@ -10,9 +10,15 @@ and moves once per batch of work you would notice, not once per commit.
 
 ## 0.692 — 27 November 2026
 
-**Admin › Modules tiles use the three dots too.** Each module's Delete
-button there has moved behind three dots that open the same panel as in
-Material, headed with the module's name. Delete still asks first.
+**One action on a tile is a button; two or more are behind three dots.**
+A tile with a single thing to do shows that one button. A tile with
+several shows three dots that open the panel of them. So Admin › Modules
+keeps its Delete button on each tile, and Material and My space keep their
+three dots. Delete still asks first.
+
+**A tile's buttons have no outline.** The three dots and a tile's own
+button are now plain icons, with a soft background only while pressed or
+pointed at, so they stand back from the tile's title.
 
 ## 0.691 — 26 November 2026
 

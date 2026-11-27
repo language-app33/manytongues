@@ -3420,12 +3420,13 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         {`${d.ownerName} · ${moduleSize(d)}`}
                       </>
                     }
-                    /* Behind three dots, as on Material's tiles (0.692):
-                       the app's one panel of actions on a thing. */
+                    /* Its one action, Delete, as its own button: the dots
+                       are for two or more (0.692, the owner's rule). */
                     actions={
                       <MoreMenu
                         label={`More for ${d.title}`}
                         title={d.title}
+                        onTile
                         items={[{
                           label: `Delete ${moduleKind(d)}`,
                           icon: "delete",
@@ -10874,7 +10875,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           <MoreMenu
                             label={`More for ${d.title}`}
                             title={d.title}
-                            ghost
+                            onTile
                             items={[
                               { label: `Export ${moduleKind(d)}`, icon: "download", onClick: () => exportModules([d.id]) },
                               /* A My space deck into the space (0.549; 2a, 9b, 10a). */

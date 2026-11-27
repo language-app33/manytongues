@@ -841,7 +841,7 @@ export function ComponentGallery() {
       <Row
         name="MoreMenu"
         what="Three dots that open the app's one context menu: a sheet of actions, named for what it acts on."
-        note="For the less used actions on a tile or a list — a module's Export and Delete, a list's Import — out of the way of the one it is for. The sheet is the one a saved session's dots open: up from the foot of a phone, in the middle of a wide screen, a SheetAction per row. title heads it; items is [{ label, icon, danger, note, disabled, onClick }]; anything falsy is left out. Its clicks stop at it, so a tile it sits on does not open too."
+        note="For the less used actions on a tile or a list — a module's Export and Delete, a list's Import — out of the way of the one it is for. The sheet is the one a saved session's dots open: up from the foot of a phone, in the middle of a wide screen, a SheetAction per row. title heads it; items is [{ label, icon, danger, note, disabled, onClick }]; anything falsy is left out. On a tile (onTile), a single action is drawn as its own button instead, and both kinds are ghosts without a stroke. Its clicks stop at it, so a tile it sits on does not open too."
       >
         <V label="press it">
           <MoreMenu

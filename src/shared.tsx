@@ -2434,13 +2434,18 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
  * it acts on, a row per action. A thumb reaches it, and a tile at the foot
  * of the screen cannot cut it off, which a menu hanging from the dots did.
  *
+ * On a tile (`onTile`, 0.692, the owner's rule), one action is not worth a
+ * panel: it is drawn as its own button on the tile, and only two or more
+ * go behind the dots. Either way the button is a ghost without its stroke,
+ * so a tile's buttons stand back from the tile's own words.
+ *
  * Its clicks stop at it, so a tile it sits on does not open as well.
  * Items are { label, icon, danger, note, disabled, onClick }; anything
  * falsy is left out, so an action that only some things have is written in
  * place with `&&`.
  */
 type MoreItem = { label: string; icon: string; danger?: boolean; note?: string; disabled?: boolean; onClick: () => void };
-export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
+export function MoreMenu({ label = "More", title, lede, items, ghost = true, onTile = false }: {
   /** What the button is called, to a screen reader and on hover. */
   label?: string;
   /** The panel's heading: the thing it acts on. */
@@ -2449,16 +2454,35 @@ export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
   lede?: string;
   items: (MoreItem | null | false | undefined)[];
   ghost?: boolean;
+  /** On a tile: one action is its own button, and the buttons have no
+      stroke. */
+  onTile?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const shut = useCallback(() => setOpen(false), []);
   const live = items.filter(Boolean) as MoreItem[];
   if (!live.length) return null;
+  if (onTile && live.length === 1) {
+    const only = live[0];
+    return (
+      <div className="at-morewrap" onClick={(e) => e.stopPropagation()}>
+        <IconButton
+          icon={only.icon}
+          label={only.label}
+          danger={only.danger}
+          disabled={only.disabled}
+          ghost
+          className="at-tileact"
+          onClick={only.onClick}
+        />
+      </div>
+    );
+  }
   return (
     <div className="at-morewrap" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${open ? " on" : ""}`}
+        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${onTile ? " at-tileact" : ""}${open ? " on" : ""}`}
         title={label}
         aria-label={label}
         aria-haspopup="dialog"
