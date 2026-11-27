@@ -5,7 +5,7 @@
  * 16.4, and the build cannot rewrite one: it hands it over as it is. One
  * such pattern anywhere in the bundle and the app does not start there at
  * all — a blank page, with no message, which is what every iPhone on iOS
- * 16.3 or older got until 0.728 (docs/AUDIT-safari-ios.md). The build
+ * 16.3 or older got until 0.730 (docs/AUDIT-safari-ios.md). The build
  * rewrites newer syntax for older browsers but not this, so it is checked
  * here, in the source.
  */

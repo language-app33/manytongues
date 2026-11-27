@@ -252,7 +252,7 @@ const swap = (text: string, at: number, end: number, put: string): string => tex
 /* The pronouns English names the table's persons with, as the words
    stand: "you (f)" with its note, or "you" without. */
 /* What stands before the word is matched and stepped over, not looked
-   back at (0.728): Safari before 16.4 cannot read a look-behind, and a
+   back at (0.730): Safari before 16.4 cannot read a look-behind, and a
    pattern it cannot read stopped the whole app from starting there. */
 const PRONOUN = /(^|[^\p{L}\p{N}'’])(i|you|he|she|we|they|me|him|her|us|them)(\s*\((?:m|f|pl|f pl)\))?(?![\p{L}\p{N}'’])/giu;
 interface Pronoun { at: number; end: number; said: string; word: string; noted: boolean }

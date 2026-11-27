@@ -106,7 +106,7 @@ under the keyboard. Same component, different amount of content.
 An emulated iPhone in Playwright is Chromium with an iPhone's size and
 name. It shows the app's layout; it says nothing about what Safari's
 engine makes of the code. For that there is `scripts/webkit-driver.mjs`
-(0.728), which drives WebKitGTK, the same engine built for Linux, with
+(0.730), which drives WebKitGTK, the same engine built for Linux, with
 real clicks:
 
 ```bash

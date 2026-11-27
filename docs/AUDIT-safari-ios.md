@@ -1,4 +1,4 @@
-# Audit: Safari and iOS browsers (0.728)
+# Audit: Safari and iOS browsers (0.730)
 
 Whether the app works in Safari on an iPhone, iPad and Mac, and in the
 other browsers on iOS, which are all Safari's engine underneath.

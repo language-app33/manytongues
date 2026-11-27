@@ -1,5 +1,5 @@
 // @ts-nocheck — a harness run by hand, not part of the app.
-// The app in a real WebKit, the engine Safari is built on (0.728; see
+// The app in a real WebKit, the engine Safari is built on (0.730; see
 // docs/DEBUGGING-on-a-phone.md, "A real WebKit"). Chromium made to look like
 // an iPhone is still Chromium: it says nothing about what Safari's engine
 // makes of the code. This drives WebKitGTK through its WebDriver, which

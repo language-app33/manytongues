@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.728 — 27 November 2026
+## 0.730 — 27 November 2026
 
 **The app opens on older iPhones and iPads.** On Safari older than 16.4
 (an iPhone or iPad on iOS 16.3 or earlier, or a Mac not updated since
@@ -26,6 +26,63 @@ Both came out of a check of the whole app in Safari's own engine
 (`docs/AUDIT-safari-ios.md`). Practising, the tabs and the teacher's card
 screens ran in it without a fault, in a private window too.
 
+## 0.729 — 27 November 2026
+
+**Every module says what kind it is, by its name.** In Teaching › Material
+› Modules, each tile now has a small outlined badge right after the
+module's name: **Deck**, **Unit** or **Personal set**. The words "Unit"
+and "Personal set" are gone from the line under the name, which now says
+only what needs looking at, who can see the module, and its score. On a
+phone, a long name pushes the badge onto the next line. Other lists of
+modules, such as a course's, are unchanged for now.
+
+
+## 0.728 — 27 November 2026
+
+**A simpler bar above every list.** Teaching › Material › Cards had two
+rows of controls over its cards; now it has one, and every list in the app
+that uses the same bar changes with it.
+
+- **One row:** a green **+** for a new card, the search box, **Filter** and
+  three dots. On a phone the + is the button on its own; on a wider screen
+  it still says New card.
+- **A quiet line under it** says how many cards there are and the order
+  they are in ("14 cards · Newest changes"), with the grid/table switch at
+  its end. Tap the order to change it.
+- **Sort and Filter open in the panel from the foot of the screen**, like
+  every other menu, instead of pushing the list down.
+- **Filters take effect as you tick them.** The panel's button counts along
+  ("Show 5 cards") and just closes it.
+- **Sorting waits for Apply.** Close the Sort panel any other way and the
+  order stays as it was. The order's words now fit what is being sorted:
+  "Newest first" for dates, "With first" for recordings, "Most first" for
+  forms.
+- **While the list is filtered**, the line reads "5 of 14" with **Clear**,
+  and each filter that is on is a chip in a row you can swipe sideways. Tap
+  a chip's cross to take just that filter off.
+- **Select is in the three dots.** On a list where it would be the only
+  thing there, such as People, it is its own button. On a phone or tablet,
+  **pressing and holding a card** also starts selecting, with that card
+  ticked.
+- **While selecting**, the search box and Filter stay, so you can narrow the
+  list and tick what is left; ticks survive a search. A cross ends it, and
+  the line says "3 selected" with Select all.
+- **One Actions button** at the foot replaces the tray of seven buttons. It
+  opens a panel listing every action, each with its own picture, Delete
+  last. Delete still asks first.
+- Inside a module, **Add existing cards** says "to this deck" (or unit, or
+  personal set) where there is room.
+
+Trade-offs: Select and Import are one press further away; New card is an
+icon on a phone; a new order needs Apply; each bulk action is one press
+further.
+
+To check by hand: on an iPhone and on Android, that holding a card starts
+selecting without the phone's own text-selection or link menu appearing;
+that the Filter panel scrolls smoothly with its button in view, including
+with the keyboard open after searching; that the row of chips swipes
+sideways without moving the page; and that the bar at the foot clears the
+phone's home indicator.
 ## 0.727 — 27 November 2026
 
 **An empty course offers one button, not two.** In a course's Modules
