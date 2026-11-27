@@ -130,10 +130,12 @@ import {
   cardWords,
   clipped,
   CheckList,
+  ChipPick,
   ClipList,
   clipHashes,
   ConfirmModal,
   RadioGroup,
+  Switch,
   Field,
   formHasAudio,
   FilterMenu,
@@ -1929,11 +1931,14 @@ const MODE_LABEL: Record<PracticeMode, string> = {
   none: "No translation",
   custom: "Custom",
 };
-/* What each preset does, in one line under the choice (0.708). */
+/* What each preset does (0.708); since 0.734 always under its own row, so
+   a teacher reads all four before a tap that changes what students get. */
 const MODE_SAYS: Record<PracticeMode, string> = {
   with: "Students see English in questions and answers.",
   little: "Students see English only where a card needs it.",
-  none: "No English: pictures, sound and the language itself.",
+  /* "only" since 0.734 (the owner's wording): this is the whole of what
+     students get, not a list of extras. */
+  none: "No English: only pictures, sound and the language itself.",
   custom: "Choose each exercise yourself.",
 };
 
@@ -2102,6 +2107,11 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
   const now: CoursePractice = readPractice(course.practice) || { mode: "with", off: [] };
   const [asking, setAsking] = useState<{ next: CoursePractice; n: number } | null>(null);
   const [showUntaught, setShowUntaught] = useState(false);
+  /* Which groups are open under a preset (0.734): all shut to begin with,
+     and shut again when the preset changes, so what opens is what was
+     asked about under this one. */
+  const [opened, setOpened] = useState<Set<number>>(() => new Set());
+  useEffect(() => setOpened(new Set()), [now.mode]);
   const untaught = useMemo(() => untaughtWithoutEnglish(cards), [cards]);
   /* The exercises this course's language words, by level. A type the pack
      has no wording for is not one its cards can be asked. */
@@ -2136,18 +2146,20 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           What students in this course are asked. Phones on an older version of the app ask everything until they update.
         </span>
       </div>
-      <div className="at-practice-modes">
-      <Segmented
-        size={null}
+      {/* Four rows, each saying what it does, with a mark on the chosen
+          one (0.734, the owner's 6a): every tap changes what students get,
+          so each choice explains itself before it is made. */}
+      <RadioGroup
+        name={`practice-mode-${course.id}`}
         label="How much English"
-        disabled={busy}
-        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m] }))}
+        quiet
         value={now.mode}
-        onChange={(mode) => mode !== now.mode && ask({ mode, off: now.off })}
+        onChange={(mode) => {
+          if (busy) return;
+          if (mode !== now.mode) ask({ mode, off: now.off });
+        }}
+        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m], note: MODE_SAYS[m] }))}
       />
-      </div>
-      {/* What the chosen preset does, in a line (0.708). */}
-      <Help>{MODE_SAYS[now.mode]}</Help>
       {/* Switches set under an earlier Custom choice still apply. */}
       {now.mode !== "custom" && now.off.length > 0 && (
         <Help>
@@ -2167,36 +2179,90 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           {untaught.map((c) => <li key={c.id}>{word(c)}</li>)}
         </ul>
       )}
-      {/* The switches one by one, only under Custom (0.708). */}
-      {now.mode === "custom" && byLevel.map(([level, types]) => (
-        <div key={level} className="at-practice-level">
-          <div className="at-practice-levelname">{LEVEL_NAME[level] || `Level ${level}`}</div>
-          {types.map((t) => {
-            const s = switchOf(now, t);
-            const locked = now.mode !== "custom" && usesEnglish(t);
-            const spec = lang ? exOf(t, lang) : null;
+      {/* Under a preset, what it asks, a group at a time (0.734, the
+          owner's 7a): a fixed label over the four groups, each folded with
+          its count, opening to read — the preset decides, so no switches. */}
+      {now.mode !== "custom" && (
+        <div className="at-field at-practice-asks">
+          <label className="at-label">What this asks</label>
+          {byLevel.map(([level, types]) => {
+            const on = types.filter((t) => switchOf(now, t) !== "off").length;
+            const open = opened.has(level);
+            const name = LEVEL_NAME[level] || `Level ${level}`;
             return (
-              <div key={t} className={`at-practice-row${locked ? " locked" : ""}`}>
-                <span className="grow">
-                  {(spec && spec.label) || t}
-                  {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
-                </span>
-                {locked ? (
-                  <span className="at-practice-lockword">{s === "on" ? "On" : s === "off" ? "Off" : "Where needed"}</span>
-                ) : (
-                  <Segmented
-                    label={(spec && spec.label) || t}
-                    disabled={busy}
-                    options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
-                    value={s === "off" ? "off" : "on"}
-                    onChange={(v) => flip(t, v === "on")}
-                  />
-                )}
+              <div key={level} className="at-practice-group">
+                <button
+                  type="button"
+                  className="at-practice-fold"
+                  aria-expanded={open}
+                  onClick={() =>
+                    setOpened((was) => {
+                      const next = new Set(was);
+                      if (next.has(level)) next.delete(level);
+                      else next.add(level);
+                      return next;
+                    })
+                  }
+                >
+                  <b>{name}</b>
+                  <span className="at-practice-foldcount">{`${on} of ${types.length} on`}</span>
+                  <Icon name={open ? "chevronUp" : "chevronDown"} size={18} />
+                </button>
+                {open &&
+                  types.map((t) => {
+                    const s = switchOf(now, t);
+                    const spec = lang ? exOf(t, lang) : null;
+                    return (
+                      <div key={t} className="at-practice-row">
+                        <span className="grow">
+                          {(spec && spec.label) || t}
+                          {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
+                        </span>
+                        {s === "on" ? (
+                          <span className="at-practice-state on" aria-label="On" title="On">
+                            <Icon name="check" size={18} />
+                          </span>
+                        ) : s === "off" ? (
+                          <span className="at-practice-state off" aria-label="Off" title="Off">
+                            –
+                          </span>
+                        ) : (
+                          <span className="at-practice-state where">Where needed</span>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             );
           })}
         </div>
-      ))}
+      )}
+      {/* Under Custom every group open, each exercise one sliding switch
+          (0.734, the owner's 7a; it was an OFF / ON pair). */}
+      {now.mode === "custom" && byLevel.map(([level, types]) => {
+        const on = types.filter((t) => switchOf(now, t) !== "off").length;
+        return (
+          <div key={level} className="at-practice-level">
+            <div className="at-practice-levelname">
+              <span>{LEVEL_NAME[level] || `Level ${level}`}</span>
+              <span>{`${on} of ${types.length}`}</span>
+            </div>
+            {types.map((t) => {
+              const s = switchOf(now, t);
+              const spec = lang ? exOf(t, lang) : null;
+              return (
+                <div key={t} className="at-practice-row">
+                  <span className="grow">
+                    {(spec && spec.label) || t}
+                    {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
+                  </span>
+                  <Switch on={s !== "off"} label={(spec && spec.label) || t} disabled={busy} onChange={(v) => flip(t, v)} />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
       {asking && (
         <ConfirmModal
           title={`${plural(asking.n, "card")} would have no questions`}
@@ -7622,7 +7688,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       label: "Kind",
       value: cardFilter.kinds.length ? "some" : "any",
       quiet: "any",
-      wide: true,
       chip: CARD_KINDS.filter((k) => cardFilter.kinds.includes(k.id)).map((k) => k.label).join(", "),
       onReset: () =>
         setCardFilter((f) => ({
@@ -7631,21 +7696,22 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           subtypes: NO_CARD_FILTER.subtypes,
           sceneKinds: NO_CARD_FILTER.sceneKinds,
         })),
-      /* Ticked rather than pressed, because several at once is the point:
-         words and sentences, without the scenes. A kind's subtypes are
-         offered under it once it is ticked, and only then — "verbs" says
-         nothing about a sentence. */
+      /* Chips, several at once (0.734, the owner's 3a): words and
+         sentences, without the scenes. A kind's subtypes are offered under
+         it once it is lit, and only then — "verbs" says nothing about a
+         sentence. Nothing lit narrows nothing, so no line says so. */
       custom: (
         <div className="at-kindfilter">
-          <CheckList
-            options={CARD_KINDS.map((k) => ({ id: k.id, title: k.label, note: kindCounts.get(k.id) || 0 }))}
+          <ChipPick
+            label="Kind"
+            options={CARD_KINDS.map((k) => ({ value: k.id, label: k.label, note: kindCounts.get(k.id) || 0 }))}
             chosen={cardFilter.kinds}
             onToggle={(id, on) =>
               setCardFilter((f) => ({
                 ...f,
                 kinds: on ? f.kinds.filter((x) => x !== id) : f.kinds.concat([id]),
                 /* A kind let go of takes its subtypes with it, so nothing
-                   out of sight is left narrowing the next time it is ticked. */
+                   out of sight is left narrowing the next time it is lit. */
                 subtypes: on && id === "word" ? [] : f.subtypes,
                 sceneKinds: on && id === "scene" ? [] : f.sceneKinds,
               }))
@@ -7654,8 +7720,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {cardFilter.kinds.includes("word") && (
             <>
               <p className="at-hint">Which words or phrases</p>
-              <CheckList
-                options={subtypesHere.map((t) => ({ id: t.id, title: t.label, note: t.n }))}
+              <ChipPick
+                label="Which words or phrases"
+                options={subtypesHere.map((t) => ({ value: t.id, label: t.label, note: t.n }))}
                 chosen={cardFilter.subtypes}
                 onToggle={(id, on) =>
                   setCardFilter((f) => ({
@@ -7669,10 +7736,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {cardFilter.kinds.includes("scene") && (
             <>
               <p className="at-hint">Which scenes</p>
-              <CheckList
+              <ChipPick
+                label="Which scenes"
                 options={[
-                  { id: "text", title: "Text", note: kindCounts.get("scene:text") || 0 },
-                  { id: "conversation", title: "Conversation", note: kindCounts.get("scene:conversation") || 0 },
+                  { value: "text", label: "Text", note: kindCounts.get("scene:text") || 0 },
+                  { value: "conversation", label: "Conversation", note: kindCounts.get("scene:conversation") || 0 },
                 ]}
                 chosen={cardFilter.sceneKinds}
                 onToggle={(id, on) =>
@@ -7684,7 +7752,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               />
             </>
           )}
-          {!cardFilter.kinds.length && <p className="at-hint">Tick a kind. Until you do, this narrows nothing.</p>}
         </div>
       ),
     },
@@ -7736,7 +7803,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ? cardFilter.deckMode
         : "any",
       quiet: "any",
-      wide: true,
       chip: cardFilter.deckMode === "none"
         ? "In no module"
         : `${cardFilter.deckMode === "out" ? "Not in" : "In"} ${plural(cardFilter.deckIds.length, "module")}`,
@@ -7745,9 +7811,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          teacher has made, and several of them at once. */
       custom: (
         <div className="at-deckfilter">
-          <Segmented
-            size={null}
+          <ChipPick
             label="In or out of the chosen modules"
+            quiet="any"
             options={[
               { value: "any", label: "Any module" },
               { value: "in", label: "In these" },
@@ -7755,7 +7821,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               { value: "none", label: "In no module" },
             ]}
             value={cardFilter.deckMode}
-            onChange={(v) => setCardFilter((f) => ({ ...f, deckMode: v }))}
+            onChange={(v) => setCardFilter((f) => ({ ...f, deckMode: v as typeof f.deckMode }))}
           />
           {cardFilter.deckMode === "none" && (
             <p className="at-hint">Cards that are in no module at all, so no student sees them.</p>
@@ -7797,7 +7863,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          list than every card. */
       value: cardFilter.blankMode,
       quiet: "any",
-      wide: true,
       chip: pickedLabel(BLANK_SIDES, cardFilter.blankMode),
       onReset: () => setCardFilter((f) => ({ ...f, blankMode: NO_CARD_FILTER.blankMode, blankNames: NO_CARD_FILTER.blankNames })),
       /* Which blank is a list as long as the blanks a teacher has written,
@@ -7805,9 +7870,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          above it, learned once. */
       custom: (
         <div className="at-deckfilter">
-          <Segmented
-            size={null}
+          <ChipPick
             label="Which side of a blank a card is on"
+            quiet="any"
             options={BLANK_SIDES}
             value={cardFilter.blankMode}
             onChange={(v: string) => setCardFilter((f) => ({ ...f, blankMode: v }))}

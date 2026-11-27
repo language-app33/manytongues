@@ -113,9 +113,12 @@ const ICONS: Record<string, string> = {
     "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
   edit:
     "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  /* A funnel: Filter, everywhere (0.734, the owner's 4a). `tune` stays for
+     settings: the Exercises tab, a card's Advanced tab. */
+  filter: "M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39c.51-.66.04-1.61-.79-1.61H5.04c-.83 0-1.3.95-.79 1.61z",
   tune:
     "M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z",
-  /* Ordering a list. `tune` beside it is what
+  /* Ordering a list. `filter` beside it is what
      narrowing one looks like, so the three buttons over a card list read as
      three different jobs rather than three shades of the same one. */
   sort: "M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z",
@@ -2315,8 +2318,6 @@ export interface FilterGroup {
   options?: { value: string; label?: Node; note?: Node }[];
   /** Drawn instead of the buttons, where the choices are not a few. */
   custom?: Node;
-  /** A line of its own, for a group too wide to share one. */
-  wide?: boolean;
   /** What this group's chip says under a list's bar while it is narrowing
       — "Without recordings". Its label, where this is left out. */
   chip?: string;
@@ -2343,6 +2344,55 @@ export function narrowing(groups?: FilterGroup[]): number {
   return liveGroups(groups).filter((g) => g.quiet !== undefined && g.value !== g.quiet).length;
 }
 
+/**
+ * Chips to pick from (0.734, the owner's 2a and 3a). One of a few, or
+ * several: rounded, in ordinary letters, wrapping as they need.
+ *
+ * One at a time (`onChange`): the option that means "none" (`quiet`) is not
+ * drawn, because nothing lit already says it; pressing the lit chip goes
+ * back to it. Several (`onToggle`): each chip on or off by itself.
+ */
+export function ChipPick({ options, value, quiet, onChange, chosen, onToggle, label, disabled }: {
+  options: { value: string; label?: Node; note?: Node }[];
+  /** One at a time: the value picked, and the value that means "none". */
+  value?: string;
+  quiet?: string;
+  onChange?: (value: string) => void;
+  /** Several at once: the values picked. */
+  chosen?: string[];
+  onToggle?: (value: string, wasOn: boolean) => void;
+  /** Said to a screen reader for the group. */
+  label: string;
+  disabled?: boolean;
+}) {
+  const several = !onChange && !!onToggle;
+  const shown = several || quiet === undefined ? options : options.filter((o) => o.value !== quiet);
+  return (
+    <div className="at-chippick" role="group" aria-label={label}>
+      {shown.map((o) => {
+        const on = several ? (chosen || []).includes(o.value) : o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            className={`at-chipopt${on ? " on" : ""}`}
+            aria-pressed={on}
+            disabled={disabled}
+            onClick={() => {
+              if (several) onToggle && onToggle(o.value, on);
+              else if (!on) onChange && onChange(o.value);
+              else if (quiet !== undefined) onChange && onChange(quiet);
+            }}
+          >
+            {o.label ?? o.value}
+            {o.note !== undefined && o.note !== null ? <span className="at-chipnote">{o.note}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /*
  * A set of pickers over a list: how to order it, or what to leave out.
  *
@@ -2352,8 +2402,9 @@ export function narrowing(groups?: FilterGroup[]): number {
  * the disclosure belongs to ItemList, which draws the button and is the
  * only thing that can know which panel is open.
  *
- * Built from Segmented rather than a new control, because picking one of a
- * few is a thing this app already does one way.
+ * Built from ChipPick since 0.734: it was Segmented, with an "Any" option
+ * lit green in every group, so a list narrowing nothing looked as busy as
+ * one narrowed three ways.
  */
 export function FilterBar({ groups, note, onClear }: {
   groups?: FilterGroup[];
@@ -2378,19 +2429,18 @@ export function FilterBar({ groups, note, onClear }: {
         </div>
       ) : null}
       {live.map((g) => (
-        <div className={`at-filtergroup${g.wide ? " wide" : ""}`} key={g.key}>
+        <div className="at-filtergroup" key={g.key}>
           <span className="at-filterlabel">{g.label}</span>
-          {/* Full width: a filter group is a narrow column, and some of
-              these option sets are long — "Least first", "Recordings".
-              Compact would take the width the labels want and hang off
-              the side of the bar. */}
+          {/* Chips, every group full width (0.734, the owner's 2a and 3a):
+              no "Any" to press, since nothing lit is what narrows nothing,
+              so green says one thing — this is narrowing the list. */}
           {g.custom || (
-            <Segmented
+            <ChipPick
               options={g.options || []}
               value={g.value}
+              quiet={g.quiet}
               onChange={g.onChange || (() => {})}
-              label={g.label}
-              size={null}
+              label={g.label || ""}
             />
           )}
         </div>
@@ -2413,7 +2463,7 @@ export function FilterBar({ groups, note, onClear }: {
  * Options are { value, label, note }, and `quiet` is the value that means
  * "everything" — usually the first one.
  */
-export function FilterMenu({ icon = "tune", label, options, value, onChange, quiet = "" }: {
+export function FilterMenu({ icon = "filter", label, options, value, onChange, quiet = "" }: {
   icon?: string;
   label?: string;
   options?: { value: string, label?: Node, note?: Node }[];
@@ -2629,32 +2679,34 @@ function SortSheet({ sort, onClose }: { sort: ListSort; onClose: () => void }) {
   const opt = sort.options.find((o) => o.value === value) || sort.options[0];
   return (
     <PickSheet title="Sort" className="at-footsheet at-sortsheet" onClose={onClose}>
+      {/* Rows with a mark for what to sort by, and one two-part switch
+          under them for which way, in ordinary letters (0.734, the
+          owner's 1a). Still a draft until Apply. */}
       <div className="at-sheetbody">
-        <FilterBar
-          groups={[
-            {
-              key: "by",
-              label: "Sort by",
-              value,
-              onChange: setValue,
-              options: sort.options.map((o) => ({ value: o.value, label: o.label })),
-            },
-            {
-              key: "order",
-              label: "Order",
-              value: down ? "down" : "up",
-              onChange: (v) => setDown(v === "down"),
-              /* In the words of the one picked above, so they change as it
-                 does: "Newest first" is wrong about a count of forms. */
-              options: opt
-                ? [
-                    { value: "down", label: opt.down },
-                    { value: "up", label: opt.up },
-                  ]
-                : [],
-            },
-          ]}
+        <RadioGroup
+          name="list-sort-by"
+          label="Sort by"
+          value={value}
+          onChange={setValue}
+          options={sort.options.map((o) => ({ value: o.value, label: o.label }))}
         />
+        {opt ? (
+          <div className="at-field at-sortorder">
+            <span className="at-label">Order</span>
+            {/* In the words of the one picked above, so they change as it
+                does: "Newest first" is wrong about a count of forms. */}
+            <Segmented
+              size={null}
+              label="Order"
+              value={down ? "down" : "up"}
+              onChange={(v) => setDown(v === "down")}
+              options={[
+                { value: "down", label: opt.down },
+                { value: "up", label: opt.up },
+              ]}
+            />
+          </div>
+        ) : null}
       </div>
       <div className="at-sheetfoot">
         <Button
@@ -3103,7 +3155,7 @@ export function ItemList<T>({
               aria-expanded={sheet === "filter"}
               onClick={() => setSheet("filter")}
             >
-              <Icon name="tune" />
+              <Icon name="filter" />
               <span className="at-btnword">Filter</span>
               {filtering ? <span className="at-filtercount">{filtering}</span> : null}
             </button>
@@ -5113,6 +5165,32 @@ export function RadioGroup<T extends string>({ options, value, onChange, label, 
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * On or off, as one sliding switch (0.734, the owner's 7a). It replaced an
+ * OFF / ON pair on a course's Exercises tab, the only place that pair was
+ * used: two words for one fact read as two things to choose between.
+ */
+export function Switch({ on, onChange, label, disabled }: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={`at-switch${on ? " on" : ""}`}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+    >
+      <span />
+    </button>
   );
 }
 

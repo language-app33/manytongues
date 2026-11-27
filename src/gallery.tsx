@@ -31,6 +31,7 @@ import {
   CardReadout,
   CardTile,
   CheckList,
+  ChipPick,
   ClipList,
   ConfirmModal,
   Empty,
@@ -54,6 +55,7 @@ import {
   Section,
   Segmented,
   Stat,
+  Switch,
   Tabs,
   Tile,
   TileNote,
@@ -66,7 +68,7 @@ import {
    Icon itself: a name missing from here renders as a blank square, which is
    visible rather than silent. */
 const ICON_NAMES = [
-  "add", "search", "close", "delete", "edit", "tune", "sort", "size", "check",
+  "add", "search", "close", "delete", "edit", "tune", "filter", "sort", "size", "check",
   "back", "save", "folder", "cards", "person", "group", "key", "download",
   "verify", "play", "pause", "view", "select", "school", "copy", "refresh",
   "mic", "remove", "chevronDown", "chevronUp", "menu", "help", "theme",
@@ -660,6 +662,9 @@ export function ComponentGallery() {
   const [only, setOnly] = useState("any");
   const [maker, setMaker] = useState("");
   const [seg, setSeg] = useState("on");
+  const [chip, setChip] = useState("any");
+  const [chips, setChips] = useState<string[]>(["word"]);
+  const [switched, setSwitched] = useState(true);
   const [segBig, setSegBig] = useState("b");
   const [checked, setChecked] = useState(["one"]);
   const [tab, setTab] = useState("first");
@@ -789,21 +794,22 @@ export function ComponentGallery() {
       <Row
         name="FilterBar"
         what="The pickers a list's Sort or Filter panel holds: how to order it, or what to leave out."
-        note="ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips. Give a group a `quiet` value to say which setting counts as not narrowing; narrowing() counts the groups away from it, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the buttons, for a choice a few buttons cannot say; `wide` gives it a line of its own."
+        note="What the Filter panel holds since 0.734: each group full width, its choices ChipPick chips, with no Any — the group's `quiet` option is not drawn, and pressing the lit chip goes back to it. ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips under the bar. narrowing() counts the groups away from `quiet`, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the chips, for a choice a few chips cannot say. Sort no longer uses this: its panel is RadioGroup rows and a Segmented Order."
       >
         <V label="two groups" wide>
           <FilterBar
             note="3 of 12"
             groups={[
               {
-                key: "order",
-                label: "Sort",
+                key: "status",
+                label: "Status",
                 value: order,
                 onChange: setOrder,
                 quiet: "added",
                 options: [
-                  { value: "added", label: "Added" },
-                  { value: "changed", label: "Changed" },
+                  { value: "added", label: "Any" },
+                  { value: "changed", label: "Published" },
+                  { value: "waiting", label: "Waiting to publish" },
                 ],
               },
               {
@@ -926,6 +932,52 @@ export function ComponentGallery() {
           <Field label="A note" hint="Only you see this." optional>
             <input className="at-input" placeholder="Anything" readOnly />
           </Field>
+        </V>
+      </Row>
+
+      <Row
+        name="ChipPick"
+        what="Rounded chips in ordinary letters, wrapping as they need: one of a few, or several."
+        note="The Filter panel's choices (0.734). One at a time: value, onChange and `quiet`, the value meaning none, which is not drawn — pressing the lit chip goes back to it. Several: chosen and onToggle(value, wasOn). An option's note (a count) is drawn small after its label. label is what a screen reader says for the group."
+      >
+        <V label="one at a time, quiet left out" wide>
+          <ChipPick
+            label="Recordings"
+            quiet="any"
+            value={chip}
+            onChange={setChip}
+            options={[
+              { value: "any", label: "Any" },
+              { value: "with", label: "With" },
+              { value: "without", label: "Without" },
+              { value: "lost", label: "Missing" },
+            ]}
+          />
+        </V>
+        <V label="several, with counts" wide>
+          <ChipPick
+            label="Kind"
+            chosen={chips}
+            onToggle={(v, on) => setChips((c) => (on ? c.filter((x) => x !== v) : c.concat([v])))}
+            options={[
+              { value: "word", label: "Word or phrase", note: 42 },
+              { value: "sentence", label: "Sentence", note: 17 },
+              { value: "scene", label: "Scene", note: 3 },
+            ]}
+          />
+        </V>
+      </Row>
+
+      <Row
+        name="Switch"
+        what="On or off, as one sliding switch."
+        note="A course's Exercises tab under Custom (0.734), where it replaced an OFF / ON pair. role=switch with aria-checked; label names it. The button is padded to a 44px target around a 46×28 track."
+      >
+        <V label="press it">
+          <Switch on={switched} onChange={setSwitched} label="Match the pairs" />
+        </V>
+        <V label="disabled">
+          <Switch on={false} onChange={() => {}} label="Unavailable" disabled />
         </V>
       </Row>
 

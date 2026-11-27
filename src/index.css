@@ -735,6 +735,10 @@ button {
 .at-sheetfoot > .at-btn { width:100%; }
 /* In a sheet the pickers are the sheet's own, not a panel inside it. */
 .at-sheetbody > .at-filterbar { padding:0; border:0; background:none; }
+/* The Sort panel's Order (0.734, the owner's 1a): the one switch under the
+   rows, full width, in ordinary letters rather than the track's capitals. */
+.at-sortorder { margin-top:16px; }
+.at-sortorder .at-seg { text-transform:none; letter-spacing:0; font-size:15px; font-weight:700; }
 /* ---- pictures in practice ----
    The prompt: large enough to recognise the thing at a glance, its own
    shape inside a frame the height of a phrase prompt's worth of room. The
@@ -1100,7 +1104,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    any is. */
 .at-toolbar .at-filterbtn { position:relative; font-family: var(--ui); font-size:14px; font-weight:700; }
 .at-toolbar .at-filterbtn > .at-filtercount { position:absolute; top:-6px; right:-6px; }
-.at-filterbtn.on { border-color: var(--brass); color: var(--brass); }
+/* Green while any filter is on (0.734): the same green as a lit chip in
+   the panel, so green says one thing — this list is narrowed. */
+.at-filterbtn.on { border-color: var(--jade); color: var(--jade); background: var(--jade-bg); }
+.at-filterbtn.on > .at-filtercount { background: var(--jade); color: var(--onjade); }
 .at-filterbtn.open, .at-donebtn { border-color: var(--accent); color: var(--accent); }
 /* The screen's own worded button, on a row of its own over the bar. */
 .at-toolsrow { flex-wrap:wrap; }
@@ -1920,12 +1927,28 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
    its own to go on, it collapsed to nothing and its options spilled out
    over each other. A column gives it the group's width to work with, and
    the bar wraps the groups. */
-.at-filtergroup { display:flex; flex-direction:column; align-items:stretch; gap:6px;
-  flex:1 1 150px; min-width:0; }
-/* A group with a list in it rather than a few buttons — which decks a card
-   is in — takes the bar's whole width: shared with three others it would be
-   a column of ticks two words wide. */
-.at-filtergroup.wide { flex:1 1 100%; }
+/* Every group full width, one under another (0.734, the owner's 2a): its
+   chips wrap across the panel rather than squeezing into a column. */
+.at-filtergroup { display:flex; flex-direction:column; align-items:stretch; gap:8px;
+  flex:1 1 100%; min-width:0; }
+/* Chips (ChipPick): rounded, in ordinary letters, wrapping as they need.
+   Lit means narrowing; nothing lit narrows nothing. */
+.at-chippick { display:flex; flex-wrap:wrap; gap:8px; }
+.at-chipopt { display:inline-flex; align-items:center; gap:6px; min-height:36px;
+  padding:7px 12px; border:1px solid var(--line); border-radius:999px;
+  background: var(--surface); color: var(--text-soft);
+  font-family: var(--ui); font-size:14px; font-weight:700; letter-spacing:0; text-transform:none;
+  cursor:pointer; transition: background 120ms, color 120ms, border-color 120ms, transform 60ms; }
+/* Only where there is a real hover: on a phone it would stick to the chip
+   last tapped, and a chip just let go of would still look picked. */
+@media (hover: hover) {
+  .at-chipopt:hover:not(:disabled):not(.on) { color: var(--text); border-color: var(--text-soft); }
+}
+.at-chipopt.on { border-color: var(--jade); background: var(--jade-bg); color: var(--text); }
+.at-chipopt:active:not(:disabled) { transform: translateY(1px); }
+.at-chipopt:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-chipopt:disabled { cursor:default; opacity:.5; }
+.at-chipnote { font-size:12px; font-weight:600; color: var(--muted); }
 
 .at-kindfilter .at-hint, .at-deckfilter .at-hint { margin:0; }
 .at-deckfilter .at-ticklist { max-height:40vh; overflow-y:auto; }
@@ -3019,12 +3042,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    three labels where the button holds one, so an even split starved it
    and pushed its options to the smallest type they have. */
 .at-row > .at-segmented { flex:2 1 auto; }
-/* Beside its own label in the sort-and-filter bar, a picker is one item in
-   a wrapping row rather than a block of its own: it takes the width its
-   options need and the bar wraps around it. Left at full width it was
-   squeezed into whatever the group had left and stacked its options one
-   per line. */
-.at-filtergroup .at-segmented { width:auto; flex:0 1 auto; }
 /* --- Stat: one big number --- */
 .at-stat2 { display:block; }
 .at-stat2 .at-statvalue { font-family: var(--serif); font-size: var(--fs-stat); font-weight:600; line-height:1.05; margin:0; color: var(--text); }
@@ -3885,3 +3902,25 @@ p.at-pathhome { cursor:default; font-weight:700; }
 .at-pathunitstate { margin:0; color: var(--muted); font-size:13px; white-space:nowrap; }
 .at-pathunitstate i { font-style:normal; opacity:.75; }
 .at-unithead { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+
+/* --- Switch: on or off, sliding (0.734, the owner's 7a) ---
+   The track is 46×28; the button around it is padded to a 44px target so
+   a thumb does not have to find the track itself. */
+.at-switch { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  min-height:44px; min-width:46px; padding:8px 0; background:none; border:0; cursor:pointer; }
+.at-switch > span { position:relative; display:block; width:46px; height:28px; border-radius:999px;
+  background: var(--shade); transition: background 150ms; }
+.at-switch > span::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px;
+  border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition: transform 150ms; }
+.at-switch.on > span { background: var(--jade); }
+.at-switch.on > span::after { transform: translateX(18px); }
+.at-switch:focus-visible { outline:none; }
+.at-switch:focus-visible > span { outline:3px solid var(--brass); outline-offset:2px; }
+.at-switch:disabled { cursor:default; opacity:.5; }
+@media (prefers-reduced-motion: reduce) {
+  .at-switch > span, .at-switch > span::after { transition:none; }
+}
+
+/* Another accepted answer, as a worded link under the last box on a card's
+   Basic tab (0.734, the owner's 9a). */
+.at-addanswer { align-self:flex-start; margin-top:8px; font-weight:700; font-size:15px; min-height:32px; }
