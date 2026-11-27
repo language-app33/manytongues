@@ -2383,7 +2383,7 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(40);
 }
 
-/* ---- Courses, from the student's menu (0.692) ----
+/* ---- Courses, from the student's menu (0.693) ----
    It broke with "reading 'filter'" once the code said module: Learning
    still handed the screen its modules under the old name, and the screen
    got none. A course tile counting its modules is the proof it got them. */

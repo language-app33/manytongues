@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.692 — 27 November 2026
+## 0.693 — 27 November 2026
 
 **Courses opens again for students.** Learning › You › Courses showed
 "Something broke" (reading 'filter') for anyone in a course, since 0.687
@@ -18,6 +18,12 @@ each course counts its modules again. The type check now covers the props
 of every screen that loads on demand, so a rename missed on one side
 fails the build instead of the screen; it found one more such slip, in
 claiming super admin from Settings, which is mended too.
+
+## 0.692 — 27 November 2026
+
+**Admin › Modules tiles use the three dots too.** Each module's Delete
+button there has moved behind three dots that open the same panel as in
+Material, headed with the module's name. Delete still asks first.
 
 ## 0.691 — 26 November 2026
 
