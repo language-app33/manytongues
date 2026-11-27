@@ -135,7 +135,7 @@ const ICONS: Record<string, string> = {
     "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
   /* A folder with a plus or a minus on it, and a tag with one beside it:
      putting things into a module or taking them out, and tagging them or
-     untagging them, as rows of a selection's Actions panel (0.725) — where
+     untagging them, as rows of a selection's Actions panel (0.727) — where
      every row has a picture of its own, so two of them cannot both be a
      folder. */
   folderAdd:
@@ -2336,7 +2336,7 @@ export function narrowing(groups?: FilterGroup[]): number {
  * A set of pickers over a list: how to order it, or what to leave out.
  *
  * The pickers, not the button that opens them nor the panel they are in.
- * Since 0.725 ItemList puts them in the panel from the foot of the screen —
+ * Since 0.727 ItemList puts them in the panel from the foot of the screen —
  * Filter's live, as they are ticked, and Sort's as a draft until Apply — so
  * the disclosure belongs to ItemList, which draws the button and is the
  * only thing that can know which panel is open.
@@ -2573,7 +2573,7 @@ export function SheetAction({ icon, label, note, danger, disabled, on, onClick }
 
 /*
  * One way of ordering a list, as ItemList's Sort panel and the line under
- * its bar say it (0.725). `label` is its name in the panel ("Changed");
+ * its bar say it (0.727). `label` is its name in the panel ("Changed");
  * `down` and `up` are the two directions in the panel's words ("Newest
  * first", "Oldest first"); `saysDown` and `saysUp` are what the line over
  * the list says while it is in force ("Newest changes"). Four strings
@@ -2606,7 +2606,7 @@ export interface BulkAction {
 }
 
 /*
- * The Sort panel (0.725). It keeps its own draft of both choices and the
+ * The Sort panel (0.727). It keeps its own draft of both choices and the
  * list behind it does not move until Apply: the owner chose the word Apply
  * and chose that it mean what it says. Shut any other way — its cross,
  * Escape, a tap outside — and the draft goes with it. Mounted only while
@@ -2671,7 +2671,7 @@ const HOLD_SLOP = 10;
  * The standard list frame: one bar of controls, a quiet line under it, the
  * list, a slim bar at the foot while selecting, an empty state, and paging.
  *
- * The bar is one row since 0.725 (the owner's design): New, the search box,
+ * The bar is one row since 0.727 (the owner's design): New, the search box,
  * Filter and three dots. It was two, with Sort, Filter, Select and the view
  * button as a row of icons under the search box, and Sort and Filter opened
  * by pushing the list down the page. What changed and why:
@@ -2909,7 +2909,7 @@ export function ItemList<T>({
   const allShown = shown.length > 0 && shown.every((it) => picked.has(itemKey(it)));
 
   /*
-   * A finger held on a tile starts selecting, with that tile ticked (0.725)
+   * A finger held on a tile starts selecting, with that tile ticked (0.727)
    * — what a phone's own lists do, and the one way in that does not need
    * the three dots. Touch and pen only: a mouse has the dots in reach and
    * a held mouse button is somebody selecting text.
@@ -3291,7 +3291,7 @@ export function ItemList<T>({
       )}
 
       {/* The slim bar at the foot while anything is ticked: how many, and
-          one button for what can be done to them (0.725). It was a tray of
+          one button for what can be done to them (0.727). It was a tray of
           every action as a button, seven of them on the Cards tab, which
           covered half a phone's screen over the very cards being chosen. */}
       {selecting && picked.size > 0 && (

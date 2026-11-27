@@ -83,7 +83,8 @@ before building on a guess. When everything is clear, do not invent
 questions for the sake of asking; get on with it.
 
 Whenever there are questions for the owner, while brainstorming, before
-building or at any other point, ask them this way, every time:
+building or at any other point, ask them this way, every time (and in an
+artifact page rather than the chat, as the next section says):
 
 - Questions are numbered 1, 2, 3, and so on. Numbers are for questions only,
   never 1a or 1.1 for a question.
@@ -99,11 +100,49 @@ building or at any other point, ask them this way, every time:
   and a very short reason why — a sentence at most.
 - Concise and non-technical, in the same plain terms as above.
 
+## Questions and proposals go in an artifact, not in the chat
+
+**Whenever there are questions for the owner, or ideas, proposals or
+suggestions to put to them, publish them as an artifact page, every time,
+without being asked.** This covers every kind of work: new features,
+improvements, builds with something unclear in them, and bug fixes. It is a
+standing instruction from the repository's owner; only exceptional
+circumstances that make a page unfeasible (the artifact tool is not
+available, say) excuse it, and then say so.
+
+The one exception: **one or two short questions with nothing to show** may
+be asked in the chat, in the format above. If either question needs more
+than a line or two, or a picture would help, it goes in a page.
+
+What the page holds:
+
+- The same format as above: numbered questions or decisions, lettered
+  options, the recommended option marked with its very short reason.
+- **A picture wherever one is relevant.** A change the owner would see in
+  the app is shown as a realistic mock-up in the app's real look, at phone
+  size, one per option where the options look different. Anything else
+  (behaviour, order of steps, what is stored) gets a simple sketch, or
+  none if it would add nothing.
+- Under every question: the options as a choice the owner selects on the
+  page, including "none of these", and a box for a comment or note.
+- **One button that copies every answer and note to the clipboard** as a
+  short text ("1a, 2b: note…") the owner pastes back into the chat. It
+  must work on a phone, and show what was copied or that copying failed.
+- Selections and notes survive a reload of the page.
+
+Follow-up questions go in **a new version of the same page**, not a new
+page and not the chat: the earlier decisions stay on it, shown as settled
+with the owner's notes, and the new questions carry on the numbering.
+
+**When a page is shared, the chat message is extremely short**: a line
+saying what the page is for and how many questions it holds, and the link.
+Do not repeat the questions, the options or the reasoning in the chat.
+
 ## How to propose fixes
 
 Whenever there is more than one way to fix something, whether in answer to a
 question, in a plan, or offered unprompted, set them out the same way as
-questions, every time:
+questions, every time, and in an artifact page as the section above says:
 
 - Each thing to decide is numbered 1, 2, 3, running on across any headings.
 - The fixes for it are lettered a, b, c under it, one fix per letter, so

@@ -3387,7 +3387,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 empty={
                   moduleOwner
                     ? "Nothing by them. Choose Anyone to see every module again."
-                    : "No modules yet. Make one, then add it to a course so students can see it."
+                    : "No modules yet. Teachers make them in Teaching › Material, then add them to a course so students can see them."
                 }
                 match={(d, q) =>
                   d.title.toLowerCase().includes(q) ||
@@ -5997,7 +5997,7 @@ export const cardFormCount: (c: Card) => number = (c) => formsOf(c).length;
 export const cardAdded: (c: Card) => number = (c) => c.created || c.updated || 0;
 export const cardChanged: (c: Card) => number = (c) => c.updated || c.created || 0;
 
-/* Each order with the words the list says it in (0.725): `down` and `up`
+/* Each order with the words the list says it in (0.727): `down` and `up`
    are its two directions in the Sort panel, `saysDown` and `saysUp` what
    the line over the list reads while it is in force. "Most first" had
    been the word for every one of them, which was wrong about a date. */
@@ -6462,29 +6462,24 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
+/* Said at the top of an open word set (0.725, the owner's 3a): the Word
+   sets tab says what a set is, the set itself that it is shared. */
+const SHARED_SET = "Any teacher here can edit it.";
+
 /**
- * Modules, Cards and Word sets, inside Material and My space (0.550): the
- * line saying which side you are in, then their tab row (0.689, the
- * owner's wish: the line describes the whole page, not the tab under it).
- * One piece for both sides since 0.685 (the owner's 5a). Word sets is a
- * tab of its own since 0.689, left off where no language taught has one.
+ * Modules, Cards and Word sets, inside Material (0.550): their tab row.
+ * The line about My space being retired went with My space (0.725). Word
+ * sets is a tab of its own since 0.689, left off where no language taught
+ * has one.
  */
-function ModulesOrCards({ tab, onTab, mine, spaceName, withSets }: {
+function ModulesOrCards({ tab, onTab, withSets }: {
   tab: string;
   onTab: (key: string) => void;
-  /** My space, the teacher's own, rather than Material, the space's. */
-  mine: boolean;
-  spaceName: string;
   /** Whether any language switched on has a word set to write. */
   withSets: boolean;
 }) {
   return (
     <>
-      {mine && (
-        <Help className="at-mb3">
-          {`My space is being retired. Move what you want to keep to ${spaceName}, where you now make everything. Nothing here is deleted unless you delete it.`}
-        </Help>
-      )}
       <Tabs
         tabs={[
           ["decks", "Modules", "folder"],
@@ -7530,7 +7525,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * showing only cards with recordings opens showing the same, which is
    * what a filter above a list means everywhere else.
    *
-   * ItemList draws both (0.725): the order as a line of small text over the
+   * ItemList draws both (0.727): the order as a line of small text over the
    * list, opening the Sort panel, where a new order waits for Apply; the
    * filters behind the Filter button, taking hold as they are ticked, with
    * each one in force a chip that takes it off — which is what `chip` and
@@ -8904,17 +8899,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const tiles = mineSide ? ownTiles : sharedTiles;
     return (
       <>
-        {mineSide ? (
-          <Help className="at-mb3">
-            Lists every language has, such as numbers and pronouns. You write the words once for the
-            language, then add the set to a module as a whole, or a range of numbers at a time.
-            {personalOnly ? null : ` Share a set to list it in ${spaceName}'s Material, where its teachers can use it and edit it.`}
-          </Help>
-        ) : (
-          <Help className="at-mb3">
-            {`One set of each for every language, used by all of ${spaceName}'s courses. Any teacher here can correct them.`}
-          </Help>
-        )}
+        {/* One line per tab, matching Modules and Cards (0.725). That any
+            teacher here can edit a set is said inside the set instead. */}
+        <Help className="at-mb3">
+          A word set is a ready-made group of cards taught together, like numbers. Fill it in once per language, then add it to a module.
+        </Help>
         {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
         {several
           ? wordSetLangsOn.map((id) => (
@@ -8976,6 +8965,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return (
       <PronounsEditor
         lang={pLang}
+        sharedNote={mineSide ? undefined : SHARED_SET}
         cards={setCards}
         busy={busy}
         onClose={() => {
@@ -9034,6 +9024,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return (
       <NumberSystemEditor
         lang={numLang}
+        sharedNote={mineSide ? undefined : SHARED_SET}
         numbers={numbers}
         times={clock}
         busy={busy}
@@ -9446,6 +9437,39 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
   };
 
+  /* A deck put in or taken out of a course from its own screen, saved as
+     it is tapped, as the course's screen does (0.725, the owner's 1a). A
+     deck being edited has its draft brought along, so Save does not put
+     back what was just changed. */
+  const saveModuleCourse = (d: Module, courseId: string, on: boolean) => {
+    if (moduleSaving[courseId]) return;
+    const course = courses.find((c) => c.id === courseId);
+    const where = course ? course.title : "the course";
+    setModuleSaving((now) => ({ ...now, [courseId]: on ? "drop" : "add" }));
+    run(
+      async () => {
+        const r: any = on ? await API.detachModule(d.id, courseId) : await API.attachModule(d.id, courseId);
+        const saved = r && r.deck;
+        if (saved && Array.isArray(saved.courses))
+          setModules((prev) => prev.map((x) => (x.id === d.id ? { ...x, courses: saved.courses } : x)));
+        else await refresh(true);
+        if (r && r.course && Array.isArray(r.course.decks))
+          setCourses((prev) => prev.map((x) => (x.id === courseId ? { ...x, decks: r.course.decks } : x)));
+        setModuleDraft((dd) => (dd ? {
+          ...dd,
+          courses: on ? dd.courses.filter((x) => x !== courseId) : dd.courses.concat([courseId]),
+        } : dd));
+      },
+      on ? `${d.title} taken out of ${where}` : `${d.title} added to ${where}`,
+    ).finally(() =>
+      setModuleSaving((now) => {
+        const next = { ...now };
+        delete next[courseId];
+        return next;
+      }),
+    );
+  };
+
   /* A deck's word sets — its number ranges and the language's pronouns —
      written straight away from the Manage cards page. A deck
      being edited has its draft brought along, so saving the edit does not
@@ -9774,7 +9798,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               listed.length ? (
                 <div className="at-mt3">
                   {/* Both labels, and the stylesheet shows the one that
-                      fits on one line (0.725): the long one says where the
+                      fits on one line (0.727): the long one says where the
                       cards go, which a phone has no room for. */}
                   <Button icon="add" className="at-blockbtn at-addexisting"
                     onClick={() => openAdding(d)}>
@@ -10003,10 +10027,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     onChange={(e) => edit({ title: e.target.value })}
                   />
                 </Field>
+              </fieldset>
 
                 {/* Which courses carry it, as a card says which decks it
                     is in: the names, each with its way out, and the way to
-                    add another on the end of the row. */}
+                    add another on the end of the row. Outside the fieldset,
+                    since nothing here waits for Edit: a course added or
+                    taken out is saved as it is tapped (0.725). */}
                 {/* A My space deck is in no course; in their place, whether its
                     owner practises it (0.545, 59b, 61a). */}
                 {d.personal ? null : (
@@ -10015,13 +10042,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     <Nudge
                       icon="school"
                       tone="attention"
-                      action={editing ? (
+                      action={
                         <ModuleSwitch
                           modules={courses.map((c) => ({ id: c.id, title: c.title }))}
                           chosen={shown.courses}
-                          onToggle={(id, on) =>
-                            edit({ courses: on ? shown.courses.filter((x) => x !== id) : shown.courses.concat([id]) })
-                          }
+                          onToggle={(id, on) => saveModuleCourse(d, id, on)}
+                          saving={moduleSaving}
                           title="Courses"
                           size={null}
                           words={{
@@ -10033,7 +10059,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                             none: "You aren't teaching a course yet.",
                           }}
                         />
-                      ) : undefined}
+                      }
                     >
                       Not in a course yet, so no students can see it. Add it to a course to share it.
                     </Nudge>
@@ -10041,9 +10067,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     <ModuleSwitch
                       modules={courses.map((c) => ({ id: c.id, title: c.title }))}
                       chosen={shown.courses}
-                      onToggle={(id, on) =>
-                        edit({ courses: on ? shown.courses.filter((x) => x !== id) : shown.courses.concat([id]) })
-                      }
+                      onToggle={(id, on) => saveModuleCourse(d, id, on)}
+                      saving={moduleSaving}
                       title="Courses"
                       size={null}
                       words={{
@@ -10058,8 +10083,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   )}
                 </Field>
                 )}
-
-              </fieldset>
 
 
               {/* The whole deck, whatever the list below is showing: what a
@@ -10373,7 +10396,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         })}
       />
     );
-    const people = (title: string, list: string[], none: string) => (
+    const people = (title: string, list: string[], none: Node) => (
       <Field label={`${title} · ${list.length}`}>
         {list.length ? (
           list.map((h) => {
@@ -10392,11 +10415,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               </div>
             );
           })
-        ) : (
+        ) : typeof none === "string" ? (
           <Help>{none}</Help>
-        )}
+        ) : none}
       </Field>
     );
+    /* The student code, copied from where it is wanted (0.725, the owner's
+       2a): the People tab said to go and find it on the Course tab. Where
+       the browser refuses, the code is said in the message instead. */
+    const copyStudentCode = async () => {
+      try {
+        if (!navigator.clipboard || !c.code) throw new Error("no-clipboard");
+        await navigator.clipboard.writeText(c.code);
+        snack("Student code copied", "good");
+      } catch {
+        snack(c.code ? `Couldn't copy it. The student code is ${c.code}` : "This course has no student code yet. Ask your administrator for one.", "warn");
+      }
+    };
     /* A deck put in or taken out of this course. What the server saved
        comes back with the answer — the deck's courses and the course's
        decks — and is put on screen as it is, rather than fetching every
@@ -10579,7 +10614,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 <span className="at-formrole">Your administrator adds and removes people.</span>
               </div>
               {people("Teachers", c.teachers, "Nobody yet.")}
-              {people("Students", c.students, "Nobody has joined yet. Share the student code on the Course tab.")}
+              {people("Students", c.students, (
+                <Nudge
+                  icon="group"
+                  action={c.code ? (
+                    <Button size="sm" variant="primary" icon="copy" onClick={() => void copyStudentCode()}>Copy student code</Button>
+                  ) : undefined}
+                >
+                  Nobody has joined yet. Share the student code with your class so they can join.
+                </Nudge>
+              ))}
             </div>
             </div>
             )}
@@ -10774,7 +10818,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
           {tab === "cards" && (
             <>
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={setsHere} />
+              <ModulesOrCards tab={tab} onTab={setTab} withSets={setsHere} />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -10843,10 +10887,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {/* Sentences waiting for review and cards with more than one
                   meaning used to be said here, above the list. They are in
                   To do on Home since 0.693 (the owner's 7a); the Review
-                  filter still finds the sentences. And a line saying what a
-                  card is, until 0.714 (the owner's 6a): with no cards the
-                  empty list says it, and with cards it only pushed them
-                  down. */}
+                  filter still finds the sentences. A line saying what a card
+                  is, taken off in 0.714, is back in 0.725 as one of three
+                  matching lines, one per tab (the owner's wording). */}
+              <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
 
               <ItemList
                 noun="card"
@@ -10968,7 +11012,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               language switched on has one, Modules stands in for it. */}
           {tab === "wordsets" && setsHere && (
             <>
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets />
+              <ModulesOrCards tab={tab} onTab={setTab} withSets />
               {wordSetsTab()}
             </>
           )}
@@ -11015,7 +11059,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }
                 />
               )}
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={setsHere} />
+              <ModulesOrCards tab={tab} onTab={setTab} withSets={setsHere} />
               {moduleAction && (
                 <Screen
                   title={
@@ -11097,7 +11141,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               )}
 
               {mineSide ? null : (
-                <Help>A module is something a course learns from: a deck of cards, a unit on a course&apos;s path, or a personal set. Students see a module once it&apos;s added to a course they belong to.</Help>
+                <Help>A module is a group of cards. Add it to a course to teach it.</Help>
               )}
 
               <ItemList
