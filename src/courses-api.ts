@@ -404,14 +404,32 @@ export const setModuleParts = (moduleId: string, parts: string[]) =>
    null for an ordinary deck again (0.629). See src/sets.ts. */
 export const saveSet = (moduleId: string, set: SetConfig | null) => call("save-set", { body: { deckId: moduleId, set } });
 export const myCards = () => call("my-cards");
-/** Who a deck may take its numbers from, owner first (0.541). */
-export const numberSources = (moduleId: string): Promise<{
-  ok: true;
-  sources: { handle: string; displayName: string; numbers: boolean; times: boolean }[];
-  chosen: string;
-}> => call("number-sources", { params: { deck: moduleId } });
-export const setModuleNumbers = (moduleId: string, from: string) =>
-  call("set-deck-numbers", { body: { deckId: moduleId, from } });
+/* Word sets shared with a space, and whose a course uses (0.689). A
+   course uses one teacher's set of each kind: the one chosen on it, or the
+   earliest written of those reaching it — see wordSetPick on the server. */
+export type WordSetKind = "numbers" | "pronouns";
+export type SharedPronouns = { owner: string; name: string; lang: string; cards: Card[] };
+export type SharedNumbers = { owner: string; name: string; lang: string; numbers: unknown; times: unknown };
+export const spaceWordSets = (): Promise<{ ok: true; pronouns: SharedPronouns[]; numbers: SharedNumbers[] }> =>
+  call("space-word-sets");
+/* A teacher's own set into the space's Material: pronouns as a copy, which
+   sharing again brings up to date; numbers by marking them shared. */
+export const shareWordSet = (kind: WordSetKind, lang: LangId): Promise<{ ok: true; made?: number; updated?: number }> =>
+  call("share-word-set", { body: { kind, lang } });
+export type CourseWordSet = {
+  options: { handle: string; name: string }[];
+  /** Whose set its students get now. */
+  using: string;
+  /** Whether a teacher chose it, rather than its being the earliest reaching the course. */
+  chosen: boolean;
+  /** Whose sets reach it through its modules. */
+  reaching: string[];
+};
+export const courseWordSets = (courseId: string): Promise<{ ok: true; sets: Record<WordSetKind, CourseWordSet> }> =>
+  call("course-word-sets", { params: { course: courseId } });
+/* "" goes back to the earliest reaching the course. */
+export const setCourseWordSet = (courseId: string, kind: WordSetKind, from: string) =>
+  call("set-course-word-set", { body: { courseId, kind, from } });
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
 /**
@@ -435,6 +453,8 @@ export type SaveExtra = {
   decksWere?: string[];
   /* Save and publish: what this save writes goes out to students too. */
   publish?: boolean;
+  /** A new pronoun written into another teacher's shared set (0.689), which stays theirs. */
+  forOwner?: string;
 };
 /* `org` is the space the save was made in, for one queued offline and sent
    from wherever the app is by then (0.580). */
@@ -486,10 +506,12 @@ export const openUnit = (courseId: string, moduleId: string, open: boolean) =>
    carries the document that is there — see `stale-system` in explain. */
 export const mySystems = (): Promise<{ ok: true; systems: any[]; signed?: Record<string, number | null> }> =>
   call("my-systems");
+/* `owner` saves a set another teacher shared with the space (0.689). */
 export const saveSystem = (
   kind: "numbers" | "times",
   system: unknown,
-): Promise<{ ok: true; system: any }> => call("save-system", { body: { kind, system } });
+  owner?: string,
+): Promise<{ ok: true; system: any }> => call("save-system", { body: { kind, system, ...(owner ? { owner } : {}) } });
 export const deleteSystem = (kind: "numbers" | "times", languageId: LangId) =>
   call("delete-system", { body: { kind, languageId } });
 

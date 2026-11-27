@@ -596,8 +596,13 @@ const fakeFetch = async (input, opts = {}) => {
       lockedModules.push(body);
       return json({ ok: true });
     }
-    /* Whose numbers a deck uses (0.541): nobody here has any. */
-    if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
+    /* Word sets shared with the space, and whose a course uses (0.689):
+       nobody here has shared any. */
+    if (action === "space-word-sets") return json({ ok: true, pronouns: [], numbers: [] });
+    if (action === "course-word-sets") {
+      const none = { options: [], using: "", chosen: false, reaching: [] };
+      return json({ ok: true, sets: { numbers: none, pronouns: none } });
+    }
     if (action === "create-unit" && teacherSets) {
       const body = JSON.parse(opts.body || "{}");
       madeUnits.push(body);

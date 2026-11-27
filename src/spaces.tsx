@@ -6617,11 +6617,30 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const [numbering, setNumbering] = useState<LangId | null>(null);
   /* Which language's pronouns are open. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
+  /* Whose set is open from Material's Word sets (0.689): another teacher's
+     shared set, or null for the teacher's own. Read by the pronouns and the
+     numbers screens alike, and cleared as either closes. */
+  const [setOwner, setSetOwner] = useState<string | null>(null);
+  /* Every teacher's word sets shared with the space, for Material's Word
+     sets screen (0.689) — fetched as it opens, and again after a save. */
+  const [spaceSets, setSpaceSets] = useState<{ pronouns: API.SharedPronouns[]; numbers: API.SharedNumbers[] } | null>(null);
+  const loadSpaceSets = useCallback(async () => {
+    const r = await API.spaceWordSets();
+    setSpaceSets({ pronouns: r.pronouns || [], numbers: r.numbers || [] });
+  }, []);
+  /* A teacher's own set on its way into the space's Material, awaiting a yes. */
+  const [sharing, setSharing] = useState<WordSet | null>(null);
   /* The Word sets screen (0.569), off the Cards tab: every set, each
      language's under its name, which is where Numbers and Pronouns are
      opened from. It replaced an icon for each and a "Which language?" step
      before either. */
   const [wordSets, setWordSets] = useState(false);
+  /* Material's Word sets lists every teacher's shared sets (0.689): fetched
+     each time it opens, so a set shared from another device is there. */
+  useEffect(() => {
+    if (!wordSets || mineSide) return;
+    void loadSpaceSets().catch((e) => setError(API.explain(e)));
+  }, [wordSets, mineSide, loadSpaceSets, setError]);
   /* The open deck, being edited: null while it is only read. */
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
   const [discardingModule, setDiscardingModule] = useState(false);
@@ -7704,10 +7723,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * says in words — the cost of the decision, paid where it happens
    * rather than hidden.
    */
-  function saveSystem(kind: "numbers" | "times", system: NumberSystem | TimeSystem) {
+  function saveSystem(kind: "numbers" | "times", system: NumberSystem | TimeSystem, owner?: string) {
     return run(async () => {
-      const r = await API.saveSystem(kind, system);
+      const r = await API.saveSystem(kind, system, owner);
       const saved = kind === "times" ? readTimeSystem(r.system) : readNumberSystem(r.system);
+      /* Another teacher's shared set (0.689): theirs, so it is the space's
+         list that is read again, not this teacher's own systems. */
+      if (owner) {
+        await loadSpaceSets();
+        void refresh(true);
+        return saved;
+      }
       setSystems((held) => {
         const was = held || { numbers: [], times: [] };
         /* A first save since sign-off existed starts the system's sign-off,
@@ -8533,8 +8559,19 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     ...((composerFor(langId) || { ranges: () => [] }).ranges()),
     ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
   ];
-  const pronounCardsOf = (langId: LangId | undefined): Card[] => {
-    const own = cards.filter((c) => isPronounCard(c) && c.lang === langId);
+  /* One teacher's pronouns (0.689): the named teacher's, or else the
+     viewer's own where they have any here, or else the earliest written —
+     the set a course uses until someone chooses. Material can hold several
+     teachers' sets, and "the pronouns" a deck takes is one of them. */
+  const pronounCardsOf = (langId: LangId | undefined, owner?: string | null): Card[] => {
+    const all = cards.filter((c) => isPronounCard(c) && c.lang === langId);
+    /* A card with no owner yet is one this teacher just made, kept on this
+       device until it can be sent. */
+    const ownerOf = (c: Card) => String(c.owner || account.handle);
+    const owners = [...new Set(all.map(ownerOf))];
+    const earliest = [...all].sort((a, b) => (Number(a.created) || 0) - (Number(b.created) || 0))[0];
+    const whose = owner || (owners.includes(account.handle) ? account.handle : earliest ? ownerOf(earliest) : "");
+    const own = owner || owners.length > 1 ? all.filter((c) => ownerOf(c) === whose) : all;
     const group = groupPronouns(own).find(isPronounGroup);
     const order = group ? group.members : [];
     return order.map((id) => own.find((c) => c.id === id)).filter(Boolean) as Card[];
@@ -8553,7 +8590,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
   /* A language's word sets, each with how much is written and how many
      of the language's decks hold it — see WordSet. */
-  const wordSetsOf = (langId: LangId): WordSet[] => {
+  const wordSetsOf = (langId: LangId, owner?: string): WordSet[] => {
     const lang = languages[langId];
     const inLang = modules.filter((d) => ((langOfModule(d) || {}).id || d.lang) === langId);
     const out: WordSet[] = [];
@@ -8569,11 +8606,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         total: parts.length,
         unit: "range",
         decks: inLang.filter((d) => partsNow(d.parts || []).some((p) => ids.has(p))).length,
-        open: () => setNumbering(langId),
+        open: () => {
+          setSetOwner(null);
+          setNumbering(langId);
+        },
       });
     }
     if (lang && hasPronouns(lang)) {
-      const own = pronounCardsOf(langId);
+      const own = pronounCardsOf(langId, owner);
       const holding = new Set(own.flatMap((c) => c.decks || []));
       out.push({
         kind: "pronouns",
@@ -8583,55 +8623,197 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         total: personsOf(verbOf(lang)).length,
         unit: "pronoun",
         decks: inLang.filter((d) => holding.has(d.id)).length,
-        open: () => setPronouning(langId),
+        open: () => {
+          setSetOwner(owner || null);
+          setPronouning(langId);
+        },
       });
     }
     return out;
   };
   /* The pronouns into a deck or out of it, from their own screen (0.569):
      every pronoun card of the language, as Add existing cards does it. */
-  const pronounsInModule = (langId: LangId, moduleId: string, on: boolean) =>
+  /* A module holds one teacher's pronouns (0.689): putting a set in takes
+     any other teacher's out, and taking them out takes out every one. */
+  const pronounsInModule = (langId: LangId, moduleId: string, on: boolean, set?: Card[]) =>
     run(async () => {
-      for (const card of pronounCardsOf(langId)) {
+      const chosen = set || pronounCardsOf(langId);
+      const ids = new Set(chosen.map((c) => c.id));
+      const others = cards.filter((c) => isPronounCard(c) && c.lang === langId && !ids.has(c.id));
+      for (const card of chosen.concat(others)) {
         const inNow = card.decks || [];
-        if (on === inNow.includes(moduleId)) continue;
-        absorbSaved(await saveNamed(card, on ? inNow.concat([moduleId]) : inNow.filter((x) => x !== moduleId)));
+        const want = on && ids.has(card.id);
+        if (want === inNow.includes(moduleId)) continue;
+        absorbSaved(await saveNamed(card, want ? inNow.concat([moduleId]) : inNow.filter((x) => x !== moduleId)));
       }
     }, on ? "Added to the module" : "Taken out of the module");
 
-  /* ---- the Word sets screen (0.569) ----
-     Every set the teacher can write, each language's under its name where
-     more than one is switched on, so one tap opens the right one. A set
-     opens over this screen, and closing it comes back here. */
+  /* ---- the Word sets screen (0.569; by teacher since 0.689) ----
+     My space: the teacher's own sets, each with the way to share it with
+     the space. Material: every set a teacher has shared with the space,
+     under that teacher's name, any of which a teacher here may open and
+     edit. Each language's under its name where more than one is switched
+     on. A set opens over this screen, and closing it comes back here. */
   const wordSetsScreen = () => {
     const several = wordSetLangsOn.length > 1;
-    const tiles = (langId: LangId) => (
+    const langName = (id: LangId) => (languages[id] || { name: id }).name;
+    /* My space: as the sets always were, and Share under each. */
+    const ownTiles = (langId: LangId) => (
       <div className="at-decklist2">
         {wordSetsOf(langId).map((s) => (
-          <OpenRow
-            key={s.kind}
-            title={s.name}
-            meta={wordSetLine(s)}
-            onOpen={s.open}
-            label={several ? `${s.name}, ${(languages[langId] || { name: langId }).name}` : undefined}
-          />
+          <div key={s.kind}>
+            <OpenRow
+              title={s.name}
+              meta={wordSetLine(s)}
+              onOpen={s.open}
+              label={several ? `${s.name}, ${langName(langId)}` : undefined}
+            />
+            {personalOnly ? null : (
+              <div className="at-mt2 at-mb3">
+                <Button
+                  size="sm"
+                  icon="upload"
+                  /* Something to share: a pronoun written, or numbers begun. */
+                  disabled={busy || (s.kind === "numbers"
+                    ? !(systems && systems.numbers.some((n) => n.languageId === langId))
+                    : !s.written)}
+                  onClick={() => setSharing(s)}
+                >
+                  {`Share with ${spaceName}`}
+                </Button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     );
+    /* Material: the teacher's own sets first — pronouns written here are
+       the space's already, and their numbers can be shared from here too —
+       then one tile per other teacher's shared set. */
+    const sharedTiles = (langId: LangId) => {
+      if (!spaceSets) return null;
+      const lang = languages[langId];
+      const numbersShared = spaceSets.numbers.some((x) => x.lang === langId && x.owner === account.handle);
+      const yours = (
+        <div className="at-decklist2">
+          {wordSetsOf(langId, account.handle).map((s) => (
+            <div key={s.kind}>
+              <OpenRow
+                title={s.name}
+                meta={wordSetLine(s)}
+                onOpen={s.open}
+                label={several ? `${s.name}, ${langName(langId)}` : undefined}
+              />
+              {s.kind === "numbers" && !numbersShared && systems && systems.numbers.some((n) => n.languageId === langId) ? (
+                <div className="at-mt2 at-mb3">
+                  <Help>Not shared with {spaceName} yet: other teachers can&apos;t see these or choose them for a course.</Help>
+                  <Button size="sm" icon="upload" disabled={busy} onClick={() => setSharing(s)}>{`Share with ${spaceName}`}</Button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      );
+      const tiles: { key: string; title: string; meta: string; open: () => void }[] = [];
+      for (const n of spaceSets.numbers.filter((x) => x.lang === langId && x.owner !== account.handle && !!composerFor(langId))) {
+        const sys = readNumberSystem(n.numbers);
+        const clock = n.times ? readTimeSystem(n.times) : null;
+        /* Counted as the teacher's own are, over every part the language
+           has — its numbers and its clock — so two tiles never disagree. */
+        const parts = numberPartsOf(langId);
+        const open = new Set(
+          rangeChecks(composerFor(langId), sys, timeComposerFor(langId), clock && sys && clock.numberSystemId === sys.id ? clock : null)
+            .filter((c) => c.open).map((c) => c.range.id),
+        );
+        const written = parts.filter((r) => open.has(r.id)).length;
+        tiles.push({
+          key: `numbers ${n.owner}`,
+          title: `Numbers · ${n.name}`,
+          meta: written === parts.length ? `All ${plural(parts.length, "range")} written` : `${written} of ${plural(parts.length, "range")} written`,
+          open: () => {
+            setSetOwner(n.owner);
+            setNumbering(langId);
+          },
+        });
+      }
+      for (const p of spaceSets.pronouns.filter((x) => x.lang === langId && x.owner !== account.handle && !!lang && hasPronouns(lang))) {
+        const total = personsOf(verbOf(lang)).length;
+        const decks = new Set(p.cards.flatMap((c) => c.decks || [])).size;
+        tiles.push({
+          key: `pronouns ${p.owner}`,
+          title: `Pronouns · ${p.name}`,
+          meta: `${p.cards.length >= total ? `All ${plural(total, "pronoun")} written` : `${p.cards.length} of ${plural(total, "pronoun")} written`} · ${decks ? `in ${plural(decks, "module")}` : "in no module yet"}`,
+          open: () => {
+            setSetOwner(p.owner);
+            setPronouning(langId);
+          },
+        });
+      }
+      return (
+        <>
+          {yours}
+          <Section title="Shared by other teachers">
+            {tiles.length ? (
+              <div className="at-decklist2">
+                {tiles.map((t) => (
+                  <OpenRow key={t.key} title={t.title} meta={t.meta} onOpen={t.open} label={several ? `${t.title}, ${langName(langId)}` : undefined} />
+                ))}
+              </div>
+            ) : (
+              <Help>No other teacher has shared a word set in {langName(langId)} yet.</Help>
+            )}
+          </Section>
+        </>
+      );
+    };
+    const tiles = mineSide ? ownTiles : sharedTiles;
     return (
       <Screen title="Word sets" onBack={() => setWordSets(false)}>
-        <Help>
-          Lists every language has, such as numbers and pronouns. You write the words once for the
-          language, then add the set to a module as a whole, or a range of numbers at a time.
-        </Help>
+        {mineSide ? (
+          <Help>
+            Lists every language has, such as numbers and pronouns. You write the words once for the
+            language, then add the set to a module as a whole, or a range of numbers at a time.
+            {personalOnly ? null : ` Share a set to list it in ${spaceName}'s Material, where its teachers can use it and edit it.`}
+          </Help>
+        ) : (
+          <Help>
+            Your word sets for {spaceName}, and below them the sets other teachers have shared here.
+            Any teacher can open a shared set and edit it. Each course chooses whose set of each kind
+            its students get.
+          </Help>
+        )}
         <Notice kind="error">{error}</Notice>
+        {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
         {several
           ? wordSetLangsOn.map((id) => (
-            <Section key={id} title={(languages[id] || { name: id }).name}>
+            <Section key={id} title={langName(id)}>
               {tiles(id)}
             </Section>
           ))
           : wordSetLangsOn.length ? tiles(wordSetLangsOn[0]) : null}
+        {sharing ? (
+          <ConfirmModal
+            title={`Share your ${sharing.name.toLowerCase()} with ${spaceName}?`}
+            confirmLabel="Share"
+            danger={false}
+            busy={busy}
+            body={
+              <p>
+                {sharing.kind === "pronouns"
+                  ? `A copy goes into ${spaceName}'s Material under your name. Its teachers can use it in their modules, edit it, and choose it for a course. Sharing again later brings that copy up to date with yours.`
+                  : `Your numbers are listed in ${spaceName}'s Material under your name. Its teachers can use them, edit them, and choose them for a course. They stay one set: an edit made there changes your numbers too.`}
+              </p>
+            }
+            onCancel={() => setSharing(null)}
+            onConfirm={() =>
+              run(async () => {
+                await API.shareWordSet(sharing.kind, sharing.lang);
+                setSharing(null);
+                await refresh(true);
+              }, `Shared with ${spaceName}`)
+            }
+          />
+        ) : null}
       </Screen>
     );
   };
@@ -8648,19 +8830,34 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       setPronouning(null);
       return null;
     }
+    /* Whose set (0.689): one opened from Material's Word sets is that
+       teacher's, as the server last listed it with anything saved here
+       since laid over it; otherwise the one set this side shows. */
+    const shared = setOwner && !mineSide && spaceSets
+      ? spaceSets.pronouns.find((p) => p.owner === setOwner && p.lang === pronouning) || null
+      : null;
+    const setCards = shared
+      ? shared.cards.map((c) => cards.find((x) => x.id === c.id) || c)
+        .concat(cards.filter((x) => isPronounCard(x) && x.lang === pronouning && x.owner === setOwner && !shared.cards.some((c) => c.id === x.id)))
+      : pronounCardsOf(pronouning, setOwner);
+    const forOwner = setOwner && setOwner !== account.handle ? setOwner : "";
     return (
       <PronounsEditor
         lang={pLang}
-        cards={cards}
+        cards={setCards}
         busy={busy}
-        onClose={() => setPronouning(null)}
+        onClose={() => {
+          setPronouning(null);
+          setSetOwner(null);
+        }}
         modules={modules
           .filter((d) => ((langOfModule(d) || {}).id || d.lang) === pronouning)
           .map((d) => ({ id: d.id, title: String(d.title || ""), locked: !!d.locked, cardCount: d.cardCount || 0 }))}
-        onModule={(moduleId, on) => void pronounsInModule(pronouning, moduleId, on)}
+        onModule={(moduleId, on) => void pronounsInModule(pronouning, moduleId, on, setCards)}
         onSave={async (card, inModules) => {
-          const r = await sendOrKeep(card, inModules);
+          const r = await sendOrKeep(card, inModules, !card.id && forOwner ? { forOwner } : {});
           absorbSaved(r);
+          if (shared) void loadSpaceSets().catch(() => {});
           return r;
         }}
       />
@@ -8679,15 +8876,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     if (!systems) {
       return <FetchingSystems name={numLang.name} load={loadSystems} onBack={() => setNumbering(null)} />;
     }
-    const held = systems.numbers.find((n) => n.languageId === numbering) || null;
+    /* Another teacher's numbers, opened from Material's Word sets (0.689):
+       as the server last listed them, saved back as theirs. */
+    const theirs = setOwner && setOwner !== account.handle && !mineSide && spaceSets
+      ? spaceSets.numbers.find((n) => n.owner === setOwner && n.lang === numbering) || null
+      : null;
+    const whose = theirs ? theirs.owner : account.handle;
+    const held = theirs
+      ? readNumberSystem(theirs.numbers)
+      : systems.numbers.find((n) => n.languageId === numbering) || null;
     const numbers =
-      held || emptyNumberSystem("", account.handle, numbering, Date.now(), (composerFor(numbering) || { version: 1 }).version);
+      held || emptyNumberSystem("", whose, numbering, Date.now(), (composerFor(numbering) || { version: 1 }).version);
     const clock =
-      systems.times.find((t) => t.languageId === numbering) ||
+      (theirs ? (theirs.times ? readTimeSystem(theirs.times) : null) : systems.times.find((t) => t.languageId === numbering)) ||
       (timeComposerFor(numbering)
         ? emptyTimeSystem(
             "",
-            account.handle,
+            whose,
             numbering,
             numbers.id,
             Date.now(),
@@ -8700,8 +8905,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         numbers={numbers}
         times={clock}
         busy={busy}
-        onClose={() => setNumbering(null)}
-        onSave={saveSystem}
+        onClose={() => {
+          setNumbering(null);
+          setSetOwner(null);
+        }}
+        onSave={theirs ? (kind, system) => saveSystem(kind, system, theirs.owner) : saveSystem}
         error={error}
         cards={cards as unknown as Record<string, unknown>[]}
         /* The decks in this language and the parts each holds — the same
@@ -9714,7 +9922,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
               </fieldset>
 
-              {(d.parts || []).length ? <NumbersFrom moduleId={d.id} /> : null}
 
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
@@ -9809,11 +10016,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               const notes: { key: string; text: string; open?: () => void }[] = [];
               const waiting = (d.partsWaiting || []).filter((p) => (d.parts || []).includes(p)).length;
               if (waiting) {
-                const ours = !d.numbersFrom || d.numbersFrom === account.handle;
+                /* A My space module's numbers are the teacher's own; a
+                   space module's are whichever teacher's its course chose
+                   (0.689), so it opens the shared sets to pick from. */
+                const ours = !!d.personal;
                 notes.push({
                   key: "numbers",
                   text: `${waiting === 1 ? "A range" : `${waiting} ranges`} of numbers in this ${kindW} still ${waiting === 1 ? "needs its" : "need their"} words written. Students get the other ranges, and ${waiting === 1 ? "this one" : "these"} as soon as ${waiting === 1 ? "it is" : "they are"} written.`,
-                  open: ours ? () => setNumbering(langId) : undefined,
+                  open: ours ? () => setNumbering(langId) : () => setWordSets(true),
                 });
               }
               const lang = languages[langId];
@@ -10103,6 +10313,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   if (saved) setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, practice: saved } : x)));
                 }, `${c.title} now asks ${next.mode === "custom" ? "the exercises you chose" : next.mode === "none" ? "no English" : next.mode === "little" ? "little English" : "everything, with translation"}`)
               }
+            />
+
+            <CourseWordSets
+              key={c.id}
+              course={c}
+              lang={languages[c.language as LangId] || null}
+              onOpenSets={() => {
+                setSide("space");
+                setWordSets(true);
+              }}
             />
 
             {pathSection}
@@ -11062,56 +11282,96 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
   );
 }
 
-function NumbersFrom({ moduleId }: { moduleId: string }) {
-  const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
-  const [chosen, setChosen] = useState("");
+/*
+ * Whose word sets a course uses (0.689; 3a, 5a, 6a, 7a).
+ *
+ * One teacher's set of each kind, so two teachers' versions of a pronoun
+ * or a number never reach the same students. Any teacher of the course
+ * chooses, out of the sets shared with the space and any already reaching
+ * the course. Until somebody does, the course uses the earliest written of
+ * those reaching it, and where there is more than one the screen says so.
+ */
+function CourseWordSets({ course, lang, onOpenSets }: { course: { id: string; language?: string }; lang: Lang | null; onOpenSets: () => void }) {
+  const [sets, setSets] = useState<Record<API.WordSetKind, API.CourseWordSet> | null>(null);
   const [error, setError] = useState("");
-  /* Loading the choice, and making one: each its own Retry (0.636). */
+  const [saving, setSaving] = useState<API.WordSetKind | null>(null);
   const loadReach = useReach();
   const saveReach = useReach();
+  const load = useCallback((): Promise<void> =>
+    API.courseWordSets(course.id).then(
+      (r) => {
+        loadReach.ok();
+        setError("");
+        setSets(r.sets);
+      },
+      (e) => setError(loadReach.caught(e, load) ? LOAD_UNREACHED : API.explain(e)),
+    ), [course.id, loadReach]);
   useEffect(() => {
-    let live = true;
-    const go = (): Promise<void> =>
-      API.numberSources(moduleId).then(
-        (r) => {
-          if (!live) return;
-          loadReach.ok();
-          setError("");
-          setSources(r.sources);
-          setChosen(r.chosen);
-        },
-        (e) => {
-          if (live) setError(loadReach.caught(e, go) ? LOAD_UNREACHED : API.explain(e));
-        },
-      );
-    void go();
-    return () => {
-      live = false;
-    };
-  }, [moduleId, loadReach]);
-  async function choose(h: string, was: string): Promise<void> {
-    setChosen(h);
+    void load();
+  }, [load]);
+  const kinds: { kind: API.WordSetKind; name: string; label: string }[] = [];
+  if (lang && composerFor(lang.id)) kinds.push({ kind: "numbers", name: "numbers", label: "Numbers from" });
+  if (lang && hasPronouns(lang)) kinds.push({ kind: "pronouns", name: "pronouns", label: "Pronouns from" });
+  if (!kinds.length) return null;
+  async function choose(kind: API.WordSetKind, from: string): Promise<void> {
+    setSaving(kind);
     try {
-      await API.setModuleNumbers(moduleId, h);
+      await API.setCourseWordSet(course.id, kind, from);
       saveReach.ok();
+      await load();
     } catch (e) {
-      setChosen(was);
-      if (!saveReach.caught(e, () => choose(h, was))) setError(API.explain(e));
+      if (!saveReach.caught(e, () => choose(kind, from))) setError(API.explain(e));
+    } finally {
+      setSaving(null);
     }
   }
-  if (error) return <Notice kind="error">{error}</Notice>;
-  if (!sources || !sources.length) return null;
   return (
-    <Field label="Numbers from" lede="Whose numbers and recordings this module's students practise.">
-      <RadioGroup
-        name={`numbers-from-${moduleId}`}
-        label="Numbers from"
-        quiet
-        value={chosen}
-        options={sources.map((x) => ({ value: x.handle, label: x.displayName }))}
-        onChange={(h) => void choose(h, chosen)}
-      />
-    </Field>
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Word sets</span>
+        <span className="at-formrole">
+          Whose numbers and pronouns this course&apos;s students get: one teacher&apos;s of each, whichever module they are in.
+        </span>
+      </div>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      {!sets && !error ? <Help>Fetching the word sets…</Help> : null}
+      {sets ? kinds.map(({ kind, name, label }) => {
+        const s = sets[kind];
+        const nameOf = (h: string) => (s.options.find((o) => o.handle === h) || { name: h }).name;
+        if (!s.options.length) {
+          return (
+            <Field key={kind} label={label}>
+              <Help>No teacher has shared {name} with the space yet.</Help>
+            </Field>
+          );
+        }
+        return (
+          <div key={kind}>
+            {!s.chosen && s.reaching.length > 1 ? (
+              <div className="at-mb3">
+                <Nudge icon={kind === "numbers" ? "hash" : "person"} tone="attention">
+                  {`${plural(s.reaching.length, "teacher")}' ${name} reach this course through its modules. Its students get ${nameOf(s.using)}'s, written first, until you choose.`}
+                </Nudge>
+              </div>
+            ) : null}
+            <Field label={label} lede={s.chosen ? undefined : s.using ? `Not chosen yet: students get ${nameOf(s.using)}'s.` : "Not chosen yet."}>
+              <RadioGroup
+                name={`word-set-${kind}-${course.id}`}
+                label={label}
+                quiet
+                value={s.chosen ? s.using : ""}
+                options={s.options.map((o) => ({ value: o.handle, label: o.name }))}
+                onChange={(h) => {
+                  if (saving) return;
+                  void choose(kind, h);
+                }}
+              />
+            </Field>
+          </div>
+        );
+      }) : null}
+      <Button size="sm" icon="view" onClick={onOpenSets}>See the shared word sets</Button>
+    </div>
   );
 }
 

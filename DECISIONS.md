@@ -7309,6 +7309,51 @@ drafts per screen; only the shown one is saved.
 
 ---
 
+## One word set per course
+
+**27 November 2026** · `wordSetPick`, `spaceWordSets`, `share-word-set`,
+`course-word-sets`, `set-course-word-set` and the pronoun swap in
+`my-material` in `server/api/courses.js`; `CourseWordSets` and the Word sets
+screen in `src/spaces.tsx`
+
+Two teachers who each moved a module holding their pronouns into a space,
+onto one course, gave its students 18 pronoun cards: two of each. Numbers
+did the same through two modules, since 0.541's choice was per module. The
+owner's answers (1a, 1b then 1a, 2a–7a): a word set is one teacher's;
+Material lists every teacher's shared set; any teacher may edit one; a
+course chooses whose set of each kind it uses; until somebody does, it uses
+the earliest written of those reaching it, and says so where there are two;
+the per-module numbers choice goes.
+
+Pronouns stay cards, so a module still holds a set as cards, and the choice
+is applied on the way out: `my-material` drops a deck's pronoun cards and
+sends the chosen teacher's instead. Weighed: rewriting the decks when a
+course chooses. Rejected because one deck can sit in courses that chose
+differently, and because the choice would then be undone by the next
+teacher who adds their own set to a module. The cost is that a deck sent
+under one course takes that course's choice where it is in two (as it
+already took that course's title), and that switching teacher gives
+students new cards, so progress on the old ones does not carry.
+
+The swap reads cards outside the deck, whose edits move no deck version, so
+a pronoun save now moves its owner's `fillsrev`, as a value's does, and the
+chosen teachers' handles go into the version's list.
+
+Numbers are not copied when shared — they are one document per teacher
+across every space, and two copies would drift — so sharing marks the
+document with the space (`spaces`), and a save keeps the mark. A system
+already used by a module of the space counts as shared, so nothing that
+reached a course before is missing from Material. Pronouns are copied, as a
+card moved into a space always was, and sharing again updates the copy by
+person rather than adding a second set. A new pronoun written into another
+teacher's shared set is saved as theirs (`forOwner`), so a set never splits
+between two owners.
+
+No new storage key: the course carries `wordSets`, the number system its
+`spaces`, and everything else is read from what exists.
+
+---
+
 ## A deck's numbers come from one person
 
 **2 November 2026** · `number-sources`, `set-deck-numbers` and `partsWaiting`
