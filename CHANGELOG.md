@@ -8,12 +8,35 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.714 — 27 November 2026
+## 0.715 — 27 November 2026
 
 **The card status panel no longer opens with a "Now: …" line.** Under
 "Card status" it repeated the status the card already has, which the panel
 shows anyway with a tick beside it. The line is gone; the choices are the
 same as before.
+
+## 0.714 — 27 November 2026
+
+**The card lists are simpler.**
+
+- **Two views instead of four**, in every card list: Teaching › Material ›
+  Cards, inside a module, and a learner's own cards. The view button now
+  switches between a grid and a table. The large grid and the one-line-per-card list are gone;
+  a list left on either opens at the nearest of the two (the large grid at
+  the grid, the list at the table).
+- **A teacher's card tile is just the card.** Its Edit and Delete buttons (Edit and Remove
+  inside a module) are behind three dots, as on a module's tile. Tapping
+  the card still opens it. The date is off the tile; Sort still orders by
+  it.
+- **A teacher's table has five columns:** Word, Meaning, Kind, Modules and Status,
+  so it fits a desktop and reads on a phone. Status is last, and also says
+  when a recording is missing. Transliteration, subtype, recording, review
+  and the two dates are no longer columns; Filter and Sort still reach
+  them.
+- **The line "A card is one thing to learn…" is gone from above the list.**
+  With no cards yet, the empty list still says what a card is.
+
+Trade-off: editing or deleting from the list is one more tap.
 
 ## 0.713 — 27 November 2026
 

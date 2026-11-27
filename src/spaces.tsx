@@ -4,7 +4,7 @@ import "./teaching.css";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Course, Module, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
-import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
+import type { CardRow, CardViews, FilterGroup, MoreItem, Node } from "./shared.tsx";
 import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
 import { keyFromLink, signInLink } from "./sign-in-link.ts";
@@ -127,7 +127,6 @@ import {
   CARD_KINDS,
   cardKindOf,
   cardKindLabel,
-  cardSubtypeLabel,
   cardWords,
   CheckList,
   ClipList,
@@ -6182,7 +6181,7 @@ function StatusMenu({ card, disabled, onStatus }: {
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
         {/* The statuses open in the app's one panel (0.690, the owner's
-            1a), its status now ticked. No "Now: …" line over them (0.714):
+            1a), its status now ticked. No "Now: …" line over them (0.715):
             the tick already says it. */}
         {open && (
           <PickSheet title="Card status" className="at-statussheet" onClose={() => setOpen(false)}>
@@ -6235,20 +6234,17 @@ function StatusMenu({ card, disabled, onStatus }: {
 }
 
 /* The table view of a teacher's card lists, column by column. */
+/* Five columns, so the table fits a desktop and reads on a phone (0.714,
+   the owner's 5a). Status is last: it is empty on most cards, and first it
+   was an empty column across every phone. What went — transliteration,
+   subtype, recording, review and the two dates — the filter and sort
+   still reach; a missing recording is said in Status. */
 const TEACHER_COLUMNS = [
-  /* First, so the cards students do not have yet are the ones the eye
-     finds: empty on a published card with nothing waiting. */
-  { key: "status", label: "Status" },
   { key: "word", label: "Word" },
-  { key: "lat", label: "Transliteration" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
-  { key: "subtype", label: "Subtype" },
   { key: "decks", label: "Modules" },
-  { key: "audio", label: "Recording" },
-  { key: "review", label: "Review" },
-  { key: "created", label: "Created" },
-  { key: "modified", label: "Modified" },
+  { key: "status", label: "Status" },
 ];
 
 export const NO_CARD_FILTER = {
@@ -7323,38 +7319,33 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }
     />
   );
-  /* Edit and Delete, on a card's tile and at the end of its row. */
-  const cardActions = (c: Card) => (
-    <>
-      <IconButton
-        icon="edit"
-        label="Edit"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation();
-          setEditing({ card: c, decks: c.decks || [] });
-        }}
-      />
-      <IconButton
-        icon="delete"
-        label="Delete"
-        danger
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation();
-          setConfirm({ kind: "cards", ids: [c.id], action: () => {} });
-        }}
-      />
-    </>
+  /* Edit and the rest, on a card's tile and at the end of its row: behind
+     three dots, as on a module's tile (0.714, the owner's 3a), so the tile
+     is the card rather than two buttons. `also` is what a list adds — a
+     module's Remove — and `del` whether Delete is offered. */
+  const cardMenu = (c: Card, also: MoreItem[] = [], del = true) => (
+    <MoreMenu
+      label="More for this card"
+      title={leadOf(c).ar || "This card"}
+      items={[
+        { label: "Edit", icon: "edit", onClick: () => setEditing({ card: c, decks: c.decks || [] }) },
+        ...also,
+        del && { label: "Delete", icon: "delete", danger: true, onClick: () => setConfirm({ kind: "cards", ids: [c.id], action: () => {} }) },
+      ]}
+    />
   );
+  const cardActions = (c: Card) => cardMenu(c);
   /* One card of the Cards tab or of a deck, as a tile. */
   const cardTile = (c: Card | PronounGroup) => isPronounGroup(c) ? pronounTile(c) : (
     <CardTile
       card={c}
       lang={langOfCard(c)}
+      /* No date on the tile (0.714, the owner's 4a): Sort still orders
+         by it. What is left is only what needs looking at. */
       meta={
         <>
           {cardLostRecordings(c) ? <span className="at-statusbadge lost">Recording missing</span> : null}
           {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
-          {shortDate(cardAdded(c))}
         </>
       }
       onClick={() => openCard(c)}
@@ -7362,10 +7353,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     />
   );
   /*
-   * And as a line or a row of the table. The table is everything a teacher
-   * might want to compare across their cards: what each says, what kind it
-   * is, where it is, whether it has a recording and has been read, and when
-   * it was made and last changed.
+   * And as a row of the table: what each says, what kind it is, where it
+   * is, and whether it reaches students.
    *
    * The pronouns are one entry here as on the tiles, opening the screen
    * they are written on; what is about one card — its decks, its dates —
@@ -7377,23 +7366,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     row: (c): CardRow => {
       if (isNumberPart(c)) {
         return {
-          word: c.label,
-          meaning: "Numbers",
-          cells: { word: c.label, kind: "Numbers", subtype: "Word set" },
+          cells: { word: c.label, kind: "Numbers", status: <span className="at-statusbadge">Word set</span> },
           open: () => {},
           actions: actGroup ? actGroup(c) : undefined,
-          lead: <span className="at-statusbadge">Word set</span>,
         };
       }
       if (isPronounGroup(c)) {
         const said = cardWords(c, languages[c.lang as LangId]);
         return {
-          word: said.word,
-          meaning: said.meaning,
-          cells: { word: said.word, meaning: said.en, kind: cardKindLabel(c), subtype: "Pronouns" },
+          cells: { word: said.word, meaning: said.en, kind: "Pronouns", status: <span className="at-statusbadge">Word set</span> },
           open: () => setPronouning(c.lang as LangId),
           actions: actGroup ? actGroup(c) : undefined,
-          lead: <span className="at-statusbadge">Word set</span>,
         };
       }
       const said = cardWords(c, langOfCard(c));
@@ -7401,29 +7384,20 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         .map((id: string) => (modules.find((d) => d.id === id) || { title: "" }).title)
         .filter(Boolean);
       return {
-        word: said.word,
-        meaning: said.meaning,
         cells: {
           word: said.word,
-          lat: said.lat,
           meaning: said.en,
           kind: cardKindLabel(c),
-          subtype: cardSubtypeLabel(c, langOfCard(c)),
           decks: titles.join(", "),
-          status: statusPill(c),
-          audio: cardLostRecordings(c) ? "Missing" : cardHasAudio(c) ? "Yes" : "",
-          review: waitingIds.has(c.id) ? "Waiting" : needsReview(c) ? "Reviewed" : "",
-          created: shortDate(c.created),
-          modified: shortDate(c.updated),
+          status: (
+            <>
+              {lostPill(c)}
+              {statusPill(c)}
+            </>
+          ),
         },
         open: () => openCard(c),
         actions: act(c),
-        lead: (
-          <>
-            {lostPill(c)}
-            {statusPill(c)}
-          </>
-        ),
       };
     },
   });
@@ -9697,6 +9671,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }}
       />
     );
+    /* Remove, behind a card's three dots on Manage cards, where the Cards
+       tab has Delete (0.714). While it is under way the spinner stands in
+       for the dots. */
+    const removeItem = (it: any): MoreItem => ({
+      label: `Remove from this ${kindW}`, icon: "remove", onClick: () => removeFromModule(d, [it]),
+    });
+    const manageMenu = (it: any) => leaving.has(it.id) ? removeBtn(it) : cardMenu(it, [removeItem(it)], false);
     /* A card in the deck, read on the deck screen; on Manage cards, with
        Remove where the Cards tab has Delete. */
     const moduleTile = (it: any, manage: boolean) =>
@@ -9709,14 +9690,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           <CardTile
             card={it}
             lang={langOfCard(it)}
-            meta={<>{statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}{shortDate(cardAdded(it))}</>}
+            meta={statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}
             onClick={() => openCard(it)}
-            actions={
-              <>
-                <IconButton icon="edit" label="Edit" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setEditing({ card: it, decks: it.decks || [] }); }} />
-                {removeBtn(it)}
-              </>
-            }
+            actions={manageMenu(it)}
           />
         )
         : cardTile(it);
@@ -9817,12 +9793,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 onClick: (ids) => setConfirm({ kind: "cards", ids: realIds(ids), action: () => {} }),
               },
             ]}
-            views={cardViews("teacher-deck", (c) => (
-              <>
-                <IconButton icon="edit" label="Edit" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setEditing({ card: c, decks: c.decks || [] }); }} />
-                {removeBtn(c)}
-              </>
-            ), removeBtn)}
+            views={cardViews("teacher-deck", manageMenu, removeBtn)}
             renderItem={(it) => moduleTile(it, true)}
           />
           {cardScreen}
@@ -10816,10 +10787,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {/* Sentences waiting for review and cards with more than one
                   meaning used to be said here, above the list. They are in
                   To do on Home since 0.693 (the owner's 7a); the Review
-                  filter still finds the sentences. */}
-              <Help>
-                A card is one thing to learn — a word, a phrase, a sentence. Add it to a module so students get it.
-              </Help>
+                  filter still finds the sentences. And a line saying what a
+                  card is, until 0.714 (the owner's 6a): with no cards the
+                  empty list says it, and with cards it only pushed them
+                  down. */}
 
               <ItemList
                 noun="card"

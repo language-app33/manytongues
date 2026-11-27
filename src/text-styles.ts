@@ -416,15 +416,15 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
     },
     {
       name: ".at-minien",
-      size: "calc(12px * var(--tile, 1))",
-      what: "The meaning on a card tile in the list, or the name the teacher gave the card, which takes the same place and style. Scaled with the tile, which the reader sizes.",
+      size: "12px",
+      what: "The meaning on a card tile in the list, or the name the teacher gave the card, which takes the same place and style.",
       example: "to eat",
       cls: "at-minien at-mininame",
       tag: "span",
     },
     {
       name: ".at-minicard .ar",
-      size: "calc(18px * var(--sscale, 1) * var(--tile, 1))",
+      size: "calc(18px * var(--sscale, 1))",
       what: "The word itself on that tile, in the script.",
       example: "كِتَاب",
       cls: "ar",
@@ -433,7 +433,7 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
     },
     {
       name: ".at-minicard .en",
-      size: "calc(12px * var(--tile, 1))",
+      size: "12px",
       what: "And what the word on that tile means, under the script.",
       example: "book",
       cls: "en",
