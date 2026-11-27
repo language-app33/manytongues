@@ -628,6 +628,11 @@ button {
   text-align:start; padding:10px 12px; border:2px solid var(--line);
   border-radius: var(--r-sm); background: var(--raised); color: var(--text); }
 .at-deckpick.on { border-color: var(--accent); }
+/* Create a new module, the sheet's first row (0.727): dashed, as the add
+   button is, and in the accent, since it makes rather than picks. */
+.at-deckpick.new { border-style:dashed; border-color: var(--faint); background:none;
+  color: var(--accent); }
+.at-deckpick.new:hover { border-color: var(--accent); }
 .at-deckpick > .at-tickbody { flex:1 1 auto; }
 .at-deckmark { flex:0 0 auto; font-family: var(--ui); font-size:12px;
   font-weight:800; letter-spacing:.05em; text-transform:uppercase;
@@ -2902,10 +2907,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-nudgebody { flex:1; min-width:0; align-self:center; }
 .at-nudgetext { margin:0; font-size:14px; font-weight:600; line-height:1.5; color: var(--text); }
 .at-nudgeact { margin-top:10px; }
-/* Two ways to fill it side by side — an empty course's Create a module
-   and its Add a module to this course (0.724) — wrapping on a phone. */
-.at-nudgeboth { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
-.at-nudgeboth > .at-chooser.deckwrap { width:auto; }
 /* A box's buttons with an icon-only one on the end — Import, while the
    list it would fill is empty. The icon keeps its own size; a row of
    worded buttons before it takes the rest of the line. Top-aligned, so
