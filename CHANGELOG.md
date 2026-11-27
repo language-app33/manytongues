@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.705 — 27 November 2026
+
+**Progress shows three groups.** The seven tiles of "The ladder" are now
+three: Learning, Almost there and Learnt, under one bar that shows the share
+of each. Tap a group to see its cards. The four levels are still shown on
+each card's own page. Trade-off: a student no longer sees at a glance how
+many cards sit on each level.
+
+To check by hand: the three groups and the bar on a small phone screen.
+
 ## 0.704 — 27 November 2026
 
 **A student's card page is shorter.** Tapping a card now shows the word, how

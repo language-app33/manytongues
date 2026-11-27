@@ -2520,10 +2520,9 @@ if (/Build a session/.test(document.body.textContent)) {
      They were plain text, so the only way to find out which cards were
      still new was to read every deck. */
   const counts = /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll("button.at-rung")]);
-  /* Every card, then one per level of the ladder, then the ones that have
-     been all the way up, then the ones that have stuck. They used to be
-     the four maturities. */
-  check("every count at the top is a button", counts.length === 7, `${counts.length} tiles`);
+  /* Three groups since 0.705: Learning, Almost there, Learnt. They used
+     to be seven tiles, every card and then one per level. */
+  check("every count at the top is a button", counts.length === 3, `${counts.length} tiles`);
   const live = counts.find((b) => !b.disabled);
   check("a count with cards behind it can be pressed", !!live,
     counts.map((b) => `${(b.textContent || "").replace(/\s+/g, " ")}${b.disabled ? " (off)" : ""}`).join(" · "));
@@ -2537,9 +2536,8 @@ if (/Build a session/.test(document.body.textContent)) {
      spread over every level, so one card's 40% and another's would be
      forty per cent of different climbs. The bars belong under a level,
      where they measure the same thing on every tile. */
-  check("but the list of every card carries no bars, which would compare different climbs",
-    !/All cards/.test((live || {}).textContent || "") ||
-      ![...shown].some((t) => t.querySelector(".at-minibar")),
+  check("but the list carries no bars, which would compare different climbs",
+    ![...shown].some((t) => t.querySelector(".at-minibar")),
     `${[...shown].filter((t) => t.querySelector(".at-minibar")).length} of ${shown.length} barred`);
   /* On a screen of its own, titled by the tile that opened it. They used
      to open as a strip under the grid, which put a list of any length
@@ -2566,7 +2564,7 @@ if (/Build a session/.test(document.body.textContent)) {
     document.querySelectorAll(".at-cardgrid .at-minicard").length === 0,
     `${document.querySelectorAll(".at-cardgrid .at-minicard").length} still up`);
   check("which brings the tiles back",
-    document.querySelectorAll("button.at-rung").length === 7,
+    document.querySelectorAll("button.at-rung").length === 3,
     `${document.querySelectorAll("button.at-rung").length} tiles`);
 
   /* ---- the tiles say what a level asks, not what number it is ----
@@ -2575,21 +2573,12 @@ if (/Build a session/.test(document.body.textContent)) {
      read, on the screen whose job is saying where you are. */
   {
     const named = counts.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
-    check("every tile says what its level asks, in words",
-      counts.length === 7 && named.every((t) => /[A-Za-z]{3}/.test(t)) &&
-        !named.some((t) => /^\d+\s*Level \d+$/.test(t)),
-      named.join(" · "));
-    check("in the same words a card's own screen uses",
-      named.some((t) => /What it means/.test(t)) && named.some((t) => /Learnt/.test(t)),
-      named.join(" · "));
-    /* Cleared stands between the top level and Learnt, which is the whole
-       reason it exists: a card worked all the way up tonight used to be
-       filed under "write it from its meaning" beside cards that had only
-       just reached that rung. */
-    check("and a card up its whole ladder is counted apart from one still on the top rung",
-      named.findIndex((t) => /Cleared/.test(t)) ===
-        named.findIndex((t) => /Learnt/.test(t)) - 1 &&
-        named.some((t) => /Cleared/.test(t)),
+    const labels = counts.map((b) => ((b.querySelector(".at-rungname") || {}).textContent || "").trim());
+    check("the three groups are Learning, Almost there and Learnt, in that order",
+      labels.join("|") === "Learning|Almost there|Learnt", labels.join(" · "));
+    check("and each says what it means in words, with a number",
+      counts.length === 3 && named.every((t) => /^\d+/.test(t) && /[A-Za-z]{3}.*[A-Za-z]{3}/.test(t)) &&
+        !named.some((t) => /Level \d/.test(t)),
       named.join(" · "));
     check("and each carries a drawing of what it asks",
       counts.every((b) => !!b.querySelector("svg")),
@@ -2610,7 +2599,7 @@ if (/Build a session/.test(document.body.textContent)) {
      own screen and nowhere in the list, which left a card coming back
      tonight looking exactly like one coming back in a month. */
   {
-    const top = counts.filter((b) => /Cleared|Learnt/.test(b.textContent || ""));
+    const top = counts.filter((b) => /Almost there|Learnt/.test(b.textContent || ""));
     check("both tiles at the top of the ladder are there to open", top.length === 2,
       counts.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim()).join(" · "));
     const openable = top.filter((b) => !b.disabled);
@@ -2620,12 +2609,12 @@ if (/Build a session/.test(document.body.textContent)) {
     check("and at least one of them has cards behind it", openable.length > 0,
       top.map((b) => `${(b.textContent || "").replace(/\s+/g, " ").trim()}${b.disabled ? " (off)" : ""}`).join(" · "));
     for (const tile of openable) {
-      const name = (tile.textContent || "").replace(/\s+/g, " ").trim().replace(/^\d+\s*/, "");
+      const name = ((tile.querySelector(".at-rungname") || {}).textContent || "").trim();
       click(tile);
       await sleep(300);
       const cards = [...document.querySelectorAll(".at-cardgrid .at-minicard")];
       const said = cards.map((t) => ((t.querySelector(".at-minimeta") || {}).textContent || "").trim());
-      const isCleared = /Cleared/.test(name);
+      const isCleared = /Almost there/.test(name);
       /* Under Cleared, which of the reviews still to make is next — "First
          review in 3d" — because that is what the card is waiting on. Under
          Learnt there is nothing left to count, so it is simply the next
@@ -2779,9 +2768,9 @@ if (/Build a session/.test(document.body.textContent)) {
      the number underneath, so it is the number that names it here rather
      than the whole of its text. */
   const levelTile = counts.find(
-    (b) => !b.disabled && /Level \d/.test((b.textContent || "").replace(/\s+/g, " ")),
+    (b) => !b.disabled && /^Learning$/.test(((b.querySelector(".at-rungname") || {}).textContent || "").trim()),
   );
-  check("a level has cards behind it", !!levelTile,
+  check("Learning has cards behind it", !!levelTile,
     counts.map((b) => (b.textContent || "").replace(/\s+/g, " ")).join(" · "));
   click(levelTile);
   await sleep(300);
@@ -2797,40 +2786,15 @@ if (/Build a session/.test(document.body.textContent)) {
   check("and each heading is a status, with how many are in it",
     heads.length > 0 && headed.every((h) => /^(Paused|Learning|Not started)\s*\d+$/.test(h)),
     headed.join(" · ") || "no headings");
-  /* ---- and each of them says how far it has got on that level ----
-     The headings say which of three states a card is in, which is the
-     difference between started and not. This is the difference between a
-     card nearly through the level and one that has just begun, and those
-     look identical under "Learning" without it. */
+  /* ---- and each of them says where it is (0.705) ----
+     Learning holds all four levels, so a percentage of one level would
+     compare different climbs: each card says its level instead. */
   {
     const tiles = [...document.querySelectorAll(".at-cardgrid .at-minicard")];
-    const pctOf = (/** @type {Element} */ t) =>
-      ((t.querySelector(".at-minibar b") || {}).textContent || "").trim();
-    check("every card under a level says how far it has got on it, as a percentage",
-      tiles.length > 0 && tiles.every((t) => /^\d+%$/.test(pctOf(t))),
-      tiles.map(pctOf).map((p) => p || "(none)").join(" · ") || "no tiles");
-    /* Read off the bar itself rather than the tile's text, the way the
-       deck bars are: a number beside a word runs into it. */
-    check("and the bar beside it is drawn to the width of that number",
-      tiles.every((t) => {
-        const fill = /** @type {any} */ (t.querySelector(".at-minibarrail > span"));
-        return !!fill && fill.style.width === pctOf(t);
-      }),
-      tiles.map((t) => {
-        const fill = /** @type {any} */ (t.querySelector(".at-minibarrail > span"));
-        return fill ? fill.style.width : "no bar";
-      }).join(" · "));
-    /* The bar is the number again, so a screen reader is told once. */
-    check("the bar is drawing, and not read out twice",
-      tiles.every((t) => {
-        const rail = t.querySelector(".at-minibarrail");
-        return !!rail && rail.getAttribute("aria-hidden") === "true";
-      }));
-    /* And it is never full: a card whose level is done has moved up and is
-       under the next tile along. */
-    check("and none of them is full, because a finished level is the next tile",
-      tiles.every((t) => Number(pctOf(t).replace("%", "")) < 100),
-      tiles.map(pctOf).join(" · "));
+    const metaOf = (/** @type {Element} */ t) => ((t.querySelector(".at-minimeta") || {}).textContent || "").trim();
+    check("every card under Learning says where it is, and carries no bar",
+      tiles.length > 0 && tiles.every((t) => !!metaOf(t) && !t.querySelector(".at-minibar")),
+      tiles.map(metaOf).map((p) => p || "(none)").join(" · ") || "no tiles");
   }
 
   /* The counts are of the whole run, so they add up to the number on the
@@ -3037,9 +3001,9 @@ if (/Build a session/.test(document.body.textContent)) {
 {
   click(buttonNamed(/^Progress$/));
   await sleep(400);
-  /* The first tile is "Cards" — every card that is anywhere on the ladder. */
+  /* Every card in view, as the line under "Your cards" counts them (0.705). */
   const cardCount = () =>
-    Number(((document.querySelector("button.at-rung") || {}).textContent || "").trim().match(/^\d+/));
+    Number(((document.body.textContent || "").match(/How well you know your (\d+) cards/) || [])[1]);
   const both = cardCount();
   /* The languages are in the sheet behind where you are, at the top of
      the page (0.601). */

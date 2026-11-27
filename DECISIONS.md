@@ -9430,3 +9430,13 @@ except `ReadKind`, the lede of "The card" and `ReadReference`. Only
 `CardLadder`'s four rows became one four-part bar (`at-levelbar`, filled in
 `--jade`); `TenseLadder` is unchanged. "High priority" is renamed on the
 card screen only; filters, tiles and sessions keep the old words.
+
+## Progress shows three groups (0.705)
+
+Seven boxes, two of them (Cleared, Learnt) unexplained, answered "how am I
+doing?". `LADDER_TILES` is now three entries (`learning`, `cleared`,
+`done`), each with a one-line `note` where "Level N" was. `byBucket` is
+filled as before and gains a derived `learning` bucket (l1–l4 in order);
+the `all` bucket and tile went. Learning's list is grouped by `STATUS_RUNS`
+with `standingShort` as small print and no per-level bar, which would
+compare different climbs. One stacked `at-sharebar` above the tiles.

@@ -2464,7 +2464,7 @@ button.at-flag:hover { color: var(--text); border-color: var(--muted); }
 .at-lately p:last-child { margin-bottom:0; }
 .at-lately b { color: var(--text); font-weight:800; }
 
-.at-rungs { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+.at-rungs { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
   gap:8px; margin-bottom:18px; }
 .at-rung { display:flex; flex-direction:column; align-items:flex-start; gap:1px;
   width:100%; font:inherit; color:inherit; text-align:start; cursor:pointer;
@@ -2475,16 +2475,23 @@ button.at-flag:hover { color: var(--text); border-color: var(--muted); }
 .at-rungicon { display:inline-flex; margin-bottom:5px; }
 .at-rungname { font-family: var(--ui); font-size:12px; font-weight:700; color: var(--text-soft);
   line-height:1.25; overflow-wrap:anywhere; }
-.at-rungstep { font-family: var(--ui); font-size:9px; font-weight:800; letter-spacing:.07em;
-  text-transform:uppercase; color: var(--faint); margin-top:2px; }
+/* A group's one line of what it means (0.705). */
+.at-rungstep { font-family: var(--ui); font-size:11px; font-weight:500; line-height:1.35;
+  color: var(--muted); margin-top:3px; }
+/* The three groups' shares in one bar above them (0.705): Learning in
+   brass, Almost there in light green, Learnt in green. */
+.at-sharebar { display:flex; gap:2px; height:10px; border-radius:999px; overflow:hidden;
+  background: var(--well); margin:0 0 12px; }
+.at-sharebar > span { display:block; height:100%; }
+.at-sharebar-a { background: var(--brass); }
+.at-sharebar-b { background: var(--jade-soft); }
+.at-sharebar-c { background: var(--jade); }
 /* The one the others are climbing towards, so it is the one that has to
    carry across the room: its own ground, its own edge, and the icon in a
    badge rather than sitting on the tile like the rest.
 
-   And the whole of the last row. Seven tiles in three columns leave one
-   over, and a lone tile in a corner reads as a tile that did not fit —
-   where this one standing across the foot of the grid reads as the thing
-   the six above it are for. It lays itself out along the row rather than
+   And the whole of the last row: the two groups above it in two columns,
+   and this one across the foot of the grid, the thing they are for. It lays itself out along the row rather than
    down it, so a full-width tile is not a tall empty box. */
 .at-rung.learnt { background: var(--jade-bg); border-color: var(--jade-soft);
   grid-column: 1 / -1; flex-direction:row; align-items:center; gap:10px; }

@@ -1037,14 +1037,13 @@ const LEVEL_REACHED: Record<number, string> = {
  * than the badge, and brass rather than jade: the work is done and the app
  * is still checking.
  */
-const LADDER_TILES: { key: string; label: string; icon: string }[] = [
-  { key: "all", label: "All cards", icon: "cards" },
-  { key: "l1", label: LEVEL_NAME[1], icon: "help" },
-  { key: "l2", label: LEVEL_NAME[2], icon: "search" },
-  { key: "l3", label: LEVEL_NAME[3], icon: "copy" },
-  { key: "l4", label: LEVEL_NAME[4], icon: "edit" },
-  { key: "cleared", label: "Cleared", icon: "check" },
-  { key: "done", label: "Learnt", icon: "verify" },
+/* Three groups since 0.705, in place of seven tiles: the four levels
+   together as Learning, then Cleared as "Almost there", then Learnt. The
+   levels are still on each card's own page. */
+const LADDER_TILES: { key: string; label: string; note: string; icon: string; tone: string; bar: string }[] = [
+  { key: "learning", label: "Learning", note: "You're still getting to know these.", icon: "help", tone: "var(--text)", bar: "at-sharebar-a" },
+  { key: "cleared", label: "Almost there", note: "Right at every level. A few more days and they're learnt.", icon: "check", tone: "var(--brass)", bar: "at-sharebar-b" },
+  { key: "done", label: "Learnt", note: "You still knew these days later.", icon: "verify", tone: "var(--jade)", bar: "at-sharebar-c" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -21188,7 +21187,7 @@ function ProgressTab({
      to say four hundred and once to list them — is a walk of every card
      for nothing. */
   const byBucket = useMemo(() => {
-    const out: Record<string, Item[]> = { all: counted, l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
+    const out: Record<string, Item[]> = { l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
     for (const it of counted) {
       const at = progressOf.get(it.id);
       /* A card with nothing it can be asked yet — no meaning, or every
@@ -21203,6 +21202,8 @@ function ProgressTab({
         at.status === "done" ? "done" : at.status === "cleared" ? "cleared" : `l${at.level}`;
       (out[bucket] || []).push(it);
     }
+    /* The four levels as one group, Learning (0.705), in level order. */
+    out.learning = [...out.l1, ...out.l2, ...out.l3, ...out.l4];
     return out;
   }, [counted, progressOf]);
   /* Which tile is open, or none. One at a time: they are six views of the
@@ -21216,7 +21217,7 @@ function ProgressTab({
      two tiles — "Cards" is spread over every level, so one card's 40% and
      another's would be forty per cent of different climbs, and under
      "Learnt" every bar would be full. */
-  const onLevel = /^l\d$/.test(showing);
+  const onLevel = showing === "learning";
   /* And whether it is one of the two at the top, where the climb is over
      and what is left is time: every bar there would be full, so each card
      says when it is next asked instead. */
@@ -21279,9 +21280,21 @@ function ProgressTab({
       <Lately moves={moves} />
       <Section
         head
-        title="The ladder"
-        lede="See how well you know each card. Answer a card correctly twice in a row to move it up a level."
+        title="Your cards"
+        lede={`How well you know your ${counted.length} cards.`}
       >
+      {/* The three groups' shares, drawn once; the tiles carry the numbers. */}
+      {(() => {
+        const total = LADDER_TILES.reduce((n, t) => n + byBucket[t.key].length, 0);
+        return total ? (
+          <div className="at-sharebar" aria-hidden="true">
+            {LADDER_TILES.map((t) => (
+              <span key={t.key} className={t.bar}
+                style={{ width: `${(100 * byBucket[t.key].length) / total}%` }} />
+            ))}
+          </div>
+        ) : null;
+      })()}
 
       {/* A number you want to see the cards behind is a number worth
           pressing. Buttons rather than divs with a click on them: there is
@@ -21295,16 +21308,8 @@ function ProgressTab({
           looking at now, and each says what its level actually asks rather
           than what number it happens to be. */}
       <div className="at-rungs">
-        {LADDER_TILES.map(({ key, label, icon }) => {
+        {LADDER_TILES.map(({ key, label, note, icon, tone }) => {
           const count = byBucket[key].length;
-          const tone =
-            key === "all"
-              ? "var(--text)"
-              : key === "done"
-              ? "var(--jade)"
-              : key === "cleared"
-              ? STATUS_COLOR.cleared
-              : LEVEL_COLOR[Number(key.slice(1))];
           return (
             <button
               type="button"
@@ -21324,7 +21329,7 @@ function ProgressTab({
               </span>
               <b style={{ color: tone }}>{count}</b>
               <span className="at-rungname">{label}</span>
-              {/^l\d$/.test(key) && <span className="at-rungstep">Level {key.slice(1)}</span>}
+              <span className="at-rungstep">{note}</span>
             </button>
           );
         })}
@@ -21392,7 +21397,7 @@ function ProgressTab({
                  apart is which comes back first — "Cleared" on every
                  tile and "Learnt" on every tile said nothing at all. */
               meta={
-                showing === "all"
+                showing === "learning"
                   ? standingShort(progressOf.get(it.id) || null)
                   : showing === "cleared"
                   ? heldLine(progressOf.get(it.id) || null) ||
@@ -21401,13 +21406,6 @@ function ProgressTab({
                   ? reviewLine(progress.next.get(it.id) || 0)
                   : undefined
               }
-              /* And under a level, how far the card has got on it. The
-                 headings say which of three states it is in, which is the
-                 difference between started and not; this says how much of
-                 the level is behind it, which is the difference between a
-                 card that is nearly through and one that has just begun —
-                 and those look identical under "Learning" without it. */
-              bar={onLevel ? { pct: levelPercent(progressOf.get(it.id)) } : undefined}
               /* Everything on the tile, said in full. Elsewhere a tile is
                  something to scan past and is clipped to keep it short;
                  here the small print is the answer to the question the
