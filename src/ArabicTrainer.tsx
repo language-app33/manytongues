@@ -1160,7 +1160,7 @@ function standingShort(at: Standing | null): string {
 }
 
 /*
- * A learner's card list as lines or a table — see CardViews. The table is
+ * A learner's card list as a table — see CardViews. The table is
  * what a learner compares across their cards: what each says, what kind it
  * is, and how far they have got with it. `key` is which list, so each
  * remembers the view it was left at.
@@ -1183,8 +1183,6 @@ function studentViews(
       const L = lang(it);
       const said = cardWords(it, L);
       return {
-        word: said.word,
-        meaning: said.meaning,
         cells: {
           word: said.word,
           meaning: said.en,

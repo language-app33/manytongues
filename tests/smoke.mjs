@@ -9245,7 +9245,7 @@ const openPronounTables = async () => {
     return btn ? btn.getAttribute("aria-label") || "" : "(no view button)";
   };
   check("and the view button says which view it is in and what pressing it does",
-    /^View: Small grid — press for large grid$/.test(sizeName()), sizeName());
+    /^View: Grid — press for table$/.test(sizeName()), sizeName());
   check("after it, as icons, Select, Sort and Filter, in that order",
     named(subRow()).join(" | ") === "Select | Sort | Filter",
     named(subRow()).join(" | ") || "(no second row)");
@@ -9463,41 +9463,38 @@ const openPronounTables = async () => {
       thisModule ? "the title box is live" : "(no This deck)");
   }
 
-  /* Four views, in turn: small tiles, bigger tiles — fewer to a row, each
-     with its words set larger, the grid carrying the scale so one variable
-     moves both — a line per card, and a table. */
-  const scale = () => {
-    const g = one(".at-cardgrid", null);
-    return g ? g.style.getPropertyValue("--tile") : "";
-  };
+  /* Two views, in turn (0.702): the grid, and a table of five columns. */
   const sizeBtn = () => one(".at-viewbtn", null);
   const viewIcon = () => {
     const p = one(".at-viewbtn path", null);
     return p ? p.getAttribute("d") || "" : "";
   };
-  check("the tiles start at the size they have always been", !scale(), scale() || "(no scale set)");
+  check("the list starts as a grid of tiles", !!one(".at-cardgrid .at-minicard", null) && !one(".at-cardtable", null));
+  /* A tile is the card and its three dots: Edit and Remove are in them,
+     not two buttons on every tile (0.702). */
+  {
+    const tile = one(".at-cardgrid .at-minicard", null);
+    const acts = tile ? [...tile.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") || "") : [];
+    check("a tile carries three dots, and no Edit or Remove of its own",
+      acts.includes("More for this card") && !acts.includes("Edit") && !acts.some((a) => /^Remove/.test(a)),
+      acts.join(" | ") || "(no tile)");
+    check("and no date", !!tile && !/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d/.test(tile.textContent || ""),
+      tile ? (tile.textContent || "").slice(0, 80) : "(no tile)");
+  }
   const smallIcon = viewIcon();
   click(sizeBtn());
   await sleep(200);
-  check("pressing the view button draws them bigger", Number(scale()) > 1, scale() || "(no scale set)");
-  check("and the button now offers the list",
-    /Large grid — press for list/.test(sizeName()), sizeName());
+  check("pressing the view button draws the table", !!one(".at-cardtable", null) && !one(".at-cardgrid .at-minicard", null));
+  check("and the button now offers the grid",
+    /^View: Table — press for grid$/.test(sizeName()), sizeName());
   check("and its icon changes with the view", !!viewIcon() && viewIcon() !== smallIcon, viewIcon().slice(0, 20));
   /* Kept on the device, and per list: the deck's view is not the Cards tab's. */
   check("the view is remembered on the device, for this list",
-    localStorage.getItem("arabic-trainer-view:teacher-deck") === "large",
+    localStorage.getItem("arabic-trainer-view:teacher-deck") === "table",
     String(localStorage.getItem("arabic-trainer-view:teacher-deck")));
-  click(sizeBtn());
-  await sleep(150);
-  const lines = [...document.querySelectorAll(".at-cardline")];
-  check("the list view is a line per card, with no tiles",
-    lines.length > 0 && !one(".at-cardgrid .at-minicard", null),
-    `${lines.length} lines`);
-  click(sizeBtn());
-  await sleep(150);
   const heads = [...document.querySelectorAll(".at-cardtable thead th")].map((th) => (th.textContent || "").trim()).filter(Boolean);
-  check("the table view has a column for everything the teacher compares",
-    heads.join(" | ") === "Status | Word | Transliteration | Meaning | Kind | Subtype | Modules | Recording | Review | Created | Modified",
+  check("the table has five columns, status last",
+    heads.join(" | ") === "Word | Meaning | Kind | Modules | Status",
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));
@@ -9521,9 +9518,9 @@ const openPronounTables = async () => {
   }
   click(sizeBtn());
   await sleep(150);
-  check("and it comes back round to where it started rather than running out",
-    !scale() && localStorage.getItem("arabic-trainer-view:teacher-deck") === "small",
-    `${scale() || "(no scale)"} · stored ${localStorage.getItem("arabic-trainer-view:teacher-deck")}`);
+  check("and it comes back round to the grid",
+    !!one(".at-cardgrid .at-minicard", null) && localStorage.getItem("arabic-trainer-view:teacher-deck") === "small",
+    `stored ${localStorage.getItem("arabic-trainer-view:teacher-deck")}`);
 
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
