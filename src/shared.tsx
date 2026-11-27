@@ -2039,7 +2039,7 @@ const PAGE_SIZE = 120;
  * The two ways a card list can be drawn, which its view button switches
  * between: a grid of tiles, for browsing, and a table, for comparing.
  *
- * There were four until 0.702 — small and large grids, a line per card, and
+ * There were four until 0.703 — small and large grids, a line per card, and
  * the table. The owner's wish (1a) was one view for each job and nothing
  * twice: the large grid was the small one bigger, and the line was the
  * table's first two columns. What goes in the table is the list's to say —
@@ -2077,7 +2077,7 @@ export interface CardViews<T> {
    table suits the whole collection and a grid suits one deck.
 
    A device left at a view that has gone opens at the one that took over
-   its job (0.702): the large grid at the grid, the list at the table. */
+   its job (0.703): the large grid at the grid, the list at the table. */
 const VIEW_KEY = "arabic-trainer-view:";
 function loadView(list: string): ListView {
   try {

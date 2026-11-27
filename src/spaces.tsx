@@ -7303,7 +7303,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     />
   );
   /* Edit and the rest, on a card's tile and at the end of its row: behind
-     three dots, as on a module's tile (0.702, the owner's 3a), so the tile
+     three dots, as on a module's tile (0.703, the owner's 3a), so the tile
      is the card rather than two buttons. `also` is what a list adds — a
      module's Remove — and `del` whether Delete is offered. */
   const cardMenu = (c: Card, also: MoreItem[] = [], del = true) => (
@@ -7323,7 +7323,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     <CardTile
       card={c}
       lang={langOfCard(c)}
-      /* No date on the tile (0.702, the owner's 4a): Sort still orders
+      /* No date on the tile (0.703, the owner's 4a): Sort still orders
          by it. What is left is only what needs looking at. */
       meta={
         <>
@@ -9670,7 +9670,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       />
     );
     /* Remove, behind a card's three dots on Manage cards, where the Cards
-       tab has Delete (0.702). While it is under way the spinner stands in
+       tab has Delete (0.703). While it is under way the spinner stands in
        for the dots. */
     const removeItem = (it: any): MoreItem => ({
       label: `Remove from this ${kindW}`, icon: "remove", onClick: () => removeFromModule(d, [it]),
@@ -10783,7 +10783,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   meaning used to be said here, above the list. They are in
                   To do on Home since 0.693 (the owner's 7a); the Review
                   filter still finds the sentences. And a line saying what a
-                  card is, until 0.702 (the owner's 6a): with no cards the
+                  card is, until 0.703 (the owner's 6a): with no cards the
                   empty list says it, and with cards it only pushed them
                   down. */}
 

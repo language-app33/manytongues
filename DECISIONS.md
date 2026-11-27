@@ -9414,7 +9414,7 @@ cost 0.699 named: tabs remain the one place where chosen is not green, and
 the outline is the darkest line on a light screen. 0.699's ordinary
 lettering and 2px track edge stay.
 
-## Card lists: a grid and a table, and a tile's actions behind dots (0.702)
+## Card lists: a grid and a table, and a tile's actions behind dots (0.703)
 
 A card list had four views — small grid, large grid, a line per card, a
 table of eleven columns — and every teacher's tile carried Edit and Delete
