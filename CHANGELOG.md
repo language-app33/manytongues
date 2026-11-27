@@ -18,8 +18,7 @@ little smaller and at an ordinary weight; the headings are as they were.
 
 - Editing a card is unchanged: there the words were already in boxes and
   smaller than the headings.
-- A module's and a space's own screens were checked and did not have the
-  problem.
+- A module's own screen was checked and did not have the problem.
 
 To check by hand: on a phone, that the words still read comfortably at the
 new size, the Arabic above all.
