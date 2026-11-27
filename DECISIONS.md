@@ -9546,7 +9546,7 @@ failure). Creating personal records through the server still works, for
 the tests and for old phones; whatever is made is deleted at the next
 start. The app offers no way in.
 
-## To do leaves out a course's cards that don't reach students (0.720)
+## To do leaves out a course's cards that don't reach students (0.721)
 
 **Problem.** To do on Home listed, per course, `notReaching`'s count: drafts,
 cards ready for review and number parts without words, with Open the course.

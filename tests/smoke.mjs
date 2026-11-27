@@ -13222,21 +13222,23 @@ const openPronounTables = async () => {
   check("in Material's Modules, a unit is labelled Unit and a deck is not",
     unitLabel(/Greetings unit/) === "Unit" && unitLabel(/Family unit/) === "Unit" && !!tileOf(/Lesson 1/) && !unitLabel(/Lesson 1/),
     tiles.join(" | ").slice(0, 300) || "no tiles");
-  /* A module's tile (0.689): its quality as a number in a ring, no
-     language or size under its title, and Export and Delete behind three
-     dots that do not open the module when pressed. */
+  /* A module's tile (0.689): no language or size under its title, and
+     Export and Delete behind three dots that do not open the module when
+     pressed. Since 0.720 its quality is " · score: N" at the end of the
+     line under its name (0.715), after the courses it is in, and the
+     three dots have no outline. */
   {
     const lesson = cardsNow.find((t) => /^Lesson 1$/.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
     const meta = ((lesson && lesson.querySelector(".at-deckmeta")) || {}).textContent || "";
-    check("a module's tile has its quality in a ring, and no language or card count",
-      !!lesson && !!lesson.querySelector(".at-qring") && !/\bcards?\b|Arabic/.test(meta),
-      lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
-    /* 0.715: the ring left of the name, and who can see it on the line
-       straight under the name rather than under a rule at the foot. */
-    check("its ring is left of its name, and who can see it is right under the name",
-      !!lesson && !!lesson.querySelector(".at-deckrow2 > .at-decklead .at-qring") &&
-        !!lesson.querySelector(".at-deckmain > .at-reach") && !lesson.querySelector(":scope > .at-reach"),
-      lesson ? lesson.innerHTML.slice(0, 300) : "(no Lesson 1)");
+    const line = ((lesson && lesson.querySelector(".at-deckmain > .at-reach")) || {}).textContent || "";
+    check("a module's tile has no language or card count under its name",
+      !!lesson && !/\bcards?\b|Arabic/.test(meta), lesson ? meta : "(no Lesson 1)");
+    check("who can see it is right under the name, its score last on that line",
+      !!lesson && !lesson.querySelector(".at-qring") && !lesson.querySelector(":scope > .at-reach") &&
+        /^Available to students in the course .+ · score: \d+$/.test(line.replace(/\s+/g, " ").trim()),
+      line || "(no line)");
+    check("and its three dots have no outline",
+      !!lesson && !!lesson.querySelector(".at-morebtn.bare"), lesson ? lesson.innerHTML.slice(-300) : "(no Lesson 1)");
     click(lesson ? lesson.querySelector(".at-morebtn") : null);
     await sleep(150);
     const lines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
