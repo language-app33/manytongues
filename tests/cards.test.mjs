@@ -3178,7 +3178,7 @@ test("a card's words are cut after twenty characters for the table", () => {
   assert.equal(clipped("كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ"), "كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ…");
 });
 
-/* What stands in for a missing meaning on a teacher's tile (0.732): the
+/* What stands in for a missing meaning on a teacher's tile (0.733): the
    transliteration, else a picture, else a recording, else nothing. */
 test("standIn: a card with English needs none", () => {
   assert.equal(standIn({ forms: [{ ar: "كتاب", en: "book", lat: "kitaab" }] }), null);

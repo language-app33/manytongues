@@ -204,6 +204,7 @@ const PLACES: Record<string, [string, string]> = {
   SentencePicker: [TEACH, "Editing a card · picking a sentence card as a line"],
   CapitalsBlock: [TEACH, "Editing a card · the tick for whether its English keeps its capital letters in a sentence"],
   BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its modules"],
+  CardHero: [TEACH, "A card being read · the card itself at the top: its word, how it is said, what it means"],
   DescriptionBlock: [TEACH, "Editing a card · Basic or Advanced · the word's description in the language itself, and its English"],
   MeaningsBlock: [TEACH, "Editing a card · Advanced · the other cards with the same word or meaning, the clue, and adding another"],
   CarryAsk: [TEACH, "Editing a card · whether a spelling fix goes onto the other cards with the same word"],

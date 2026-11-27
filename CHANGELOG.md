@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.732 — 27 November 2026
+## 0.733 — 27 November 2026
 
 **A simpler Home, New module panel and Cards list for teachers.**
 
@@ -58,6 +58,70 @@ the Sort control, since the list has no column headings.
 **To check by hand:** on a real phone, that the join panel stays above the
 keyboard, and that pressing and holding a tile or a list row still starts
 selecting.
+
+## 0.732 — 27 November 2026
+
+**Simpler teacher screens.** A module, the word sets and a card being read
+each ask less of the eye, as chosen on the page of mock-ups.
+
+**A module's screen**
+
+- **Its name is the heading**, with a small pencil beside it. Tap the
+  pencil and the name becomes a box with Save and Cancel, right there.
+- **Three dots at the top right** hold Export and Delete. Delete still asks
+  first.
+- **The card list is on the module's own screen**: the green + for a new
+  card, Add existing cards, Select (in the list's three dots) and Import.
+  The separate "Manage cards" screen and the Edit button are gone.
+- **The language and the number of cards are on one line** under the name,
+  and "Made by … · last changed by …" is at the foot of the screen.
+
+**Word sets**
+
+- **Numbers**: the screen is called "Numbers · (language)", like its tile,
+  and opens with two lines instead of a paragraph. Each part says one plain
+  thing — "Ready", "10 words still to write" or "Needs Numbers 0 to 9
+  first". The next part worth writing is marked **Start here**, and parts
+  that cannot work yet are drawn fainter (they still open). The section at
+  the foot is called "Fix a number".
+- **Pronouns**: each pronoun shows its word, its transliteration and
+  Record. Its English is one line with **Change**, which opens the three
+  English boxes. The long introduction is one sentence; **How sentences use
+  them** opens a panel from the foot of the screen.
+- **The tiles on the Word sets tab** say "Not started" instead of "0 of 11
+  ranges written", and "not in a module yet".
+
+**A card, before Edit**
+
+- **The card is shown as a card**: the word large, how it is said and what
+  it means. Under it, its modules, and a short "to improve" list where
+  there is something to improve (for now: a word written without its
+  vowel marks), with a button that turns the screen to editing.
+- **The red stars, the "Build an advanced card" tick-box and the "This
+  card" heading show only after Edit.** Export is behind three dots on the
+  card. A word that is only its spelling, its sound and its meaning no
+  longer repeats itself in a Content section under the card; one with a
+  recording, a picture or a second answer keeps that section. An empty
+  Description is not shown.
+- **On the Exercises tab** the exercise tiles are exactly as they were.
+  "What is practised" is one row per form saying in words where it comes
+  up ("On its own and in sentences", "In sentences only", "Not
+  practised"); the tick-boxes come back after Edit.
+- **Editing a card looks exactly as it did.**
+
+**Trade-offs**
+
+- Renaming, exporting and deleting a module are each one press further
+  away.
+- A card being read no longer looks like the card being edited.
+- The line "Students choose and write this word" from the mock-up is not
+  shown: it belongs to the Description, which shows only when one is
+  written. The card's first tab keeps its name, "Basic".
+
+**To check by hand**
+
+- On a real phone: that the pencil and the three dots are easy to hit, and
+  the Pronouns screen with the keyboard open.
 
 ## 0.731 — 27 November 2026
 

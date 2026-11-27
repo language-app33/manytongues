@@ -101,7 +101,7 @@ export function confirmStrength({ permanent, affectsOthers, name }: {
    ------------------------------------------------------------------ */
 
 const ICONS: Record<string, string> = {
-  /* Three stops joined by a line, climbing: a course's path (0.732). */
+  /* Three stops joined by a line, climbing: a course's path (0.733). */
   path: "M6 15.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM18 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.4 15.2l2.4-2.4 1.4 1.4-2.4 2.4zM13.4 9.2l2.4-2.4 1.4 1.4-2.4 2.4z",
   /* An empty ring of dashes: not out yet — the draft beside Published's
      tick. */
@@ -820,7 +820,7 @@ export function Empty({ title, children, action, art, slim }: { title?: Node; ch
       (0.642: the home screen with nothing to practise). */
   art?: Node;
   /** On one row, picture beside the words, about a third of the height:
-      a quiet To do on Teaching's Home (0.732). */
+      a quiet To do on Teaching's Home (0.733). */
   slim?: boolean }) {
   return (
     <div className={`at-empty2${slim ? " slim" : ""}`}>
@@ -1392,7 +1392,7 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
   corner?: Node;
   onClick?: () => void;
   className?: string;
-  /** What goes in the meaning's place on a card with no meaning (0.732,
+  /** What goes in the meaning's place on a card with no meaning (0.733,
       the teacher's grids): its transliteration, or that it is a picture
       or a recording. See standIn in cards.ts. Left out, the line is blank. */
   standIn?: { kind: string; text: string } | null;
@@ -2110,7 +2110,7 @@ export interface CardRow {
   open?: () => void;
   actions?: Node;
   /** What the phone's list says under the meaning where `decks` is empty
-      (0.732): "In no module", for a card; left out for a word set, whose
+      (0.733): "In no module", for a card; left out for a word set, whose
       line then holds only its badge. */
   noDecks?: string;
 }
@@ -2223,7 +2223,7 @@ export function clipped(text: string, n = 20): string {
 
 /*
  * What makes a row of a card list a thing to press, shared by the table
- * and the phone's list (0.732) so the two answer a tap, a key and a held
+ * and the phone's list (0.733) so the two answer a tap, a key and a held
  * finger alike: pressing opens the card, or ticks it while selecting.
  */
 function rowPress(selecting: boolean, picked: Set<string>, toggle: (id: string) => void) {
@@ -2248,7 +2248,7 @@ function rowPress(selecting: boolean, picked: Set<string>, toggle: (id: string) 
 }
 
 /*
- * Whether the screen is phone-narrow: under 640px wide (0.732). Where the
+ * Whether the screen is phone-narrow: under 640px wide (0.733). Where the
  * browser cannot say — the smoke walk's, which has no matchMedia — it is
  * not, so that walk keeps seeing the table it checks.
  */
@@ -2274,7 +2274,7 @@ export function useNarrow(): boolean {
 }
 
 /*
- * The table's view on a phone, as a list (0.732, the owner's choice): one
+ * The table's view on a phone, as a list (0.733, the owner's choice): one
  * card a row, its meaning over a line of where it is, what kind when it is
  * not a plain word, and its badge; its word on the right. A table five
  * columns wide scrolled sideways on a phone and showed two of them.
@@ -3006,7 +3006,7 @@ export function ItemList<T>({
   const viewAt = views ? Math.max(0, VIEWS.findIndex((v) => v.id === view)) : 0;
   const at = VIEWS[viewAt];
   const then = VIEWS[(viewAt + 1) % VIEWS.length];
-  /* On a phone the table is drawn as a list (0.732), and called one. */
+  /* On a phone the table is drawn as a list (0.733), and called one. */
   const narrowScreen = useNarrow();
   const nameOf = (v: { id: ListView; name: string }) => (narrowScreen && v.id === "table" ? "List" : v.name);
   const viewLabel = `View: ${nameOf(at)} — press for ${nameOf(then).toLowerCase()}`;
@@ -3149,7 +3149,7 @@ export function ItemList<T>({
      way back out are both still there: "0 of 14", Clear and the chips. */
   const any = items.length > 0 || whole > 0;
   /* No match, no box: a search that cannot narrow anything is a bar with
-     nothing in it. Teaching's Home leaves it out under six courses (0.732). */
+     nothing in it. Teaching's Home leaves it out under six courses (0.733). */
   const box = any && !outside && !!match;
   const filterBtn = liveFilters.length > 0 && !bare;
   /* The dots: Select first, where there is anything to select, then the

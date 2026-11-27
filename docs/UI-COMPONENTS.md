@@ -230,8 +230,9 @@ from there), the search box taking what is left, Filter (with the count of
 filters on, and its word from 640px), `narrow`, and three dots. The dots hold
 Select first, where there is anything to select, then `more` (Import, where a
 list has it); where Select would be alone in them it is an icon of its own
-and there are no dots. `tools`, the screen's worded button ("Manage this
-deck's cards"), is on a row of its own above the bar. Each part is left out
+and there are no dots. `tools`, a screen's own worded button, is on a row of its own above
+the bar. (A module's screen had one, "Manage this deck's cards", until
+0.732, when it took in Manage cards and its list became the Cards tab's.) Each part is left out
 when it would hold nothing, and with `emptyPanel` showing the bar stands
 aside.
 
@@ -276,10 +277,10 @@ is missing.
 `itemKey` defaults to reading `.id`, so items need one unless you pass your
 own.
 
-**No `match`, no search box** (0.732): a box that cannot narrow anything is
+**No `match`, no search box** (0.733): a box that cannot narrow anything is
 left out, and a bar with nothing else in it is not drawn at all.
 
-**On a phone the table is a list** (0.732). Under 640px wide (`useNarrow()`,
+**On a phone the table is a list** (0.733). Under 640px wide (`useNarrow()`,
 which reads `(max-width: 639px)` and says no where there is no
 `matchMedia`) the table view is drawn by `CardRows`: one card a row, its
 `meaning` cell over a line of its `decks` cell (or the row's `noDecks`,
@@ -307,14 +308,14 @@ One card tile for both the learner's and the teacher's lists.
 
 `card, lang, showLat, meta, actions, corner, onClick, className, standIn`
 
-**The teacher's grids pass `className="teach"`** (0.732): two tiles a row
+**The teacher's grids pass `className="teach"`** (0.733): two tiles a row
 on a phone, every tile the same height, the word and the meaning one line
 each and cut with …, a 1px outline, and the status badge at the tile's foot
 at its own width, wrapping rather than cut. The grid around them picks up
 the wider columns from the class (`:has()`). The learner's tiles pass
 nothing and are as they were.
 
-`standIn` (0.732) is what goes in the meaning's place on a card with no
+`standIn` (0.733) is what goes in the meaning's place on a card with no
 meaning and no name: `standIn(card)` from `cards.ts` gives the first
 transliteration (drawn in italics), else "Picture" or "Recording" with a
 small symbol, else nothing.
@@ -331,7 +332,7 @@ and only a verb whose own word is a cell of its table has one.
 
 ### `CoursesPage` — spaces.tsx, 2 uses
 The list of someone's courses: Teaching's Home and the learner's Courses.
-`joinButton` (0.732, Teaching only) puts joining at the foot of My courses
+`joinButton` (0.733, Teaching only) puts joining at the foot of My courses
 as a dashed button, `label`, opening a `PickSheet` titled `title` with the
 code box; `noneAtAll` says the person has no course at all, and then a
 `Nudge` saying `none` with a `first` button stands in for the list.
@@ -339,13 +340,13 @@ Without `joinButton` the join box is the section it always was.
 `searchFrom` searches the courses only from that many on (Teaching: six).
 
 ### `OpenRow` — spaces.tsx
-A row that opens something, drawn as a module's tile. `icon` (0.732) puts
+A row that opens something, drawn as a module's tile. `icon` (0.733) puts
 a picture in a soft green square beside the words, at the top of them, and
 lets the line under the title take as many lines as it needs: the kinds on
 the New module panel.
 
 ### `Empty`
-`slim` (0.732) draws it on one row, the picture beside the words, a third
+`slim` (0.733) draws it on one row, the picture beside the words, a third
 of the height: To do on Teaching's Home with nothing in it.
 
 ### `Tile` — 7 uses

@@ -1225,7 +1225,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 
 .at-openrow .at-deckrow2, .at-openrow .at-deckmain,
 .at-openrow .at-decktitle, .at-openrow .at-deckmeta { display:block; }
-/* A kind on the New module panel (0.732): its picture beside its words,
+/* A kind on the New module panel (0.733): its picture beside its words,
    at the top of them, and the description on as many lines as it takes. */
 .at-openrow.withicon .at-deckrow2 { display:flex; align-items:flex-start; gap:12px; }
 .at-openrow.withicon .at-deckmain { flex:1 1 0; }
@@ -1394,7 +1394,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   padding:0; flex:none; color: var(--muted); }
 .at-minicorner .at-morebtn:hover, .at-minicorner .at-morebtn.on { color: var(--ink); }
 .at-minicard.cornered > .ar, .at-minicard.cornered > .at-minikind { padding-right:26px; }
-/* The teacher's card grids (0.732, the owner's 5a): two a row on a phone,
+/* The teacher's card grids (0.733, the owner's 5a): two a row on a phone,
    every tile the same height, the word and the meaning one line each, cut
    with … — thinner outlines and more room. Only the teaching side passes
    `teach`; the learner's tiles are as they were. */
@@ -1454,7 +1454,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   text-transform:uppercase; color: var(--muted); padding-top:12px; }
 .at-cardtable .at-grouprow span { font-weight:700; letter-spacing:0; color: var(--faint); }
 
-/* The table's view on a phone, as a list (0.732, the owner's choice): one
+/* The table's view on a phone, as a list (0.733, the owner's choice): one
    card a row, its meaning and where it is on the left, its word on the
    right, cut with … at half the row. */
 .at-cardrows { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
@@ -3004,7 +3004,7 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-todoacts { display:flex; flex-wrap:wrap; gap:8px; }
 .at-empty2 .at-hint { margin:0 auto; max-width: 46ch; }
 .at-empty2 .at-row { justify-content:center; margin-top: var(--s4); }
-/* Teaching's To do with nothing in it (0.732, the owner's choice): the
+/* Teaching's To do with nothing in it (0.733, the owner's choice): the
    same box and cup on one row, a third of the height, so the courses
    under it come up the screen. */
 .at-empty2.slim { display:flex; align-items:center; gap: var(--s3); text-align:left; padding: var(--s3) var(--s4); }

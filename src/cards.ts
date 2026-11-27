@@ -132,7 +132,7 @@ export const withLead = <T>(card: T, lead: Form): T =>
 export const subFormsOf = (card: unknown): Form[] => formsOf(card).slice(1);
 
 /**
- * What stands in for a card's meaning on a tile when it has none (0.732,
+ * What stands in for a card's meaning on a tile when it has none (0.733,
  * the owner's 11a): its transliteration, else what it is taught by — a
  * picture or a recording. A card with a name or a meaning needs none, and
  * a card with none of these gets none: a blank line says it plainly.

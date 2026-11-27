@@ -51,12 +51,12 @@ import { CONVERSATION, MAX_SPEAKERS, TEXT, isDialog, isText, namedPart, pickedFr
 import type { SceneKind } from "./dialogs.ts";
 import { castFill, castOf, castReport, filledScene, memberBase, memberLabel, newMember, recast, roleIn } from "./cast.ts";
 import { reviewPool, sentencesOf } from "./review.ts";
-import { UNCOUNTABLE, answerRows, answersOf, packAnswers, shownAlternatives } from "./answers.ts";
+import { UNCOUNTABLE, answerRows, answersOf, firstOfEach, packAnswers, shownAlternatives } from "./answers.ts";
 import { ADJECTIVE_IS_SLOT, asMeaning, ADJECTIVE_SLOT, cardRef, DEMONSTRATIVE_READING_SLOTS, DEMONSTRATIVE_SLOT, dropRail, fillNames, fillsOf, isLent, isSentence, MAX_FILLS, movedSlot, NOUN_READING_SLOTS, NOUN_SLOT, nounNumberOf, PRONOUN_SLOT, readingBase, readingNames, READING_SLOTS, refClash, renameSlot, RESERVED_READINGS, slotName, slotsIn, slotsOf, slotTrouble, SPEAKER_COLUMNS, splitSlots, withoutSlot, withSlotAt, WORD_SLOT, wordsDir } from "./variables.ts";
 import { agreeingBlanks, combosOf, mainFormOnly, EXAMPLES_CEILING, examplesOf, fillersFor, rowsLine, tensedBlanks, whyStarved } from "./card-facts.ts";
 import type { Value } from "./variables.ts";
 import { liftSubtypeTags } from "./subtype-tags.ts";
-import { basicCard, droppedByBasic, opensAdvanced } from "./basic-card.ts";
+import { basicCard, droppedByBasic, onlyWords, opensAdvanced } from "./basic-card.ts";
 import { DESC, DESC_EN, DESC_MAX, givenAway, storedDescription } from "./description.ts";
 import { subtypeTakesCapitals, tickCapitals } from "./capitals.ts";
 import { readSpan, spanTag } from "./numbers/spans.ts";
@@ -104,6 +104,7 @@ import {
   AskedMeanings,
   AskedScript,
   Tabs,
+  MoreMenu,
 } from "./shared.tsx";
 
 /* A blank form carries every grammatical value any language might use, so a
@@ -6854,9 +6855,55 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, modules, chosen, onToggleModule, onSetModules, onCreateModule, onExport, onToSpace, onDelete, setOnly = false, made = "" }: {
+/*
+ * The card itself, drawn at the top of a card being read (0.732, the
+ * owner's 4a): its word large, how it is said, what it means, and its
+ * Export behind three dots in the corner. Only while the editor is
+ * locked; the fields under it are the same editor held still.
+ */
+function CardHero({ lang, word, talk, scene, onExport, onToSpace }: {
+  lang: Lang;
+  word: WordDraft;
+  talk: SceneDraft;
+  scene: boolean;
+  onExport?: () => void;
+  onToSpace?: (move: boolean) => void;
+}) {
+  /* One accepted answer of each kind, as a card's tile shows it. */
+  const lead = firstOfEach((word.forms[0] || {}) as Record<string, any>);
+  const name = scene ? talk.title : word.name;
+  const face = scene ? "" : lead.ar;
+  const items = [
+    onExport ? { label: "Export", icon: "download", onClick: onExport } : null,
+    onToSpace ? { label: "Copy to the space", icon: "copy", onClick: () => onToSpace(false) } : null,
+    onToSpace ? { label: "Move to the space", icon: "upload", onClick: () => onToSpace(true) } : null,
+  ];
+  return (
+    <div className="at-formblock at-cardhero" data-el="card-hero">
+      {items.some(Boolean) ? (
+        <span className="at-cardherodots">
+          <MoreMenu label="More for this card" title={face || name || "This card"} items={items} />
+        </span>
+      ) : null}
+      {face ? (
+        <p className="at-cardheroword"><bdi dir="auto" style={{ fontFamily: lang.fontStack }}>{face}</bdi></p>
+      ) : (
+        <p className="at-cardheroword">{name || "Untitled"}</p>
+      )}
+      {!scene && lead.lat ? <p className="at-cardherolat">{lead.lat}</p> : null}
+      {!scene && lead.en ? <p className="at-cardheroen">{lead.en}</p> : null}
+    </div>
+  );
+}
+
+function BasicBlock({ lang, scene, sentence = false, word, talk, advanced, canUntick, onAdvanced, drops, modules, chosen, onToggleModule, onSetModules, onCreateModule, onDelete, onEdit, setOnly = false, made = "" }: {
   /** "Made by … · last changed by …" (0.711), under the heading; empty while creating. */
   made?: string;
+  /** A sentence card: shown bare from the start, so no word on its vowel
+      marks. */
+  sentence?: boolean;
+  /** Turn the screen to editing, from a card being read (0.732). */
+  onEdit?: () => void;
   /** In personal sets and nothing else: the advanced card is not offered,
       unless the card is one already (0.634). */
   setOnly?: boolean;
@@ -6878,10 +6925,6 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onSetModules: (ids: string[]) => void;
   /** Make a deck in the card's language, from the decks screen. */
   onCreateModule?: (title: string) => Promise<Module | null | undefined>;
-  /** Export the card, where it can be — on a saved card being read. */
-  onExport?: () => void;
-  /** A My space card into the space (0.549): copy or move it into a deck. */
-  onToSpace?: (move: boolean) => void;
   /** Delete the card — on a saved card being edited, at the foot. */
   onDelete?: () => void;
 }) {
@@ -6920,37 +6963,24 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         empty={`No ${lang.name} modules yet. Make a deck with New deck, above.`}
       />
     )}
+    {/* Read, "This card", its Export and the advanced box wait for Edit;
+        the card itself is drawn above them — see CardHero (0.732, the
+        owner's 4a). With no name either, the block would be an empty
+        band under the card, so it goes. */}
+    {locked && !String((scene ? talk.title : word.name) || "").trim() ? null : (
     <div className="at-formblock">
+      {locked ? null : (
       <div className="at-formhead">
         <span className="at-formnum">This card</span>
-        {/* Export, with the other facts about the card rather than among
-            the buttons that change it. `reads`, so it works on a card that
-            is only being read — which is the only time it is offered. */}
-        {onExport ? (
-          <span className="at-formacts">
-            <Button reads size="sm" className="iconly" aria-label="Export this card" title="Export this card" onClick={onExport}>
-              <Icon name="download" />
-            </Button>
-            {onToSpace ? (
-              <>
-                <Button reads size="sm" className="iconly" aria-label="Copy to the space" title="Copy to the space" onClick={() => onToSpace(false)}>
-                  <Icon name="copy" />
-                </Button>
-                <Button reads size="sm" className="iconly" aria-label="Move to the space" title="Move to the space" onClick={() => onToSpace(true)}>
-                  <Icon name="upload" />
-                </Button>
-              </>
-            ) : null}
-          </span>
-        ) : null}
       </div>
-      {made ? <Help>{made}</Help> : null}
+      )}
+      {made && !locked ? <Help>{made}</Help> : null}
       {/* ---- basic or advanced ----
           The one question between a quick card and the whole editor, first
           because the rest of the screen follows from it. Said in no more
           than its own words; only where it cannot be unticked does it say
           why. */}
-      {setOnly && !advanced ? (
+      {locked ? null : setOnly && !advanced ? (
         <Help>A personal set uses a card&rsquo;s name, its photos and its recordings, so its cards are always basic.</Help>
       ) : (
       <CheckList
@@ -6974,15 +7004,19 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
       )}
       {/* ---- what it is called ----
           Every card has a name, whatever its kind. */}
-      <div className="at-mt5">
+      <div className={locked ? "" : "at-mt5"}>
         <NameBlock word={word} talk={talk} scene={scene} />
       </div>
     </div>
+    )}
 
     {/* ---- the word itself ----
         The card's own word, as the first form of the Advanced tab is
         written — the same form, so nothing is copied either way. */}
-    {!advanced && (
+    {/* Read, a word the card at the top already says all of has no
+        Content block under it; one with a recording, a picture or another
+        answer keeps it, so none of that is out of sight (0.732). */}
+    {!advanced && !(locked && onlyWords(word.forms[0] as Record<string, any>)) && (
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
           <span className="at-formnum">Content</span>
@@ -7010,7 +7044,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
     <div className="at-formblock at-mt5">
       <div className="at-formhead">
         <span className="at-formnum">Modules</span>
-        <span className="at-formrole">Manage what modules this card belongs to.</span>
+        {locked ? null : <span className="at-formrole">Manage what modules this card belongs to.</span>}
       </div>
       {/* In no deck, the list stands in the Nudge panel's dress; built by
           hand rather than with Nudge so the list keeps its place in the
@@ -7034,6 +7068,26 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         </div>
       </div>
     </div>
+
+    {/* ---- what is left to improve, while read (0.732) ----
+        The no-vowel-marks note the word's own box gives while editing,
+        said here as a short list with the way to fix it. */}
+    {locked && (() => {
+      const ar = String(((word.forms[0] || {}) as Record<string, any>).ar || "");
+      const notes = lang.marks && !sentence && !scene && ar.trim() && !hasMarks(ar, lang)
+        ? [`No ${lang.marks.name} written, so students never see how it is vowelled.`]
+        : [];
+      if (!notes.length) return null;
+      return (
+        <div className="at-formblock at-mt5" data-el="card-to-improve">
+          <div className="at-formhead"><span className="at-formnum">{`${plural(notes.length, "thing")} to improve`}</span></div>
+          {notes.map((n) => <p className="at-formneed unmet" key={n}>{n}</p>)}
+          {onEdit ? <Button reads size="sm" icon="edit" onClick={onEdit}>Add them</Button> : null}
+        </div>
+      );
+    })()}
+    {/* Who made it, at the foot while read (0.732). */}
+    {made && locked ? <div className="at-formblock at-mt5"><Help>{made}</Help></div> : null}
 
     {/* ---- and the way out of it altogether ----
         At the foot, away from everyday taps, and only while editing a
@@ -7206,8 +7260,44 @@ function AgreementFields({ word, lang }: { word: WordDraft; lang: Lang }) {
  */
 function PracticeList({ word, lang, skipLead }: { word: WordDraft; lang: Lang; skipLead: boolean }) {
   const { parts, canLend, setAskPart, setLendPart } = word;
+  const locked = useContext(Locked);
   const shown = parts.filter((p) => !(skipLead && p.id === "form:0"));
   if (!shown.length) return null;
+  /* Read, one row per form saying in words where it comes up; the
+     tick-boxes come back with Edit (0.732, the owner's 5a). */
+  if (locked) {
+    const where = (on: boolean, lends: boolean) =>
+      on && lends ? "On its own and in sentences"
+      : on ? (canLend ? "On its own only" : "On its own")
+      : lends ? "In sentences only"
+      : "Not practised";
+    return (
+      <div className="at-formblock">
+        <div className="at-formhead"><span className="at-formnum">What is practised</span></div>
+        <div className="at-practice said">
+          {shown.map((part) => {
+            const lends = canLend && part.lends;
+            const off = !part.on && !lends;
+            return (
+              <div className={`at-practicerow${off ? " off" : ""}`} key={part.id}>
+                <span className="at-practicename">
+                  <span className="at-practicetitle">{part.title}</span>
+                  <bdi
+                    className={`at-practicenote${part.id.startsWith("form:") ? "" : " count"}`}
+                    dir="auto"
+                    style={part.id.startsWith("form:") ? { fontFamily: lang.fontStack } : undefined}
+                  >
+                    {part.note}
+                  </bdi>
+                  <span className="at-practicesaid">{where(part.on, lends)}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="at-formblock">
       <div className="at-formhead">
@@ -7873,7 +7963,8 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           know it — so a word with none written is never seen vowelled.
           Said rather than refused: some words need none. Not on a
           sentence, which students are shown bare from the start. */}
-      {!blanks && lang.marks && String(f.ar || "").trim() && !hasMarks(String(f.ar), lang) && (
+      {/* Read, said instead under "to improve" (0.732). */}
+      {!blanks && !locked && lang.marks && String(f.ar || "").trim() && !hasMarks(String(f.ar), lang) && (
         <p className="at-formneed unmet" data-el="editor-no-marks">
           Written without {lang.marks.name}. Students see a word with its {lang.marks.name} while
           they learn what it means, then without them — so with none written here, they never see
@@ -10764,6 +10855,10 @@ function DescriptionBlock({ word, lang, alone, className = "at-formblock at-mt5"
   const set = (patch: Record<string, any>) => word.setForm(0, { ...f, ...patch });
   const desc = String(f[DESC] || "");
   const shown = givenAway(f, lang);
+  /* Read with none written, nothing: an empty section only said what a
+     teacher could add (0.732). */
+  const locked = useContext(Locked);
+  if (locked && !desc.trim()) return null;
   return (
     <div className={className} data-el="editor-description">
       <div className="at-formhead">
@@ -10848,11 +10943,14 @@ export function tapWouldChange(target: EventTarget | null): boolean {
   return !!el.closest("input, textarea, select, label, [contenteditable], button, .at-tickrow, .at-chooser, .at-field");
 }
 
-function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
+function TabPanel({ id, tab, locked, panel, before, after, onLockedTap, children }: {
   id: CardTab;
   tab: CardTab;
   locked: boolean;
   panel: React.MutableRefObject<HTMLDivElement | null>;
+  /** Above the fields and outside their lock, so its buttons work on a
+      card being read: the card drawn at the top (0.732). */
+  before?: Node;
   after?: Node;
   /** A tap on something that would change the card, while it is read. */
   onLockedTap?: () => void;
@@ -10877,6 +10975,7 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   return (
     <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}
       onPointerDown={locked && onLockedTap ? (e) => { if (tapWouldChange(e.target)) onLockedTap(); } : undefined}>
+      {before}
       <fieldset ref={box} className="at-cardlock" disabled={locked}>
         <Locked.Provider value={locked}>{children}</Locked.Provider>
       </fieldset>
@@ -11261,7 +11360,10 @@ export function CardEditor({ card, lang, modules, inModules, onCreateModule, all
           {/* ---- Basic ----
               The name, whether it is an advanced card, the word itself on
               a basic one, and its decks. */}
-          <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}>
+          <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}
+            before={locked ? (
+              <CardHero lang={lang} word={word} talk={talk} scene={scene} onExport={onExport} onToSpace={onToSpace} />
+            ) : null}>
             <SetOnly.Provider value={setOnly}>
             <BasicBlock
               made={made}
@@ -11280,9 +11382,9 @@ export function CardEditor({ card, lang, modules, inModules, onCreateModule, all
               }
               onSetModules={setChosen}
               onCreateModule={onCreateModule}
-              onExport={locked ? onExport : undefined}
-              onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}
+              onEdit={locked ? onUnlock : undefined}
+              sentence={shape === "sentence"}
               setOnly={setOnly}
             />
             </SetOnly.Provider>
