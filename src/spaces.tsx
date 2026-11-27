@@ -10406,6 +10406,36 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }),
       );
     };
+    /* A new module made from this course: the kind asked, as New module
+       asks it, then the module is put in this course and opened. */
+    const createHere = () => {
+      setNewKind("deck");
+      setNamingFor(c);
+      setChoosingKind(true);
+    };
+    const moduleSwitch = (empty: boolean) => (
+      <ModuleSwitch
+        modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+        chosen={mine.map((d) => d.id)}
+        onOpen={(id) => setOpenModule(id)}
+        onToggle={toggleModule}
+        onCreate={createHere}
+        solid={empty}
+        saving={moduleSaving}
+        find={{
+          placeholder: "Search modules",
+          match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
+        }}
+        words={{
+          first: empty ? "Add a module" : "Add a module to this course",
+          another: "Another module",
+          drop: (t) => `Take ${t} out of this course`,
+          lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
+          note: "",
+          none: "You have no modules yet. Make one under Modules, then add it to this course.",
+        }}
+      />
+    );
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -10471,58 +10501,20 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 </div>
               )}
+              {/* The course's modules as a row of names, or, empty, one way to
+                  fill it (0.727, the owner's 1a–4a): Add a module where there
+                  are modules to add, whose list can make a new one too, and
+                  Create a module where there are none. Either way a new one
+                  is asked its kind, put in this course and opened. */}
               {mine.length ? (
-                <ModuleSwitch
-                  modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
-                  chosen={mine.map((d) => d.id)}
-                  onOpen={(id) => setOpenModule(id)}
-                  onToggle={toggleModule}
-                  saving={moduleSaving}
-                  find={{
-                    placeholder: "Search modules",
-                    match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
-                  }}
-                  words={{
-                    first: "Add a module to this course",
-                    another: "Another module",
-                    drop: (t) => `Take ${t} out of this course`,
-                    lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
-                    note: "",
-                    none: "You have no modules yet. Make one under Modules, then add it to this course.",
-                  }}
-                />
+                moduleSwitch(false)
               ) : (
                 <Nudge
                   icon="folder"
                   tone="attention"
-                  action={<div className="at-nudgeboth">
-                    {/* Made here, as from To do: the kind asked, then the new
-                        module is put in this course and opened (0.724). */}
-                    <Button size="sm" variant="primary" icon="add" onClick={() => {
-                      setNewKind("deck");
-                      setNamingFor(c);
-                      setChoosingKind(true);
-                    }}>Create a module</Button>
-                    {plainModules.length > 0 && <ModuleSwitch
-                      modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
-                      chosen={mine.map((d) => d.id)}
-                      onOpen={(id) => setOpenModule(id)}
-                      onToggle={toggleModule}
-                      saving={moduleSaving}
-                      find={{
-                        placeholder: "Search modules",
-                        match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
-                      }}
-                      words={{
-                        first: "Add a module to this course",
-                        another: "Another module",
-                        drop: (t) => `Take ${t} out of this course`,
-                        lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
-                        note: "",
-                        none: "You have no modules yet. Make one under Modules, then add it to this course.",
-                      }}
-                    />}
-                  </div>}
+                  action={plainModules.length ? moduleSwitch(true) : (
+                    <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
+                  )}
                 >
                   Nothing here yet. Add a module to give your students something to practise.
                 </Nudge>

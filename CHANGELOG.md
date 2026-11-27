@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.727 — 27 November 2026
+
+**An empty course offers one button, not two.** In a course's Modules
+section, with no modules in it yet:
+
+- If you already have modules, the box offers only **Add a module**, a
+  green button like every other empty box's. Its list now starts with
+  **Create a new module**.
+- If you have none, it offers only **Create a module**.
+
+**Create a new module** asks what kind, as New module does. The new module
+is put in the course and opens, ready for cards. The same row is in the list
+behind **Another module** once the course has modules.
+
 ## 0.726 — 27 November 2026
 
 **A module's courses change as you tap.** Opening a module in Teaching ›

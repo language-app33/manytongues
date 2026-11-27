@@ -9587,3 +9587,17 @@ modules. Left as they were, by choice: the student's Cards and Progress
 tabs with no course (Home has Join a course), the "languages switched on"
 empties, and the sentence-card picker, where a button would leave a
 half-written card.
+
+## An empty course's Modules box offers one button (0.727)
+
+0.724 put a solid Create a module beside the dotted Add a module to this
+course, two styles side by side. The owner chose (1a) one button by what
+the teacher has: Add a module where there are modules, Create a module
+where there are none; (2a) the solid button, as every empty box has, so
+`ModuleSwitch` gained `solid`, which draws its add button as a primary
+`Button` while nothing is chosen; (3a) Create a new module as the first row
+of the sheet, so `ModuleSwitch` gained `onCreate`, which closes the sheet
+and hands over to the course's kind sheet; (4a) the new module opens, as
+from To do. The row is in the filled course's Another module sheet too,
+since it is the same sheet. Only the course screen passes `onCreate`; a
+card's module list keeps its own way to make one (ModulePickScreen).
