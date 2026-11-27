@@ -16,6 +16,14 @@ off the tile. Open the module and it is still there, with the reasons: how
 many are drafts, waiting for review, or need their number words written.
 To do on Home still says it for each course too.
 
+## 0.700 — 27 November 2026
+
+**The current tab is grey again.** The green look from 0.699 is undone: the
+tab you are on is back to a raised grey box with a dark grey outline, its
+name in the ordinary text colour and its icon in green. The rest of 0.699
+stays: names in ordinary lettering at the size of the bar's, and the track's
+edge as thick as everything around it.
+
 ## 0.699 — 27 November 2026
 
 **Tabs inside a page now look like the rest of the app.** The tabs at the

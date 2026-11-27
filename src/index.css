@@ -149,6 +149,9 @@ button {
   /* The ink of the page: what a heading is written in. Fifteen rules named it
      and nothing defined it, so each fell back to whatever it inherited. */
   --ink: var(--text);
+  /* The outline of the selected tab: a dark grey in both themes, so it reads
+     as a stroke on a light fill and as a rim on a dark one. */
+  --tab-stroke: #4B556D;
   /* What marks a thing as chosen — the select button, a picked tile. Named in
      the stylesheet and never defined, like --ink; the app's chosen colour. */
   --accent: var(--jade);
@@ -171,6 +174,9 @@ button {
   /* The ink of the page: what a heading is written in. Fifteen rules named it
      and nothing defined it, so each fell back to whatever it inherited. */
   --ink: var(--text);
+  /* The outline of the selected tab: a dark grey in both themes, so it reads
+     as a stroke on a light fill and as a rim on a dark one. */
+  --tab-stroke: #4B556D;
   /* What marks a thing as chosen — the select button, a picked tile. Named in
      the stylesheet and never defined, like --ink; the app's chosen colour. */
   --accent: var(--jade);
@@ -194,6 +200,9 @@ button {
     /* The ink of the page: what a heading is written in. Fifteen rules named it
        and nothing defined it, so each fell back to whatever it inherited. */
     --ink: var(--text);
+    /* The outline of the selected tab: a dark grey in both themes, so it reads
+       as a stroke on a light fill and as a rim on a dark one. */
+    --tab-stroke: #4B556D;
     /* What marks a thing as chosen — the select button, a picked tile. Named in
        the stylesheet and never defined, like --ink; the app's chosen colour. */
     --accent: var(--jade);
@@ -454,12 +463,11 @@ button {
 /* Tabs inside a page (0.685): one track the parts share equally, each its
    icon over its name. What the card screen's tabs were, now every set in a
    page; the bar at the foot draws its own (.at-docktabs).
-   0.699 (the owner's 1a, 2a, 3a): the current tab is marked the way the
-   bar at the foot marks its section — the accent colour on a faint wash of
-   it — with an accent outline, so it reads as chosen in the app's one
-   colour for chosen while staying apart from a Segmented's solid fill. The
-   names are in ordinary lettering at the bar's size, and the track's edge
-   is the 2px every card, button and field has. */
+   The current one is raised out of the well with a dark grey outline and
+   its icon in the accent colour. 0.699 (the owner's 2a, 3a): the names are
+   in ordinary lettering at the bar's size, and the track's edge is the 2px
+   every card, button and field has. 0.699 also made the current tab green;
+   0.700 put its colours back, which the owner found better. */
 .at-nav2 { display:grid; grid-auto-flow:column; grid-auto-columns: minmax(0, 1fr); gap:4px;
   margin:0 0 16px; padding:4px; border-radius:16px;
   background: var(--well-deep); border:2px solid var(--line); }
@@ -481,10 +489,9 @@ button {
   overflow-wrap: normal; padding-inline:2px; }
 .at-tab2 > svg { width:20px; height:20px; flex:none; }
 .at-tab2:not(.on):hover { background: var(--press); color: var(--text); }
-/* The selected tab is outlined as well as tinted, so which one is active
-   reads at a glance rather than by shade alone. */
-.at-tab2.on { background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent); border-color: var(--accent); }
+/* The selected tab carries a dark grey outline, so which one is active reads
+   at a glance rather than by shade alone. */
+.at-tab2.on { background: var(--raised); color: var(--text); border-color: var(--tab-stroke); }
 .at-tab2.on > svg { color: var(--accent); }
 /* How many are on a tab, under its name, where the number helps choose. */
 .at-tabcount { font-size:13px; letter-spacing:0; font-variant-numeric: tabular-nums; }
