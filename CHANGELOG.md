@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.693 — 27 November 2026
+## 0.694 — 27 November 2026
 
 **Courses opens again for students.** Learning › You › Courses showed
 "Something broke" (reading 'filter') for anyone in a course, since 0.687
@@ -18,6 +18,50 @@ each course counts its modules again. The type check now covers the props
 of every screen that loads on demand, so a rename missed on one side
 fails the build instead of the screen; it found one more such slip, in
 claiming super admin from Settings, which is mended too.
+
+## 0.693 — 27 November 2026
+
+**Teaching opens on Home, with To do at the top.** The first tab in
+Teaching is called Home (it was Courses). Above your courses, **To do**
+lists everything waiting on you, each with a button that takes you
+straight to it:
+
+- recordings that are missing, so students can't hear a card;
+- sentence cards waiting for you to review their sentences;
+- imported cards students won't see until you publish them;
+- courses with cards that don't reach students yet, and why;
+- cards with more than one meaning on them.
+
+The number of things waiting shows on Home's button in the bar, so you
+can see it from Material or My space too. When nothing is waiting, To do
+says "You're all caught up. Your students have everything they need.",
+under a small drawing of a cup of tea in the logo's colours.
+
+To do is about what students get, so it covers the space's material,
+not My space.
+
+**Fewer banners.** Missing recordings and imported cards waiting for
+review are no longer bands across the top of every Teaching screen, and
+the lines about sentences waiting for review and cards with more than one
+meaning are no longer above the Cards list. They are all in To do. The
+Review filter on Cards still finds the sentences waiting.
+
+**A course has three tabs: Course, People and Exercises.** In
+Teaching › Home, open a course:
+
+- **Course** has its name, language, student code, path and modules;
+- **People** has its teachers and students;
+- **Exercises** has how much English, and which exercises students are
+  asked.
+
+The tabs look like the ones in Material. Each course opens on Course.
+
+**Two lines are gone.** "Open a course to see its modules, its people and
+its student code." in Teaching, and "Open a course to see its modules." on
+a learner's Courses.
+
+Trade-off: a teacher who has just imported cards no longer sees a banner
+on the Cards tab; the count on Home's button says it instead.
 
 ## 0.692 — 27 November 2026
 

@@ -123,7 +123,7 @@ type SpaceName = {
 }[keyof SpacesModule];
 
 /* Typed by the component it loads, so a prop renamed on one side and not
-   the other fails the type check rather than the screen (0.693). */
+   the other fails the type check rather than the screen (0.694). */
 const fromSpaces = <K extends SpaceName>(name: K) =>
   React.lazy<SpacesModule[K]>(() =>
     import("./spaces.tsx")
