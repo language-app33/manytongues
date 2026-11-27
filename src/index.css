@@ -425,7 +425,7 @@ button {
    what it means, and when it was added. Tight at the top and between the
    two lines, because the gap between a word and its meaning was doing the
    work of separating them from each other rather than from the card. */
-.at-minicard { text-align:left; cursor:pointer; background: var(--surface); border:2px solid var(--line); border-radius: var(--r); padding:calc(8px * var(--tile, 1)) calc(10px * var(--tile, 1)); color: var(--text); min-width:0; overflow:hidden; position:relative; display:flex; flex-direction:column; gap:1px; height:100%; }
+.at-minicard { text-align:left; cursor:pointer; background: var(--surface); border:2px solid var(--line); border-radius: var(--r); padding:8px 10px; color: var(--text); min-width:0; overflow:hidden; position:relative; display:flex; flex-direction:column; gap:1px; height:100%; }
 .at-minicard.on { border-color: var(--jade); background: var(--tag-bg); }
 /* A tile that opens a card can be reached with a keyboard, so it has to
    say when it has been — the same ring the buttons take. */
@@ -437,7 +437,7 @@ button {
 .at-minicard .ar { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
   line-clamp:2; font-family: var(--sfont); font-weight:700;
   direction: var(--sdir); unicode-bidi:isolate; overflow:hidden; word-break:break-word; }
-.at-minicard .en { display:block; font-size:calc(12px * var(--tile, 1)); font-weight:600; color: var(--muted);
+.at-minicard .en { display:block; font-size:12px; font-weight:600; color: var(--muted);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-lengthgroup { margin-bottom:14px; }
 /* The length is the one decision on this step, so its numbers are read
@@ -1182,10 +1182,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 
 .at-keyfield { letter-spacing:.02em; }
 /* Whether a deck is reaching anyone, at a glance. */
-/* No rule above it (0.714, the owner's 2b): it sits under the tile's text
+/* No rule above it (0.715, the owner's 2b): it sits under the tile's text
    at the spacing of the line of facts. */
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
-/* A module's quality ring, left of its name (0.714). Its room is kept when
+/* A module's quality ring, left of its name (0.715). Its room is kept when
    a new module has no ring yet (0.709), so every name in the list starts
    at the same place. */
 .at-decklead { flex:0 0 44px; min-height:44px; display:flex; }
@@ -1232,13 +1232,8 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    fits three plus their gaps at 360px wide, which is the narrowest phone
    worth designing for; a 320px screen gets two, which is the "very small"
    exception rather than the rule. */
-/* --tile is how big the list is asking for its tiles to be drawn, set on the
-   grid by the size button in the toolbar and 1 when nobody has asked. It
-   scales the column width and the type inside a tile together: a bigger card
-   is fewer to a row with its words set larger, not the same tile with the
-   words spilling out of it. */
 .at-cardgrid { display:grid; gap:8px; margin-top:4px;
-  grid-template-columns: repeat(auto-fill, minmax(calc(100px * var(--tile, 1)), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   align-items:stretch; }
 .at-cardgrid > * { display:flex; }
 .at-cardgrid > * > .at-minicard { flex:1; }
@@ -1260,7 +1255,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    empty bands. The grid makes the tiles in a row match; nothing else has
    to. */
 .at-minien { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
-  line-clamp:2; font-size:calc(12px * var(--tile, 1)); font-weight:600; color: var(--muted);
+  line-clamp:2; font-size:12px; font-weight:600; color: var(--muted);
   overflow:hidden; word-break:break-word; }
 /* What the teacher calls the card, where its own words do not name it — a
    verb saved as the form a dictionary lists. It stands in the meaning's line
@@ -1273,9 +1268,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* What kind of card it is, where that is not obvious from the face. Above
    the words rather than below them: it is how to read what follows, not a
    note about it. */
-.at-minikind { font-family: var(--ui); font-size:calc(10px * var(--tile, 1)); font-weight:800; letter-spacing:.07em;
+.at-minikind { font-family: var(--ui); font-size:10px; font-weight:800; letter-spacing:.07em;
   text-transform:uppercase; color: var(--faint); line-height:1.4; }
-.at-minimeta { font-size:calc(11px * var(--tile, 1)); color: var(--faint); line-height:1.4; margin-top:auto;
+.at-minimeta { font-size:11px; color: var(--faint); line-height:1.4; margin-top:auto;
   padding-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* How far along the card is, where the list it is in is a list about
    progress — a bar and the number it draws. Brass and rounded, the same as
@@ -1300,18 +1295,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-minibarrail { flex:1; min-width:0; height:6px; border-radius:999px;
   background: var(--well); overflow:hidden; }
 .at-minibarrail > span { display:block; height:100%; border-radius:999px; background: var(--brass); }
-.at-minibar b { font-family: var(--ui); font-size:calc(11px * var(--tile, 1)); font-weight:800;
+.at-minibar b { font-family: var(--ui); font-size:11px; font-weight:800;
   color: var(--muted); font-variant-numeric: tabular-nums; }
 /* The mark on a card the learner asked for. In the meta line because that
    is the tile's one line of small print, but in brass rather than the
    faint the rest of it is set in: the point of it is to be picked out of a
    list you are scanning past. */
 .at-minipri { color: var(--brass); font-weight:700; margin-right:6px; }
-.at-minipri svg { width:calc(11px * var(--tile, 1)); height:calc(11px * var(--tile, 1));
+.at-minipri svg { width:11px; height:11px;
   vertical-align:-1px; margin-right:2px; }
-.at-minilat { font-size:calc(11px * var(--tile, 1)); color: var(--muted); }
-.at-minicard.picked, .at-ckbox.pick.on, .at-cardline.picked, .at-item.picked { border-color: var(--accent); }
-.at-minicard .ar { font-size:calc(18px * var(--sscale, 1) * var(--tile, 1)); line-height:calc(1.35 * var(--sleading, 1)); }
+.at-minilat { font-size:11px; color: var(--muted); }
+.at-minicard.picked, .at-ckbox.pick.on, .at-item.picked { border-color: var(--accent); }
+.at-minicard .ar { font-size:calc(18px * var(--sscale, 1)); line-height:calc(1.35 * var(--sleading, 1)); }
 /* A hole in a frame — the {{name}} a value is poured into — shown where the
    card is listed rather than asked. It is Latin standing in the taught
    script, so it takes the same correction the meaning and the romanisation
@@ -1341,32 +1336,12 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   display:flex; align-items:center; justify-content:center; }
 .at-item .at-ckbox.pick { position:static; margin-right:10px; flex:none; }
 
-/* A card list drawn as lines: the word and what it means, one card to a
-   line, for reading down a long list. The word keeps its script's size
-   and direction; the meaning takes what is left and is cut short rather
-   than wrapped, so every line is one line. */
-.at-cardlines { display:flex; flex-direction:column; gap:4px; margin-top:4px; }
-.at-cardlines > .at-grouphead { display:flex; align-items:baseline; gap:8px; margin:10px 0 2px;
-  font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.06em;
-  text-transform:uppercase; color: var(--muted); }
-.at-cardline { display:flex; align-items:center; gap:12px; min-width:0; cursor:pointer;
-  background: var(--surface); border:2px solid var(--line); border-radius: var(--r-sm);
-  padding:6px 10px; color: var(--text); }
-.at-cardline .at-ckbox.pick, .at-cardtable .at-ckbox.pick { position:static; flex:none; }
-.at-cardline-word { flex:0 1 auto; max-width:55%; min-width:0; overflow:hidden; text-overflow:ellipsis;
-  white-space:nowrap; }
-.at-cardline-word .ar { font-size:calc(18px * var(--sscale, 1)); line-height:calc(1.35 * var(--sleading, 1)); }
-.at-cardline-meaning { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  font-size:13px; font-weight:600; color: var(--muted); }
-.at-cardline-meaning .at-lat { font-weight:500; font-style:italic; }
-.at-cardline-acts { display:flex; gap:6px; flex:none; }
-.at-cardline-lead { flex:none; display:flex; }
-
-/* And as a table: everything the list knows about each card, side by side.
+/* A card list drawn as a table: what the list says about each card, side by side.
    It scrolls sideways inside its own frame where it is wider than the
    screen, rather than taking the page with it. */
 .at-tablewrap { overflow-x:auto; margin-top:4px; border:2px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); }
+.at-cardtable .at-ckbox.pick { position:static; flex:none; }
 .at-cardtable { width:100%; border-collapse:collapse; font-size:13px; color: var(--text); }
 .at-cardtable th, .at-cardtable td { padding:7px 10px; text-align:start; vertical-align:middle;
   border-bottom:1px solid var(--line); white-space:nowrap; }

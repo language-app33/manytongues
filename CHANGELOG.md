@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.714 — 27 November 2026
+## 0.715 — 27 November 2026
 
 **A module's tile is tidier: its score on the left, who can see it right
 under its name.** In Teaching › Material › Modules (and in My space, while
@@ -27,6 +27,29 @@ you still have one):
 
 The rule is gone from every tile that had one, too: courses, the modules
 list in Admin, and the rest.
+
+## 0.714 — 27 November 2026
+
+**The card lists are simpler.**
+
+- **Two views instead of four**, in every card list: Teaching › Material ›
+  Cards, inside a module, and a learner's own cards. The view button now
+  switches between a grid and a table. The large grid and the one-line-per-card list are gone;
+  a list left on either opens at the nearest of the two (the large grid at
+  the grid, the list at the table).
+- **A teacher's card tile is just the card.** Its Edit and Delete buttons (Edit and Remove
+  inside a module) are behind three dots, as on a module's tile. Tapping
+  the card still opens it. The date is off the tile; Sort still orders by
+  it.
+- **A teacher's table has five columns:** Word, Meaning, Kind, Modules and Status,
+  so it fits a desktop and reads on a phone. Status is last, and also says
+  when a recording is missing. Transliteration, subtype, recording, review
+  and the two dates are no longer columns; Filter and Sort still reach
+  them.
+- **The line "A card is one thing to learn…" is gone from above the list.**
+  With no cards yet, the empty list still says what a card is.
+
+Trade-off: editing or deleting from the list is one more tap.
 
 ## 0.713 — 27 November 2026
 

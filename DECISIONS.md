@@ -9520,3 +9520,18 @@ and no longer reads `course.wordSets`, which stays stored. `space-word-sets`
 adds `school`; `save-system` marks a teacher's numbers (and clock) with the
 space when it has none. `CourseWordSets` and its API wrappers are gone;
 `share-word-set`, `course-word-sets` and `set-course-word-set` still work.
+
+## Card lists: a grid and a table, and a tile's actions behind dots (0.714)
+
+A card list had four views — small grid, large grid, a line per card, a
+table of eleven columns — and every teacher's tile carried Edit and Delete
+buttons and a date. The owner asked for fewer views and less on each.
+Chosen (1a–6a): `ListView` is `"small" | "table"`, and a device left on
+`"large"` or `"list"` reads as the grid or the table; `CardRow` lost `word`,
+`meaning` and `lead`, which only the line drew. A teacher's tile and row put
+Edit and Delete (Edit and Remove on Manage cards) in a `MoreMenu`, as the
+module tile does; the tile has no date; the teacher's table is Word,
+Meaning, Kind, Modules, Status, with the missing-recording pill in Status.
+The cost is a tap more to edit or delete from a list, and the columns that
+went are reached through Filter and Sort rather than seen. Word-set tiles
+(numbers, pronouns) keep their single button: one action needs no menu.

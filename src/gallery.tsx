@@ -1084,7 +1084,7 @@ export function ComponentGallery() {
       <Row
         name="ItemList"
         what="The standard list frame: New, its three dots and the view button on one row; the search box, then Select and the menus as icons, on the next; bulk actions, empty state, paging at 120."
-        note="match is (item, lowercasedQuery) => boolean. more is the three dots' items, [{ label, icon, danger, onClick }] — Import, where a list has it. tools is the screen's own button after them; narrow a FilterMenu at the end of the search row. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — small grid, large grid, list, table — with { key, columns, row(item) } saying what a line and a table row show; key is where the list remembers its view."
+        note="match is (item, lowercasedQuery) => boolean. more is the three dots' items, [{ label, icon, danger, onClick }] — Import, where a list has it. tools is the screen's own button after them; narrow a FilterMenu at the end of the search row. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — grid or table — with { key, columns, row(item) } saying what a table row shows; key is where the list remembers its view."
       >
         <V label="items + renderItem" wide>
           <ItemList
@@ -1097,7 +1097,7 @@ export function ComponentGallery() {
             views={{
               key: "gallery",
               columns: [{ key: "title", label: "Title" }],
-              row: (d) => ({ word: d.title, meaning: null, cells: { title: d.title } }),
+              row: (d) => ({ cells: { title: d.title } }),
             }}
             more={[{ label: "Import", icon: "upload", onClick: () => {} }]}
             menus={[
