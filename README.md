@@ -1332,11 +1332,11 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   already hold the set. The word was "built-in" before 0.569, which wrongly
   said the app supplied the words. Why: DECISIONS.md, "Word sets".
 
-  **One teacher's set per course (0.689).** A set is one teacher's. In My
+  **One teacher's set per course (0.693).** A set is one teacher's. In My
   space each set has **Share with** the space: pronouns go in as a copy
   (sharing again updates it, `share-word-set`), numbers are marked with
   the space (`spaces` on the system) and stay one document. Material's
-  Word sets screen lists the teacher's own sets, then every other
+  Word sets tab lists the teacher's own sets, then every other
   teacher's shared set by name (`space-word-sets`); any teacher of the
   space may edit one, and a pronoun added to another's set is saved as
   theirs (`forOwner`). A course uses one set of each kind
@@ -1480,7 +1480,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   word already cleared is given its reading as done and starts on writing
   — `creditNumbers` again.
 
-  **A course's numbers come from one person** (since 0.689; a deck's own
+  **A course's numbers come from one person** (since 0.693; a deck's own
   choice from 0.541): the teacher chosen on the course under Word sets ›
   "Numbers from" (`course.wordSets.numbers`), or else the earliest written
   of those its decks reach it from (`wordSetPick`). The server stamps each

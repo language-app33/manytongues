@@ -946,7 +946,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* Select is a named button in the row under the search field, beside the
    menus that order and narrow the list — it was an unlabelled icon up in
    the search row, where it read as another way of finding something. */
-.at-toolbar-sub .at-selectbtn.on { border-color: var(--accent); color: var(--accent); }
+.at-toolbar-search .at-selectbtn.on { border-color: var(--accent); color: var(--accent); }
 /* An icon in the search row — how big to draw the tiles, the way in to a
    language's numbers — sized like the field beside it so the row keeps one
    height. Every icon there rather than that one by name: .at-icon is
@@ -955,6 +955,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    row on a list with nothing in it to search. */
 .at-toolbar .at-icon { flex:0 0 auto; width:44px; height:44px; min-height:44px;
   padding:0; box-sizing:border-box; }
+/* The view button stands at the far end of the top row, apart from New
+   and the dots at its start. */
+.at-toolbar-top .at-viewbtn { margin-inline-start:auto; }
 /* The bulk tray: what it is on the left, how many on the right. */
 .at-bulkhead2 { display:flex; align-items:baseline; justify-content:space-between;
   gap:12px; width:100%; margin-bottom:8px; }
@@ -1075,15 +1078,22 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    narrow phone has room for on one line, so this row wraps where the row
    above it must not — a search field that wrapped under its own New button
    would be a field a thumb's width from nothing. */
-.at-toolbar-sub { flex-wrap:wrap; }
-.at-toolbar-sub .at-btn { padding:0 12px; }
+/* The search row (0.689): the box takes what the icons after it leave.
+   Without a box — nothing to search yet — a filler holds the icons at the
+   end of the row, where they are when there is one. */
+.at-toolbar-search .at-toolbarfill { flex:1 1 0; min-width:0; }
+/* A menu's count, on its icon's corner now the icon has no words beside
+   it, and the open one lit as its panel hangs under the row. */
+.at-toolbar .at-menubtn { position:relative; }
+.at-toolbar .at-menubtn > .at-filtercount { position:absolute; top:-6px; right:-6px; }
+.at-toolbar .at-menubtn.open { border-color: var(--accent); color: var(--accent); }
 /* Whichever menu is open, under the row and across it. In the flow rather
    than floating: it is as tall as its groups need and pushing the list down
    is honest — a panel hanging over the first row of cards hides the thing
    being narrowed. */
 .at-listmenu { margin:0 0 12px; }
 /* Room between the line explaining a tab and the controls under it. */
-.at-toolbar-top { margin-top:16px; }
+.at-listwrap > .at-toolbar:first-child { margin-top:16px; }
 /* A boxed section inside a full-screen view, so a course reads as three
    distinct things rather than one long column. */
 .at-panel { border:2px solid var(--line); border-radius: var(--r-lg);
@@ -1873,24 +1883,12 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-toolbar .at-pickbtn { flex:0 0 auto; width:44px; height:44px; min-height:44px;
   padding:0; box-sizing:border-box; }
 .at-toolbar .at-pickbtn.on { border-color: var(--brass); color: var(--brass); }
-/* Hangs under its button and is allowed to be taller than the list is
-   long — every teacher who has made a deck can be in here — so it scrolls
-   rather than running off the foot of the screen. Right-aligned: the
-   button sits at the right-hand end of the toolbar, and a menu opening
-   leftward from it stays on a phone. */
-.at-pickmenu { position:absolute; top:50px; right:0; z-index: var(--z-chrome);
-  min-width:210px; max-width: calc(100vw - 32px); max-height:60vh; overflow-y:auto;
-  background: var(--surface); border:2px solid var(--line); border-radius:18px;
-  padding:8px; box-shadow:0 14px 40px rgba(0,0,0,.45); }
-.at-pickline { display:flex; align-items:center; gap:10px; width:100%; background:none;
-  border:0; cursor:pointer; border-radius:12px; padding:10px; color: var(--text);
-  text-align:left; font-family: var(--ui); font-size:13px; font-weight:600; }
-.at-pickline:hover { background: var(--raised); }
-.at-pickline.on { color: var(--ink); font-weight:800; }
-.at-pickmark { width:16px; flex:0 0 auto; display:inline-flex; align-items:center;
-  justify-content:center; color: var(--brass); }
-.at-picktext { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.at-picknote { flex:0 0 auto; font-size:11px; font-weight:700; color: var(--muted); }
+/* The three dots (0.689, see MoreMenu), sized like the icons beside them
+   in a list's top row and on a tile. Their panel is a PickSheet. */
+.at-morewrap { display:flex; flex:0 0 auto; }
+.at-morebtn.on { border-color: var(--accent); color: var(--accent); }
+.at-toolbar .at-morebtn { flex:0 0 auto; width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
+.at-deckacts .at-morewrap .at-morebtn { width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
 .at-eyebrow { font-family: var(--ui); font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); margin:0 0 12px; }
 .at-hint { font-size:14px; font-weight:500; color: var(--muted); line-height:1.6; margin:10px 0 0; }
 /* The same voice as a hint, said before the answer rather than after it —
@@ -2642,6 +2640,10 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-sheetacttext { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .at-sheetacttext b { font-size:16px; font-weight:800; }
 .at-sheetacttext i { font-style:normal; font-size:13px; font-weight:600; color: var(--muted); }
+/* In a sheet of choices (a card's status, whose modules to show), the one
+   that holds now: edged in the accent and ticked at the end of its row. */
+.at-sheetact.on { border-color: var(--accent); }
+.at-sheetacton { flex:0 0 auto; display:inline-flex; color: var(--accent); }
 .at-savedtile .nm { font-family: var(--ui); font-size: var(--fs-sm); font-weight:700; line-height:1.25;
   color: var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-savedtile .pc { font-family: var(--ui); font-size:20px; line-height:1; font-weight:800;

@@ -2373,15 +2373,16 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   quiet?: string;
 }) {
   const [open, setOpen] = useState(false);
-
-  /* The same close-on-anything-else the corner menu uses. Registered only
-     while it is open, and the menu stops the click that opened it from
-     closing it again. */
+  const shut = useCallback(() => setOpen(false), []);
 
   if (!options || options.length < 2) return null;
   const on = value !== quiet;
   const chosen = options.find((o) => o.value === value);
 
+  /* The choices open in the app's one panel (0.690, the owner's 2a): the
+     sheet three dots open, a row each with the chosen one ticked — a long
+     list of people scrolls there, where a list hanging from the button ran
+     off a phone. */
   return (
     <div className="at-pickwrap" onClick={(e) => e.stopPropagation()}>
       <button
@@ -2390,37 +2391,143 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
         /* The label says what the filter does; the title also says where it
            has got to, because the lit button alone does not name the person
            the list has been narrowed to. */
-        title={on && chosen ? `${label}: ${chosen.label}` : label}
+        title={on && chosen ? `${label}: ${typeof chosen.label === "string" ? chosen.label : ""}` : label}
         aria-label={label}
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-pressed={on}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
       >
         <Icon name={icon} />
       </button>
 
       {open && (
-        <Popover className="at-pickmenu" onClose={() => setOpen(false)}>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={`at-pickline${o.value === value ? " on" : ""}`}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-            >
-              <span className="at-pickmark">
-                {o.value === value ? <Icon name="check" size={16} /> : null}
-              </span>
-              <span className="at-picktext">{o.label}</span>
-              {o.note ? <span className="at-picknote">{o.note}</span> : null}
-            </button>
-          ))}
-        </Popover>
+        <PickSheet title={label || "Filter"} className="at-picksheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {options.map((o) => (
+              <SheetAction
+                key={o.value}
+                icon={o.value === quiet ? "group" : icon}
+                label={o.label}
+                note={o.note}
+                on={o.value === value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(o.value);
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
       )}
     </div>
+  );
+}
+
+/*
+ * Three dots that open the panel of what can be done with the thing they
+ * sit on — a module's Export and Delete, a list's Import (0.689).
+ *
+ * The panel is the app's one context menu (0.690, the owner's wish): the
+ * sheet a saved session's dots open on Focused training, up from the foot
+ * of the screen on a phone and in the middle of a wide one, named for what
+ * it acts on, a row per action. A thumb reaches it, and a tile at the foot
+ * of the screen cannot cut it off, which a menu hanging from the dots did.
+ *
+ * Its clicks stop at it, so a tile it sits on does not open as well.
+ * Items are { label, icon, danger, note, disabled, onClick }; anything
+ * falsy is left out, so an action that only some things have is written in
+ * place with `&&`.
+ */
+type MoreItem = { label: string; icon: string; danger?: boolean; note?: string; disabled?: boolean; onClick: () => void };
+export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
+  /** What the button is called, to a screen reader and on hover. */
+  label?: string;
+  /** The panel's heading: the thing it acts on. */
+  title: string;
+  /** A line under the heading, where one helps. */
+  lede?: string;
+  items: (MoreItem | null | false | undefined)[];
+  ghost?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const shut = useCallback(() => setOpen(false), []);
+  const live = items.filter(Boolean) as MoreItem[];
+  if (!live.length) return null;
+  return (
+    <div className="at-morewrap" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${open ? " on" : ""}`}
+        title={label}
+        aria-label={label}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="more" />
+      </button>
+      {open && (
+        <PickSheet title={title} lede={lede} className="at-moresheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {live.map((it) => (
+              <SheetAction
+                key={it.label}
+                icon={it.icon}
+                label={it.label}
+                note={it.note}
+                danger={it.danger}
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onClick();
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
+      )}
+    </div>
+  );
+}
+
+/* One thing to do in a panel of them (0.680): its icon in a round well,
+   and its name, with a line under it where it cannot be done and why.
+   Drawn like a row of "Where you are", the other panel of places to go.
+   In the library since 0.690, where MoreMenu draws its rows with it, and
+   so do the pickers that choose one of a few — a card's status, whose
+   modules to show — where `on` marks the one chosen now with a tick. */
+export function SheetAction({ icon, label, note, danger, disabled, on, onClick }: {
+  icon: string;
+  label: Node;
+  note?: Node;
+  danger?: boolean;
+  disabled?: boolean;
+  /** The choice that holds now, in a sheet of choices. */
+  on?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`at-sheetact${danger ? " danger" : ""}${on ? " on" : ""}`}
+      disabled={disabled}
+      aria-current={on ? "true" : undefined}
+      onClick={onClick}
+    >
+      <span className="at-sheetactico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="at-sheetacttext">
+        <b>{label}</b>
+        {note ? <i>{note}</i> : null}
+      </span>
+      {on ? (
+        <span className="at-sheetacton" aria-hidden="true">
+          <Icon name="check" size={20} />
+        </span>
+      ) : null}
+    </button>
   );
 }
 
@@ -2437,6 +2544,8 @@ export function ItemList<T>({
   noun,
   plural,
   tools,
+  more,
+  narrow,
   menus,
   filters,
   count,
@@ -2449,7 +2558,6 @@ export function ItemList<T>({
   views,
   onNew,
   newOff,
-  searchBelow,
   query: outsideQuery,
   renderItem,
   selected,
@@ -2464,25 +2572,25 @@ export function ItemList<T>({
   "person";
   "card". */ noun: string;
   plural?: string;
-  /** Controls in the toolbar itself;
-  right of the search box. */ tools?: Node;
+  /** Controls in the top row, after New and its three dots: the main
+      thing a screen does with its list, such as "Copy all reports". */
+  tools?: Node;
+  /** What the three dots beside New hold — Import, on a list that has it
+      (0.689). Nothing here, no dots. */
+  more?: (MoreItem | null | false | undefined)[];
+  /** Controls that narrow the list in a way of their own, at the end of
+      the search row after Select and the menus — a FilterMenu. */
+  narrow?: Node;
   /**
-   * The menus in the second row, beside Select — Sort and Filter on a card
-   * list. Each is a button that opens its `content` in a panel under the
+   * The menus on the search row, after Select — Sort and Filter on a card
+   * list. Each is an icon that opens its `content` in a panel under the
    * row, and one is open at a time: two panels at once is two answers to
    * "why is this list short". `busy` is how many of its settings are away
-   * from their default, which the button carries as a count — `narrowing`
+   * from their default, which the icon carries as a count — `narrowing`
    * counts a FilterBar's groups for it.
    */
   menus?: { key: string; label: string; icon?: string; busy?: number; content?: Node }[];
   /** Controls under the toolbar — tag pickers and the like. */ filters?: Node;
-  /**
-   * The search box on a line of its own, under New and the toolbar's
-   * buttons, rather than between them. The Cards tab asks for it: its row
-   * carries three or four icons beside New card, which left the box too
-   * narrow to read what was typed in it on a phone.
-   */
-  searchBelow?: boolean;
   /**
    * The search, typed somewhere else on the screen. Given, the list draws
    * no search box of its own and narrows by this instead — the Courses tab
@@ -2688,71 +2796,95 @@ export function ItemList<T>({
       className="at-listwrap"
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
-      <div className="at-toolbar at-toolbar-top">
-        {(onNew || newOff) && !bare && (
-          <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
-            onClick={newOff || onNew}>
-            <Icon name="add" />
-            New {noun}
-          </button>
-        )}
-        {items.length > 0 && !searchBelow && !outside && searchBox}
-        {/* Beside the search box, because narrowing by hand and narrowing by
-            typing are the same job. */}
-        {tools}
-        {/* And at the far end, how to draw them — which is about reading
-            the list rather than about what is in it, so it stands apart
-            from the row below that decides that. Its icon is a picture of
-            the view the list is in. */}
-        {views && items.length > 0 && (
-          <button
-            className="at-icon at-viewbtn"
-            title={viewLabel}
-            aria-label={viewLabel}
-            onClick={() => {
-              setView(then.id);
-              saveView(viewKey, then.id);
-            }}
-          >
-            <Icon name={at.icon} />
-          </button>
-        )}
-      </div>
+      {/* The top row (0.689): New and the three dots holding the list's
+          less used actions, together at the start; the screen's own
+          button after them; and at the far end how to draw the list —
+          which is about reading it rather than about what is in it. Its
+          icon is a picture of the view the list is in. Left out when it
+          would hold nothing. */}
+      {(() => {
+        const withNew = (onNew || newOff) && !bare;
+        const dots = !bare && more && more.some(Boolean);
+        const viewBtn = views && items.length > 0;
+        if (!withNew && !dots && !tools && !viewBtn) return null;
+        return (
+          <div className="at-toolbar at-toolbar-top">
+            {withNew && (
+              <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
+                onClick={newOff || onNew}>
+                <Icon name="add" />
+                New {noun}
+              </button>
+            )}
+            {dots ? (
+              <MoreMenu
+                label={`More for these ${plural || `${noun}s`}`}
+                title={(plural || `${noun}s`).replace(/^./, (c) => c.toUpperCase())}
+                items={more || []}
+              />
+            ) : null}
+            {tools}
+            {viewBtn && (
+              <button
+                className="at-icon at-viewbtn"
+                title={viewLabel}
+                aria-label={viewLabel}
+                onClick={() => {
+                  setView(then.id);
+                  saveView(viewKey, then.id);
+                }}
+              >
+                <Icon name={at.icon} />
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
-      {searchBelow && !outside && items.length > 0 && (
-        <div className="at-toolbar at-toolbar-search">{searchBox}</div>
-      )}
-
-      {/* Select, and the menus that order and narrow the list — one row,
-          under the one that searches it. Select is not a filter and comes
-          first; the menus are in the order they are given. */}
-      {(canSelect || live.length > 0) && !bare && (
-        <div className="at-toolbar at-toolbar-sub">
-          {canSelect && (
-            <button
-              className={`at-btn sm ghost at-selectbtn${selecting ? " on" : ""}`}
-              aria-pressed={selecting}
-              onClick={() => (selecting ? stopSelecting() : startSelecting())}
-            >
-              <Icon name={selecting ? "close" : "select"} size={16} />
-              {selecting ? "Done" : "Select"}
-            </button>
-          )}
-          {live.map((m) => (
-            <button
-              key={m.key}
-              className={`at-btn sm ghost at-menubtn${m.busy ? " on" : ""}`}
-              aria-expanded={openMenu === m.key}
-              onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
-            >
-              <Icon name={m.icon || "tune"} size={16} />
-              {m.label}
-              {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
-              <Icon name={openMenu === m.key ? "chevronUp" : "chevronDown"} size={16} />
-            </button>
-          ))}
-        </div>
-      )}
+      {/* The search row (0.689): the box on a line of its own, wide enough
+          to read what was typed in it on a phone, and after it, as icons,
+          Select and the menus that order and narrow the list. Select is not
+          a filter and comes first; the menus are in the order they are
+          given. */}
+      {(() => {
+        const box = items.length > 0 && !outside;
+        const sel = canSelect && !bare;
+        const menusHere = live.length > 0 && !bare;
+        if (!box && !sel && !menusHere && !narrow) return null;
+        const selLabel = selecting ? "Done selecting" : "Select";
+        return (
+          <div className="at-toolbar at-toolbar-search">
+            {box ? searchBox : <span className="at-toolbarfill" />}
+            {sel && (
+              <button
+                type="button"
+                className={`at-icon ghost at-selectbtn${selecting ? " on" : ""}`}
+                title={selLabel}
+                aria-label={selLabel}
+                aria-pressed={selecting}
+                onClick={() => (selecting ? stopSelecting() : startSelecting())}
+              >
+                <Icon name={selecting ? "close" : "select"} />
+              </button>
+            )}
+            {menusHere && live.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className={`at-icon ghost at-menubtn${m.busy ? " on" : ""}${openMenu === m.key ? " open" : ""}`}
+                title={m.busy ? `${m.label} (${m.busy} on)` : m.label}
+                aria-label={m.label}
+                aria-expanded={openMenu === m.key}
+                onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
+              >
+                <Icon name={m.icon || "tune"} />
+                {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
+              </button>
+            ))}
+            {narrow}
+          </div>
+        );
+      })()}
 
       {shownMenu ? <div className="at-listmenu">{shownMenu.content}</div> : null}
 

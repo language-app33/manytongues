@@ -1142,7 +1142,7 @@ function materialVersion(courses, modules, fills = [], systems = []) {
       /* And its switches, where it has any (0.627): a teacher changing what
          is asked moves nothing else a device compares. */
       const withPractice = c.practice ? withPath.concat([JSON.stringify(c.practice)]) : withPath;
-      /* And whose word sets it uses (0.689), where a teacher chose. */
+      /* And whose word sets it uses (0.693), where a teacher chose. */
       return c.wordSets ? withPractice.concat([JSON.stringify(c.wordSets)]) : withPractice;
     }),
     /* With the parts of the numbers it holds, which are not cards and so
@@ -3002,7 +3002,7 @@ async function handle(req) {
         const holding = courses.filter((c) => (c.decks || []).includes(d.id));
         const lang = d.lang || (holding[0] && holding[0].language) || "";
         /* Whose numbers the deck's students get: the one set each course
-           holding it uses (0.689), and its owner's where no course holds
+           holding it uses (0.693), and its owner's where no course holds
            it yet. Every teacher's used to count, which sent students each
            number once per teacher. */
         /** @type {string[]} */
@@ -3027,7 +3027,7 @@ async function handle(req) {
       return out;
     }
 
-    /* ================= word sets in a space, and on a course (0.689) =================
+    /* ================= word sets in a space, and on a course (0.693) =================
 
        A word set — a language's numbers, its pronouns — is written by one
        teacher. Shared with a space, it is listed in the space's Material
@@ -3061,7 +3061,7 @@ async function handle(req) {
      * Whose sets of one kind reach a course now, the earliest written first.
      *
      * Numbers reach it through a deck that holds number parts, from that
-     * deck's owner (or the teacher it named before 0.689); pronouns through
+     * deck's owner (or the teacher it named before 0.693); pronouns through
      * their cards in its decks. The first is what the course uses until a
      * teacher chooses (6a): it is the set its students had first.
      * @param {Course} course
@@ -3461,7 +3461,7 @@ async function handle(req) {
             }
           }
           /* A pronoun shared with the space is any of its teachers' to
-             correct (0.689), as the space's other material is. */
+             correct (0.693), as the space's other material is. */
           if (!allowed && isPronounRec(existing) && !existing.personal && orgOf(existing) === acting) {
             allowed = await teachesHere();
           }
@@ -4237,7 +4237,7 @@ async function handle(req) {
         if (body.personal === true && !iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
           return json({ error: "not-teaching" }, 403);
         }
-        /* A pronoun written into another teacher's shared set (0.689) is
+        /* A pronoun written into another teacher's shared set (0.693) is
            theirs, so the set stays one teacher's: whose set a course uses
            is chosen by teacher. Only into a set they have in this space. */
         let owner = mine;
@@ -4527,7 +4527,7 @@ async function handle(req) {
          revision that tells their students' devices to fetch the scene's
          lines again. */
       /* And a pronoun, because a course may send its students this
-         teacher's pronouns in place of the ones its decks hold (0.689) —
+         teacher's pronouns in place of the ones its decks hold (0.693) —
          decks this card is not in, whose versions do not move. */
       if (liveMoved && (fillsOf(saved).length || wasFilling || isSentence(saved) || isPronounRec(saved))) {
         await bumpFills(saved.owner || "");
@@ -4955,7 +4955,7 @@ async function handle(req) {
     }
 
     /* Whose numbers a deck used was chosen on the deck from 0.541 to 0.688;
-       it is the course's choice now (0.689, 4a) — see set-course-word-set.
+       it is the course's choice now (0.693, 4a) — see set-course-word-set.
        A deck's old `numbersFrom` is still read, as the set that deck
        brings to a course where nobody has chosen. */
 
@@ -5520,7 +5520,7 @@ async function handle(req) {
       if (!wanted.languageId) return json({ error: "no-language" }, 400);
 
       const keyOf = kind === "times" ? K.timeSys : K.numSys;
-      /* Whose numbers these are: the caller's own, or (0.689) a set another
+      /* Whose numbers these are: the caller's own, or (0.693) a set another
          teacher shared with this space, which any teacher of it may edit —
          saved as theirs, so it stays the one set its courses chose. */
       const whose = String(body.owner || "") || mine;
@@ -5570,7 +5570,7 @@ async function handle(req) {
         ...wanted,
         id,
         owner: whose,
-        /* The spaces it is shared with (0.689), which the editor neither
+        /* The spaces it is shared with (0.693), which the editor neither
            sends nor knows about. */
         ...(existing && Array.isArray(existing.spaces) && existing.spaces.length ? { spaces: existing.spaces } : {}),
         rev: held + 1,
@@ -5641,7 +5641,7 @@ async function handle(req) {
       return json({ ok: true, deleted: id });
     }
 
-    /* ---- word sets in a space, and on a course (0.689) — see spaceWordSets ---- */
+    /* ---- word sets in a space, and on a course (0.693) — see spaceWordSets ---- */
 
     /* Every teacher's sets shared with this space, for Material's Word sets
        screen: pronouns as their cards, numbers as their documents. */
@@ -5662,7 +5662,7 @@ async function handle(req) {
     }
 
     /*
-     * A teacher's own set into the space's Material (0.689, 1a).
+     * A teacher's own set into the space's Material (0.693, 1a).
      *
      * Pronouns are copied, as a card is: the space gets cards of its own,
      * and the teacher's My space set stays theirs. Sharing again brings the
@@ -5839,7 +5839,7 @@ async function handle(req) {
           moduleRows
             .map((/** @type {any} */ d) => d.owner)
             .concat(courseRows.flatMap((/** @type {any} */ c) => c.teachers || []))
-            /* And whoever a deck took its numbers from before 0.689, and
+            /* And whoever a deck took its numbers from before 0.693, and
                whoever a course chose a word set from since, who may teach
                none of these courses. */
             .concat(moduleRows.map((/** @type {any} */ d) => d.numbersFrom || ""))
@@ -5920,7 +5920,7 @@ async function handle(req) {
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
       await nameTheGone(nameOf, ownerHandles);
 
-      /* Whose numbers each course uses (0.689): one teacher's for the whole
+      /* Whose numbers each course uses (0.693): one teacher's for the whole
          course, so two modules of it never send two versions of a number. */
       /** @type {Map<string, string>} */
       const numbersFor = new Map();
@@ -5965,7 +5965,7 @@ async function handle(req) {
         if (c && inScope(c) && isPublished(c)) cardById.set(id, studentView(c));
       });
       /*
-       * One teacher's pronouns to a course (0.689).
+       * One teacher's pronouns to a course (0.693).
        *
        * A deck holds the pronouns as their cards, and two teachers' decks in
        * one course used to send their students two of every pronoun. Now

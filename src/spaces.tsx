@@ -138,6 +138,7 @@ import {
   FilterBar,
   formHasAudio,
   FilterMenu,
+  MoreMenu,
   flagTitle,
   feedbackTitle,
   Help,
@@ -180,10 +181,10 @@ import {
   useRun,
   useReach,
   useReachHold,
-  Popover,
   ModuleSwitch,
   ModulePickScreen,
   PickSheet,
+  SheetAction,
   BrandMark,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
@@ -2792,8 +2793,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   }
   moduleMakers.sort((a, b) => a.label.localeCompare(b.label));
   const moduleOwnerOptions = [
-    { value: "", label: "Anyone", note: String(modules.length) },
-    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: String(m.count) })),
+    { value: "", label: "Anyone", note: plural(modules.length, "module") },
+    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: plural(m.count, "module") })),
   ];
   /* Filtered before the list sees them, so the count line, "select all" and
      every bulk action work on what is on screen rather than on what a
@@ -3359,7 +3360,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                   d.title.toLowerCase().includes(q) ||
                   (d.ownerName || "").toLowerCase().includes(q)
                 }
-                tools={
+                narrow={
                   <FilterMenu
                     icon="person"
                     label="Filter by who made it"
@@ -3419,9 +3420,17 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         {`${d.ownerName} · ${moduleSize(d)}`}
                       </>
                     }
+                    /* Behind three dots, as on Material's tiles (0.692):
+                       the app's one panel of actions on a thing. */
                     actions={
-                        <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
+                      <MoreMenu
+                        label={`More for ${d.title}`}
+                        title={d.title}
+                        items={[{
+                          label: `Delete ${moduleKind(d)}`,
+                          icon: "delete",
+                          danger: true,
+                          onClick: () => {
                             if (d.locked && MODULE_LOCKS) {
                               snack(lockedDeleteNote([d.title]), "warn");
                               return;
@@ -3442,7 +3451,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               ),
                               action: () => API.deleteModule(d.id),
                             });
-                          }} />
+                          },
+                        }]}
+                      />
                     }
                     footer={
                       <TileNote live={d.courseTitles.length > 0}>
@@ -5618,6 +5629,36 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
   );
 }
 
+/* A module's quality on its tile in the list (0.689, the owner's 3b and
+   4b): the number alone, in a ring filled as far round as the score goes,
+   in the score's colour. A module with no score yet — nothing in it to
+   judge — has the empty ring and a dash, so every tile lines up the same. */
+const RING_R = 17;
+const RING_LEN = 2 * Math.PI * RING_R;
+function QualityRing({ quality }: { quality?: Quality | null }) {
+  const score = quality && quality.score !== null ? quality.score : null;
+  const tone = score === null ? "none" : qualityTone(score);
+  const said = score === null ? "Quality: not scored yet" : `Quality: ${score} out of 100`;
+  const filled = score === null ? 0 : Math.max(0, Math.min(100, score)) / 100;
+  return (
+    <span className={`at-qring ${tone}`} role="img" aria-label={said} title={said}>
+      <svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+        <circle className="at-qringtrack" cx="22" cy="22" r={RING_R} />
+        {filled > 0 ? (
+          <circle
+            className="at-qringfill"
+            cx="22"
+            cy="22"
+            r={RING_R}
+            strokeDasharray={`${(RING_LEN * filled).toFixed(2)} ${RING_LEN.toFixed(2)}`}
+          />
+        ) : null}
+      </svg>
+      <span className="at-qringnum" aria-hidden="true">{score === null ? "–" : score}</span>
+    </span>
+  );
+}
+
 /* ------------------------------------------------------------------
    A course's path (0.616)
 
@@ -6043,6 +6084,16 @@ const STATUS_ICON: Record<string, string> = {
   review: "view",
   changed: "refresh",
 };
+/* Each choice's icon in the status panel: what it leaves the card as. */
+const CHOICE_ICON: Record<string, string> = {
+  draft: "draft",
+  review: "view",
+  published: "verify",
+  "changes:draft": "draft",
+  "changes:review": "view",
+  discard: "refresh",
+  unpublish: "block",
+};
 /* The status as the menu reads while it is shut — "Published", "Draft",
    "Changes in draft". */
 const statusLabel = (card: Card): string =>
@@ -6070,8 +6121,6 @@ function StatusMenu({ card, disabled, onStatus }: {
 }) {
   const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
   const [open, setOpen] = useState(false);
-  /* The same close-on-anything-else the filter menus use, registered only
-     while it is open. */
   const now = statusNow(card);
   const choices = statusChoices(card);
   const shown = statusLabel(card);
@@ -6094,10 +6143,10 @@ function StatusMenu({ card, disabled, onStatus }: {
           className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
           aria-label={`Status: ${shown}`}
           title={`Status: ${shown}`}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={open}
           disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
         >
           {/* Where the card stands, in words and in its colour, opening
               like the other menus on the screen. */}
@@ -6105,23 +6154,23 @@ function StatusMenu({ card, disabled, onStatus }: {
           {shown}
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
+        {/* The statuses open in the app's one panel (0.690, the owner's
+            1a), its status now ticked. */}
         {open && (
-          <Popover className="at-pickmenu at-statuspick" role="menu" onClose={() => setOpen(false)}>
-            {choices.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                role="menuitem"
-                className={`at-pickline${c.value === now ? " on" : ""}`}
-                onClick={() => pick(c.value)}
-              >
-                <span className="at-pickmark">
-                  {c.value === now ? <Icon name="check" size={16} /> : null}
-                </span>
-                <span className="at-picktext">{c.label}</span>
-              </button>
-            ))}
-          </Popover>
+          <PickSheet title="Card status" lede={`Now: ${shown}`} className="at-statussheet" onClose={() => setOpen(false)}>
+            <div className="at-sheetacts">
+              {choices.map((c) => (
+                <SheetAction
+                  key={c.value}
+                  icon={CHOICE_ICON[c.value] || "verify"}
+                  label={c.label.replace(/…$/, "")}
+                  danger={c.value === "discard" || c.value === "unpublish"}
+                  on={c.value === now}
+                  onClick={() => pick(c.value)}
+                />
+              ))}
+            </div>
+          </PickSheet>
         )}
       </span>
       {asking === "discard" && (
@@ -6380,30 +6429,38 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
 const SHOW_IN_CONTEXT = false;
 
 /**
- * Decks or Cards, inside Material and My space (0.550): their tab row, and
- * which of the two sides you are in, in one line (0.551). One piece for
- * both since 0.685 (the owner's 5a), where each side had its own copy.
+ * Modules, Cards and Word sets, inside Material and My space (0.550): the
+ * line saying which side you are in, then their tab row (0.689, the
+ * owner's wish: the line describes the whole page, not the tab under it).
+ * One piece for both sides since 0.685 (the owner's 5a). Word sets is a
+ * tab of its own since 0.689, left off where no language taught has one.
  */
-function ModulesOrCards({ tab, onTab, mine, spaceName }: {
+function ModulesOrCards({ tab, onTab, mine, spaceName, withSets }: {
   tab: string;
   onTab: (key: string) => void;
   /** My space, the teacher's own, rather than Material, the space's. */
   mine: boolean;
   spaceName: string;
+  /** Whether any language switched on has a word set to write. */
+  withSets: boolean;
 }) {
   return (
     <>
-      <Tabs
-        tabs={[["decks", "Modules", "folder"], ["cards", "Cards", "cards"]]}
-        value={tab}
-        onChange={onTab}
-        label="Modules or cards"
-      />
       <Help className="at-mb3">
         {mine
-          ? "Only you see these. Copy or move them to the space when they're ready."
-          : `${spaceName}'s modules and cards, shared with its teachers.`}
+          ? `Only you can see these. When one is ready, copy or move it to ${spaceName}.`
+          : `Shared with all of ${spaceName}'s teachers. Students see a module once it's in a course.`}
       </Help>
+      <Tabs
+        tabs={[
+          ["decks", "Modules", "folder"],
+          ["cards", "Cards", "cards"],
+          ...(withSets ? [["wordsets", "Word sets", "hash"] as [string, string, string]] : []),
+        ]}
+        value={tab}
+        onChange={onTab}
+        label={withSets ? "Modules, cards or word sets" : "Modules or cards"}
+      />
     </>
   );
 }
@@ -6617,12 +6674,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const [numbering, setNumbering] = useState<LangId | null>(null);
   /* Which language's pronouns are open. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
-  /* Whose set is open from Material's Word sets (0.689): another teacher's
+  /* Whose set is open from Material's Word sets (0.693): another teacher's
      shared set, or null for the teacher's own. Read by the pronouns and the
      numbers screens alike, and cleared as either closes. */
   const [setOwner, setSetOwner] = useState<string | null>(null);
   /* Every teacher's word sets shared with the space, for Material's Word
-     sets screen (0.689) — fetched as it opens, and again after a save. */
+     sets screen (0.693) — fetched as it opens, and again after a save. */
   const [spaceSets, setSpaceSets] = useState<{ pronouns: API.SharedPronouns[]; numbers: API.SharedNumbers[] } | null>(null);
   const loadSpaceSets = useCallback(async () => {
     const r = await API.spaceWordSets();
@@ -6634,13 +6691,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      language's under its name, which is where Numbers and Pronouns are
      opened from. It replaced an icon for each and a "Which language?" step
      before either. */
-  const [wordSets, setWordSets] = useState(false);
-  /* Material's Word sets lists every teacher's shared sets (0.689): fetched
-     each time it opens, so a set shared from another device is there. */
+  /* Material's Word sets lists every teacher's shared sets (0.693): fetched
+     each time the tab opens, so a set shared from another device is there. */
   useEffect(() => {
-    if (!wordSets || mineSide) return;
+    if (tab !== "wordsets" || mineSide) return;
     void loadSpaceSets().catch((e) => setError(API.explain(e)));
-  }, [wordSets, mineSide, loadSpaceSets, setError]);
+  }, [tab, mineSide, loadSpaceSets, setError]);
   /* The open deck, being edited: null while it is only read. */
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
   const [discardingModule, setDiscardingModule] = useState(false);
@@ -6886,15 +6942,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const numberLangsOn = numberLangs.filter((id) => !!taughtOn[id]);
   const pronounLangsOn = pronounLangs.filter((id) => !!taughtOn[id]);
   /* The languages with any word set to write, in the order they are
-     taught, and what the row that opens them says they hold. */
+     taught: what the Word sets tab lists, and whether there is one. */
   const wordSetLangsOn = Object.keys(taughtOn).filter((id) => numberLangsOn.includes(id) || pronounLangsOn.includes(id));
-  const wordSetNames = (langs: string[]) => {
-    const names = [
-      langs.some((id) => numberLangsOn.includes(id)) ? "numbers" : "",
-      langs.some((id) => pronounLangsOn.includes(id)) ? "pronouns" : "",
-    ].filter(Boolean).join(" and ");
-    return `${names.charAt(0).toUpperCase()}${names.slice(1)}, written once for the language`;
-  };
   /* And for making a card or a deck: with the switch on one language,
      that is the one — see langsToMakeIn. Exactly one is the only case
      where there is nothing to ask. None is not the same as one: it means
@@ -7727,7 +7776,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return run(async () => {
       const r = await API.saveSystem(kind, system, owner);
       const saved = kind === "times" ? readTimeSystem(r.system) : readNumberSystem(r.system);
-      /* Another teacher's shared set (0.689): theirs, so it is the space's
+      /* Another teacher's shared set (0.693): theirs, so it is the space's
          list that is read again, not this teacher's own systems. */
       if (owner) {
         await loadSpaceSets();
@@ -8559,7 +8608,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     ...((composerFor(langId) || { ranges: () => [] }).ranges()),
     ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
   ];
-  /* One teacher's pronouns (0.689): the named teacher's, or else the
+  /* One teacher's pronouns (0.693): the named teacher's, or else the
      viewer's own where they have any here, or else the earliest written —
      the set a course uses until someone chooses. Material can hold several
      teachers' sets, and "the pronouns" a deck takes is one of them. */
@@ -8633,7 +8682,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
   /* The pronouns into a deck or out of it, from their own screen (0.569):
      every pronoun card of the language, as Add existing cards does it. */
-  /* A module holds one teacher's pronouns (0.689): putting a set in takes
+  /* A module holds one teacher's pronouns (0.693): putting a set in takes
      any other teacher's out, and taking them out takes out every one. */
   const pronounsInModule = (langId: LangId, moduleId: string, on: boolean, set?: Card[]) =>
     run(async () => {
@@ -8648,13 +8697,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }
     }, on ? "Added to the module" : "Taken out of the module");
 
-  /* ---- the Word sets screen (0.569; by teacher since 0.689) ----
+  /* ---- the Word sets tab (0.569; a tab since 0.689; by teacher since 0.693) ----
      My space: the teacher's own sets, each with the way to share it with
-     the space. Material: every set a teacher has shared with the space,
-     under that teacher's name, any of which a teacher here may open and
-     edit. Each language's under its name where more than one is switched
-     on. A set opens over this screen, and closing it comes back here. */
-  const wordSetsScreen = () => {
+     the space. Material: the teacher's own sets, then every set another
+     teacher has shared with the space, under that teacher's name, any of
+     which a teacher here may open and edit. Each language's under its name
+     where more than one is switched on. A set opens over the tab, and
+     closing it comes back here. */
+  const wordSetsTab = () => {
     const several = wordSetLangsOn.length > 1;
     const langName = (id: LangId) => (languages[id] || { name: id }).name;
     /* My space: as the sets always were, and Share under each. */
@@ -8768,21 +8818,20 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     };
     const tiles = mineSide ? ownTiles : sharedTiles;
     return (
-      <Screen title="Word sets" onBack={() => setWordSets(false)}>
+      <>
         {mineSide ? (
-          <Help>
+          <Help className="at-mb3">
             Lists every language has, such as numbers and pronouns. You write the words once for the
             language, then add the set to a module as a whole, or a range of numbers at a time.
             {personalOnly ? null : ` Share a set to list it in ${spaceName}'s Material, where its teachers can use it and edit it.`}
           </Help>
         ) : (
-          <Help>
+          <Help className="at-mb3">
             Your word sets for {spaceName}, and below them the sets other teachers have shared here.
             Any teacher can open a shared set and edit it. Each course chooses whose set of each kind
             its students get.
           </Help>
         )}
-        <Notice kind="error">{error}</Notice>
         {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
         {several
           ? wordSetLangsOn.map((id) => (
@@ -8814,7 +8863,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             }
           />
         ) : null}
-      </Screen>
+      </>
     );
   };
   /* Where nothing below draws a list to sit over, it is the screen. */
@@ -8830,7 +8879,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       setPronouning(null);
       return null;
     }
-    /* Whose set (0.689): one opened from Material's Word sets is that
+    /* Whose set (0.693): one opened from Material's Word sets is that
        teacher's, as the server last listed it with anything saved here
        since laid over it; otherwise the one set this side shows. */
     const shared = setOwner && !mineSide && spaceSets
@@ -8876,7 +8925,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     if (!systems) {
       return <FetchingSystems name={numLang.name} load={loadSystems} onBack={() => setNumbering(null)} />;
     }
-    /* Another teacher's numbers, opened from Material's Word sets (0.689):
+    /* Another teacher's numbers, opened from Material's Word sets (0.693):
        as the server last listed them, saved back as theirs. */
     const theirs = setOwner && setOwner !== account.handle && !mineSide && spaceSets
       ? spaceSets.numbers.find((n) => n.owner === setOwner && n.lang === numbering) || null
@@ -9433,7 +9482,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             noun="card"
             items={own}
             menus={cardMenus}
-            searchBelow
             size="small"
             match={cardMatches}
             empty={cards.some((c) => c.lang === langId && !isPronounCard(c)) ? "No cards match the filter." : "You have no cards in this language yet."}
@@ -9506,8 +9554,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       )
     );
   };
-
-  if (wordSets && !openModule) return wordSetsScreen();
 
   /* ---- an open deck takes over the screen, showing its cards the same
          way the Cards tab does ---- */
@@ -9631,9 +9677,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             items={listed}
             count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
             /* With the deck empty, Import is in the box below instead. */
-            tools={moduleEmpty ? null : <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+            more={moduleEmpty ? [] : [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }]}
             menus={cardMenus}
-            searchBelow
             size="small"
             busy={busy}
             filters={
@@ -10018,12 +10063,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               if (waiting) {
                 /* A My space module's numbers are the teacher's own; a
                    space module's are whichever teacher's its course chose
-                   (0.689), so it opens the shared sets to pick from. */
+                   (0.693), so it opens the shared sets to pick from. */
                 const ours = !!d.personal;
                 notes.push({
                   key: "numbers",
                   text: `${waiting === 1 ? "A range" : `${waiting} ranges`} of numbers in this ${kindW} still ${waiting === 1 ? "needs its" : "need their"} words written. Students get the other ranges, and ${waiting === 1 ? "this one" : "these"} as soon as ${waiting === 1 ? "it is" : "they are"} written.`,
-                  open: ours ? () => setNumbering(langId) : () => setWordSets(true),
+                  open: ours ? () => setNumbering(langId) : () => {
+                    setOpenModule(null);
+                    setTab("wordsets");
+                  },
                 });
               }
               const lang = languages[langId];
@@ -10059,7 +10107,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 </Button>
               )}
               menus={cardMenus}
-              searchBelow
               size="small"
               busy={busy}
               empty={filterNote}
@@ -10320,8 +10367,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               course={c}
               lang={languages[c.language as LangId] || null}
               onOpenSets={() => {
+                setCourseView(null);
                 setSide("space");
-                setWordSets(true);
+                setTab("wordsets");
               }}
             />
 
@@ -10429,11 +10477,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
            back later; what it shows is still built when it is asked for. */
         ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
       ]}
-      tab={tab === "decks" || tab === "cards" ? (mineSide ? "myspace" : "material") : tab}
+      tab={tab === "decks" || tab === "cards" || tab === "wordsets" ? (mineSide ? "myspace" : "material") : tab}
       onTab={(k: string) => {
         if (k === "material" || k === "myspace") {
           setSide(k === "myspace" ? "mine" : "space");
-          if (tab !== "decks" && tab !== "cards") setTab("decks");
+          if (tab !== "decks" && tab !== "cards" && tab !== "wordsets") setTab("decks");
         } else setTab(k);
       }}
       error={error}
@@ -10550,7 +10598,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
           {tab === "cards" && (
             <>
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={wordSetLangsOn.length > 0} />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -10667,19 +10715,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a module so students get it.
               </Help>
-              {/* Word sets (0.569): one row, however many sets there are,
-                  opening the screen that lists them. Above the cards
-                  because it is where a teacher already looks, and one line
-                  so it never pushes the cards down. */}
-              {wordSetLangsOn.length ? (
-                <div className="at-mb3">
-                  <OpenRow
-                    title="Word sets"
-                    meta={wordSetNames(wordSetLangsOn)}
-                    onOpen={() => setWordSets(true)}
-                  />
-                </div>
-              ) : null}
 
               <ItemList
                 noun="card"
@@ -10689,12 +10724,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     ? null
                     : `${shownCards.length} of ${plural(onCards.length, "card")}`
                 }
-                /* Numbers and pronouns used to have an icon each here; they
-                   are word sets now, reached from the row above the list
-                   (0.569). */
-                tools={cards.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
+                more={cards.length ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
                 menus={cardMenus}
-                searchBelow
                 size="small"
                 busy={busy}
                 empty={
@@ -10801,7 +10832,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             />
           )}
 
-          {tab === "decks" && (
+          {/* Word sets (0.689): a tab of their own beside Modules and Cards,
+              where they were a row at the head of the Cards tab. Where no
+              language switched on has one, Modules stands in for it. */}
+          {tab === "wordsets" && wordSetLangsOn.length > 0 && (
+            <>
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets />
+              {wordSetsTab()}
+            </>
+          )}
+
+          {(tab === "decks" || (tab === "wordsets" && !wordSetLangsOn.length)) && (
             <>
               {toSpace && (
                 <ConfirmModal
@@ -10843,7 +10884,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }
                 />
               )}
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={wordSetLangsOn.length > 0} />
               {moduleAction && (
                 <Screen
                   title={
@@ -10976,7 +11017,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                tools={modules.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
+                more={modules.length ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
                 onNew={newModule}
                 selected={selModules}
                 onSelectedChange={setSelModules}
@@ -11026,69 +11067,78 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       meta={
                         <>
                           <LockMark locked={d.locked && MODULE_LOCKS} />
-                          {/* A unit says so (0.688, the owner's 1b): its
-                              place on each path is on its own screen. */}
-                          {isPathUnit(d) ? <span data-el="unit-label">Unit · </span> : null}
-                          {`${(langOfModule(d) || { name: "" }).name} · ${moduleSize(d)}${moduleWaiting(d)}`}
+                          {/* Its language and size are off the tile (0.689,
+                              the owner's wish): what is left is whether it
+                              is a unit, and what in it needs looking at. */}
                           {(() => {
-                            /* Its cards that send students nothing yet (0.563). */
                             const off = notReaching(d, (d.cardIds || []).map((id) => cardById.get(id)).filter(Boolean) as Card[]);
-                            return off ? <span className="at-notreach">{` · ${off.short}`}</span> : null;
-                          })()}
-                          <QualityMark quality={qualities.get(d.id)} />
-                          {(() => {
+                            const ids = new Set(d.cardIds || []);
                             /* How many of its cards have a recording the
                                server lacks, so it is seen from the list. */
-                            const ids = new Set(d.cardIds || []);
                             const lost = cards.filter((c) => ids.has(c.id) && cardLostRecordings(c)).length;
-                            return lost ? <span className="at-lostcount">{` · ${plural(lost, "card")} missing a recording`}</span> : null;
+                            const waiting = moduleWaiting(d).replace(/^ · /, "");
+                            const parts = [
+                              /* A unit says so (0.688, the owner's 1b): its
+                                 place on each path is on its own screen. */
+                              isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
+                              waiting ? <span key="w">{waiting}</span> : null,
+                              /* Its cards that send students nothing yet (0.563). */
+                              off ? <span key="o" className="at-notreach">{off.short}</span> : null,
+                              lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
+                            ].filter(Boolean) as React.ReactElement[];
+                            return parts.flatMap((p, i) => (i ? [" · ", p] : [p]));
                           })()}
                         </>
                       }
                       onOpen={() => { setUnitCourse(null); setOpenModule(d.id); }}
                       actions={
                         <>
-                          <IconButton icon="download" label={`Export ${moduleKind(d)}`} onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              exportModules([d.id]);
-                            }} />
-                          {/* A My space deck into the space (0.549; 2a, 9b, 10a). */}
-                          {d.personal && !personalOnly && (
-                            <>
-                              <IconButton icon="copy" label="Copy to the space" onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation();
-                                setToSpace({ deck: d, move: false });
-                              }} />
-                              <IconButton icon="upload" label="Move to the space" onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation();
-                                setToSpace({ deck: d, move: true });
-                              }} />
-                            </>
-                          )}
-                          <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              if (d.locked && MODULE_LOCKS) {
-                                snack(lockedDeleteNote([d.title]), "warn");
-                                return;
-                              }
-                              setConfirm({
-                                kind: "deck",
-                                title: `Delete ${d.title}?`,
-                                confirmLabel: `Delete the ${moduleKind(d)}`,
-                                confirmWord: d.title,
-                                body: (
-                                  <>
-                                    {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what={moduleKind(d)} /> : null}
-                                    <p>
-                                      Its {plural(d.cardCount || 0, "card")} go with
-                                      it, out of every course and out of the apps of everyone
-                                      studying it. There is no undoing this.
-                                    </p>
-                                  </>
-                                ),
-                                action: () => API.deleteModule(d.id),
-                              });
-                            }} />
+                          <QualityRing quality={qualities.get(d.id)} />
+                          {/* Everything else done with a module, behind its
+                              three dots (0.689; the owner's 1a). */}
+                          <MoreMenu
+                            label={`More for ${d.title}`}
+                            title={d.title}
+                            ghost
+                            items={[
+                              { label: `Export ${moduleKind(d)}`, icon: "download", onClick: () => exportModules([d.id]) },
+                              /* A My space deck into the space (0.549; 2a, 9b, 10a). */
+                              d.personal && !personalOnly && {
+                                label: `Copy to ${spaceName}`, icon: "copy", onClick: () => setToSpace({ deck: d, move: false }),
+                              },
+                              d.personal && !personalOnly && {
+                                label: `Move to ${spaceName}`, icon: "upload", onClick: () => setToSpace({ deck: d, move: true }),
+                              },
+                              {
+                                label: `Delete ${moduleKind(d)}`,
+                                icon: "delete",
+                                danger: true,
+                                onClick: () => {
+                                  if (d.locked && MODULE_LOCKS) {
+                                    snack(lockedDeleteNote([d.title]), "warn");
+                                    return;
+                                  }
+                                  setConfirm({
+                                    kind: "deck",
+                                    title: `Delete ${d.title}?`,
+                                    confirmLabel: `Delete the ${moduleKind(d)}`,
+                                    confirmWord: d.title,
+                                    body: (
+                                      <>
+                                        {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what={moduleKind(d)} /> : null}
+                                        <p>
+                                          Its {plural(d.cardCount || 0, "card")} go with
+                                          it, out of every course and out of the apps of everyone
+                                          studying it. There is no undoing this.
+                                        </p>
+                                      </>
+                                    ),
+                                    action: () => API.deleteModule(d.id),
+                                  });
+                                },
+                              },
+                            ]}
+                          />
                         </>
                       }
                       footer={
@@ -11283,7 +11333,7 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
 }
 
 /*
- * Whose word sets a course uses (0.689; 3a, 5a, 6a, 7a).
+ * Whose word sets a course uses (0.693; 3a, 5a, 6a, 7a).
  *
  * One teacher's set of each kind, so two teachers' versions of a pronoun
  * or a number never reach the same students. Any teacher of the course

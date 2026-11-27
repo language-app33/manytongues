@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.689 — 27 November 2026
+## 0.693 — 27 November 2026
 
 **One teacher's word set per course.** When two teachers had each written
 the pronouns (or the numbers) and both sets reached one course, its
@@ -22,11 +22,11 @@ Now each course uses one teacher's set of each kind.
   among those reaching it. Where more than one teacher's set reaches it,
   the section says so and names whose students are getting.
 - **Material lists every teacher's shared sets.** Teaching › Material ›
-  Cards › Word sets shows your own sets first, then **Shared by other
+  Word sets shows your own sets first, then **Shared by other
   teachers**, one tile each, such as "Pronouns · Rana". Any teacher can
   open a shared set and edit it; a pronoun added to someone else's set
   stays part of their set.
-- **Share from My space.** Teaching › My space › Cards › Word sets has
+- **Share from My space.** Teaching › My space › Word sets has
   **Share with** *your space* under each set. Pronouns go in as a copy,
   and sharing again brings that copy up to date. Numbers are not copied:
   they stay one set, so an edit made in the space changes your own numbers
@@ -44,6 +44,69 @@ To check by hand: on a phone, with two teachers whose pronouns are both on
 one course, open the course as a student and check each pronoun comes
 once; then choose the other teacher on the course page and check the
 student gets theirs after a refresh.
+
+## 0.692 — 27 November 2026
+
+**Admin › Modules tiles use the three dots too.** Each module's Delete
+button there has moved behind three dots that open the same panel as in
+Material, headed with the module's name. Delete still asks first.
+
+## 0.691 — 26 November 2026
+
+**A card's status and "Filter by who made it" open the same panel too.**
+The status button on a card (Published, Draft, Ready for review…) and the
+"Filter by who made it" button in Admin › Modules now open the panel the
+three dots open, instead of a small list hanging from the button. The
+current choice is edged in colour and ticked. Unpublish and Discard changes
+are in red and still ask first. Each person in the filter shows how many
+modules they made. The menu behind your initials is unchanged.
+
+## 0.690 — 26 November 2026
+
+**Three dots open the same panel everywhere.** The three dots on a module's
+tile and beside New in a list now open the panel a saved session's dots
+open on Focused training: up from the bottom of the screen on a phone, in
+the middle of a wide one, headed with the module's name (or the list's), and
+a large row for each action. They used to open a small menu hanging from the
+dots, which on a phone could run under the bar at the foot of the screen.
+Tap the cross, tap outside the panel or press Escape to close it.
+
+## 0.689 — 26 November 2026
+
+**Module tiles are simpler.** In Teaching › Material › Modules and
+My space › Modules:
+
+- A module's quality is now a number in a ring that fills as far round as
+  the score goes, in the score's colour, on the right of the tile. A module
+  with nothing to score yet shows an empty ring with a dash.
+- Export, Delete and, in My space, Copy and Move to the space are in a menu
+  behind three dots beside the ring. The dots don't open the module, and
+  Delete still asks first.
+- The language and the number of cards are no longer on the tile. Whether
+  it is a unit, what is waiting for review, cards reaching no students and
+  missing recordings are still said under the title.
+
+**Lists have their search on a line of its own.** Everywhere a list can be
+searched, the search box has its own row, with Select, Sort and Filter after
+it as icons (hold or hover to see their names; Sort and Filter still show a
+count while they narrow the list). Import moved into a menu behind three dots
+beside New. While a list is empty, its welcome panel keeps its own Import
+button.
+
+**Word sets have their own tab.** Material and My space now have three
+tabs: Modules, Cards and Word sets. The Word sets tab lists numbers and
+pronouns where the Cards tab used to have a row leading to them. It is left
+out where no language you teach has a word set.
+
+**The line describing Material and My space is above the tabs,** and says
+more plainly who sees what:
+
+- Material: "Shared with all of *your space*'s teachers. Students see a
+  module once it's in a course."
+- My space: "Only you can see these. When one is ready, copy or move it to
+  *your space*."
+
+Trade-off: Export, Delete and Import each take one more tap.
 
 ## 0.688 — 26 November 2026
 

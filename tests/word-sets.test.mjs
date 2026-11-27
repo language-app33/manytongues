@@ -1,5 +1,5 @@
 /*
- * One word set per course (0.689).
+ * One word set per course (0.693).
  *
  * Two teachers who each wrote the pronouns, or the numbers, and each put
  * them in a module of the same course used to send that course's students

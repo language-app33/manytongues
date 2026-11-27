@@ -596,7 +596,7 @@ const fakeFetch = async (input, opts = {}) => {
       lockedModules.push(body);
       return json({ ok: true });
     }
-    /* Word sets shared with the space, and whose a course uses (0.689):
+    /* Word sets shared with the space, and whose a course uses (0.693):
        nobody here has shared any. */
     if (action === "space-word-sets") return json({ ok: true, pronouns: [], numbers: [] });
     if (action === "course-word-sets") {
@@ -4880,10 +4880,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
-  check("and it opens the app's menu of what can be done from there",
-    statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
-  if (statusBtn) click(statusBtn);
+  /* In the app's one panel since 0.690: a row per choice, the one that
+     holds now ticked. */
+  const statusLines = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
+    .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
+  check("and it opens the app's panel of what can be done from there, the status now ticked",
+    statusLines.join(" | ") === "Published ✓ | Unpublish", statusLines.join(" | ") || "(no panel)");
+  click(document.querySelector('.at-statussheet [aria-label="Close"]'));
   await sleep(100);
   /* On the title's own line since 0.484, as icons, each named out loud,
      with Export by the "This card" heading rather than among them. */
@@ -8424,8 +8427,8 @@ const openPronounTables = async () => {
 
 /* ---- a language's pronouns, written once ----
 
-   The Pronouns screen, a word set (0.569): reached from the Word sets row
-   above the Cards tab's list, through the screen that lists every set.
+   The Pronouns screen, a word set (0.569): reached from the Word sets tab
+   beside Modules and Cards (0.689), which lists every set.
    One row per column of the verb table. Filled in and saved, each row goes
    up as a card of the Pronoun kind that says which column it is. */
 {
@@ -8434,19 +8437,21 @@ const openPronounTables = async () => {
   check("the Cards tab no longer has an icon each for Numbers and Pronouns",
     !frameButtons(frame).some((b) => /^(Numbers|Pronouns)$/.test(b.getAttribute("aria-label") || "")),
     frameButtons(frame).map((b) => b.getAttribute("aria-label")).filter(Boolean).join(" | "));
-  const setsRow = /** @type {any} */ ([...frame.querySelectorAll("button.at-openrow")]
-    .find((b) => /^Word sets/.test((b.textContent || "").trim())) || null);
-  check("but one Word sets row above the cards, saying what it holds",
-    !!setsRow && /Numbers and pronouns, written once for the language/.test(setsRow.textContent || ""),
-    setsRow ? (setsRow.textContent || "").trim() : "(no row)");
-  click(setsRow);
+  check("nor a Word sets row above the cards, now that they have a tab",
+    ![...frame.querySelectorAll("button.at-openrow")].some((b) => /^Word sets/.test((b.textContent || "").trim())));
+  const innerTab = (/** @type {string} */ name) => /** @type {any} */ ([...(document.querySelector(".at-screen.bare") || document)
+    .querySelectorAll('[role="tab"]')].find((b) => (b.textContent || "").trim() === name) || null);
+  check("but Word sets is a tab beside Modules and Cards",
+    !!innerTab("Modules") && !!innerTab("Cards") && !!innerTab("Word sets"),
+    [...frame.querySelectorAll('[role="tab"]')].map((b) => (b.textContent || "").trim()).join(" | "));
+  click(innerTab("Word sets"));
   await sleep(400);
-  const setsScreen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
-    .find((sc) => ((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Word sets") || null);
+  const setsScreen = () => /** @type {any} */ (innerTab("Word sets") && innerTab("Word sets").getAttribute("aria-selected") === "true"
+    ? document.querySelector(".at-screen.bare") : null);
   const setTile = (/** @type {string} */ name) => /** @type {any} */ (setsScreen()
     ? [...setsScreen().querySelectorAll("button.at-openrow")].find((b) => ((b.querySelector(".at-decktitle") || {}).textContent || "").trim() === name) || null
     : null);
-  check("which opens a screen listing each set",
+  check("which lists each set",
     !!setTile("Numbers") && !!setTile("Pronouns"),
     setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
   check("each saying how much of it is written and how many decks hold it",
@@ -8505,7 +8510,7 @@ const openPronounTables = async () => {
   check("closing the set goes back to Word sets, which counts what was written",
     !!setsScreen() && /^1 of 9 pronouns written/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
     setsScreen() ? ((setTile("Pronouns") || {}).textContent || "(no tile)") : "(not on Word sets)");
-  click([...(setsScreen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  click(innerTab("Cards"));
   await sleep(300);
 
   /* And on the Cards tab they are one entry, not a tile each: the set is
@@ -9154,23 +9159,19 @@ const openPronounTables = async () => {
   const tabNamed = (/** @type {RegExp} */ re) =>
     frameButtons(frame).filter((b) => re.test((b.textContent || "").trim())).pop();
   const rows = () => [...frame.querySelectorAll(".at-toolbar")];
-  const subRow = () => frame.querySelector(".at-toolbar-sub");
-  /* The label a button carries, without the count riding inside it: a
-     narrowed Filter reads "Filter1" to textContent, and what is being
-     checked here is the order of the three. */
+  const subRow = () => frame.querySelector(".at-toolbar-search");
+  /* The name each icon carries (0.689: Select, Sort and Filter are icons
+     now, named for a screen reader and on hover), in order — the search
+     box's own clear cross aside. */
   const named = (/** @type {Element | null} */ row) =>
     row
-      ? [...row.querySelectorAll("button")].map((b) =>
-          [...b.childNodes]
-            .filter((n) => !(n.nodeType === 1 && /** @type {any} */ (n).classList.contains("at-filtercount")))
-            .map((n) => n.textContent || "")
-            .join("")
-            .trim()
-        )
+      ? [...row.querySelectorAll("button")]
+          .filter((b) => !b.classList.contains("at-searchclear"))
+          .map((b) => (b.getAttribute("aria-label") || "").trim())
       : [];
   const menuBtn = (/** @type {RegExp} */ re) =>
     /** @type {any} */ (
-      [...frame.querySelectorAll(".at-menubtn")].find((b) => re.test((b.textContent || "").trim())) || {}
+      [...frame.querySelectorAll(".at-menubtn")].find((b) => re.test((b.getAttribute("aria-label") || "").trim())) || {}
     );
   const tiles = () => frame.querySelectorAll(".at-cardgrid .at-minicard").length;
   /* Whatever this finds, it is a DOM node or nothing — the walk asks it for
@@ -9181,17 +9182,29 @@ const openPronounTables = async () => {
   click(tabNamed(/^Cards$/));
   await sleep(500);
 
-  check("the Cards tab's controls are three rows: buttons, search, then Select and the menus",
-    rows().length === 3, `${rows().length} rows`);
+  check("the Cards tab's controls are two rows: buttons, then search with Select and the menus",
+    rows().length === 2, `${rows().length} rows`);
   const top = /** @type {any} */ (rows()[0]);
-  check("the first row is New card and the view button, with no search box in it",
+  check("the first row is New card, its three dots and the view button, with no search box in it",
     !!top && /New card/.test(top.textContent || "") &&
-      !top.querySelector("input.at-search") && !!top.querySelector(".at-viewbtn"),
+      !top.querySelector("input.at-search") && !!top.querySelector(".at-viewbtn") && !!top.querySelector(".at-morebtn"),
     top ? (top.textContent || "").replace(/\s+/g, " ").trim() + ` · ${top.querySelectorAll("input, button").length} controls` : "no row");
+  click(one(".at-morebtn", top));
+  await sleep(150);
+  /* The app's one context menu (0.690): the sheet a saved session's dots
+     open, named for what it acts on, a row per action. */
+  const moreLines = () => [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("and the three dots open a sheet named Cards, holding Import",
+    moreLines().join(" | ") === "Import" &&
+      ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Cards",
+    moreLines().join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+  await sleep(150);
+  check("and its cross closes it", !document.querySelector(".at-moresheet"));
   const searchRow = /** @type {any} */ (rows()[1]);
   check("and the search box is on a line of its own under it",
     !!searchRow && searchRow.classList.contains("at-toolbar-search") &&
-      searchRow.querySelectorAll("input, button").length === 1 &&
+      searchRow.querySelectorAll("input").length === 1 &&
       !!searchRow.querySelector("input.at-search[placeholder='Search cards']"),
     searchRow ? searchRow.className : "no row");
   const sizeName = () => {
@@ -9200,7 +9213,7 @@ const openPronounTables = async () => {
   };
   check("and the view button says which view it is in and what pressing it does",
     /^View: Small grid — press for large grid$/.test(sizeName()), sizeName());
-  check("the row of menus is Select, Sort and Filter, in that order",
+  check("after it, as icons, Select, Sort and Filter, in that order",
     named(subRow()).join(" | ") === "Select | Sort | Filter",
     named(subRow()).join(" | ") || "(no second row)");
 
@@ -9384,8 +9397,8 @@ const openPronounTables = async () => {
      and selected only on Manage cards. */
   check("an open deck carries the same two rows",
     [...document.querySelectorAll(".at-toolbar")].length >= 2 &&
-      named(document.querySelector(".at-toolbar-sub")).join(" | ") === "Sort | Filter",
-    named(document.querySelector(".at-toolbar-sub")).join(" | ") || "(no second row)");
+      named(document.querySelector(".at-toolbar-search")).join(" | ") === "Sort | Filter",
+    named(document.querySelector(".at-toolbar-search")).join(" | ") || "(no second row)");
   check("and the same filter, still in force",
     !!document.querySelector(".at-menubtn.on"),
     [...document.querySelectorAll(".at-menubtn")].map((b) => (b.textContent || "").trim()).join(" | "));
@@ -13122,11 +13135,37 @@ const openPronounTables = async () => {
   await sleep(400);
   click([...frame().querySelectorAll("button, [role=tab]")].filter((b) => /^Modules$/.test((b.textContent || "").trim())).pop() || null);
   await sleep(500);
-  const tiles = [...document.querySelectorAll(".at-deckcard")].map((t) => (t.textContent || "").replace(/\s+/g, " "));
+  const cardsNow = [...document.querySelectorAll(".at-deckcard")];
+  const tiles = cardsNow.map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const tileOf = (/** @type {RegExp} */ re) => tiles.find((t) => re.test(t)) || "";
+  /* The label on its own since 0.689, the language and size it led having
+     come off the tile. */
+  const unitLabel = (/** @type {RegExp} */ re) => {
+    const el = cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "")));
+    return ((el && el.querySelector('[data-el="unit-label"]')) || {}).textContent || "";
+  };
   check("in Material's Modules, a unit is labelled Unit and a deck is not",
-    /Unit · /.test(tileOf(/Greetings unit/)) && /Unit · /.test(tileOf(/Family unit/)) && !!tileOf(/Lesson 1/) && !/Unit · /.test(tileOf(/Lesson 1/)),
+    unitLabel(/Greetings unit/) === "Unit" && unitLabel(/Family unit/) === "Unit" && !!tileOf(/Lesson 1/) && !unitLabel(/Lesson 1/),
     tiles.join(" | ").slice(0, 300) || "no tiles");
+  /* A module's tile (0.689): its quality as a number in a ring, no
+     language or size under its title, and Export and Delete behind three
+     dots that do not open the module when pressed. */
+  {
+    const lesson = cardsNow.find((t) => /^Lesson 1$/.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
+    const meta = ((lesson && lesson.querySelector(".at-deckmeta")) || {}).textContent || "";
+    check("a module's tile has its quality in a ring, and no language or card count",
+      !!lesson && !!lesson.querySelector(".at-qring") && !/\bcards?\b|Arabic/.test(meta),
+      lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
+    click(lesson ? lesson.querySelector(".at-morebtn") : null);
+    await sleep(150);
+    const lines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+    check("and its three dots open its sheet, with Export and Delete, without opening it",
+      lines.join(" | ") === "Export deck | Delete deck" && !document.querySelector(".at-screen.cardform") &&
+        ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Lesson 1",
+      lines.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+    await sleep(150);
+  }
   withPath = false;
   pathOrder = ["u1", "u2"];
   r.unmount();
