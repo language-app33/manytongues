@@ -9535,3 +9535,13 @@ Meaning, Kind, Modules, Status, with the missing-recording pill in Status.
 The cost is a tap more to edit or delete from a list, and the columns that
 went are reached through Filter and Sort rather than seen. Word-set tiles
 (numbers, pronouns) keep their single button: one action needs no menu.
+
+## My space is gone, and its content deleted (0.719)
+
+The owner's word, after 0.712 left the tab for teachers who still had
+material there: remove the tab and delete the content. `retireMySpace`
+runs `clearPersonal(store, handle, "")` for every user and every owner of a
+personal deck, at each start (`retireOnStart`, which logs and serves on a
+failure). Creating personal records through the server still works, for
+the tests and for old phones; whatever is made is deleted at the next
+start. The app offers no way in.

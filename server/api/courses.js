@@ -1352,6 +1352,7 @@ async function wipeAccount(store, handle, how = {}) {
  * @param {Store} store
  * @param {string} handle
  * @param {string} org
+ * @returns {Promise<number>} how many cards and decks went
  */
 async function clearPersonal(store, handle, org) {
   const here = (/** @type {any} */ rec) => !org || orgOf(rec) === org;
@@ -1388,6 +1389,24 @@ async function clearPersonal(store, handle, org) {
       (cur || []).filter((/** @type {string} */ x) => !goneModules.has(x))
     );
   }
+  return cards.length + modules.length;
+}
+
+/**
+ * My space is gone (0.719, the owner's word): every person's My space
+ * cards and decks, in every space, are deleted. Run at each start, so
+ * anything a phone on an older version still makes there goes at the next
+ * deploy. Material in a space's Material is not touched.
+ * @returns {Promise<number>} how many cards and decks went
+ */
+export async function retireMySpace() {
+  const store = getStore(STORE);
+  const handles = new Set(await readIndex(store, "users"));
+  const decks = await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id)));
+  for (const d of decks) if (d && d.personal && d.owner) handles.add(d.owner);
+  let gone = 0;
+  for (const h of handles) gone += await clearPersonal(store, h, "");
+  return gone;
 }
 
 /**

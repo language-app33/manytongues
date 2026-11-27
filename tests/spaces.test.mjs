@@ -1045,3 +1045,27 @@ test("a backup from before spaces goes back into the space, not Main", async () 
   assert.equal((await read("card:kfromthefile1")).org, B);
   assert.equal((await read("card:kfromthefile2")).org, "main");
 });
+
+/* Last, because it empties every My space in the store (0.719). */
+test("My space is deleted: every personal deck and card, and nothing of a space's", async () => {
+  const { retireMySpace } = await import("../server/api/courses.js");
+  const deck = (await api("create-deck", { key: main.teacher.key, body: { title: "Old draft", lang: "ar-PS", personal: true } })).json.deck;
+  const own = (await api("save-card", { key: main.teacher.key, body: { card: card("old-draft"), decks: [deck.id], personal: true } })).json.card;
+  const loose = (await api("save-card", { key: b.teacher.key, body: { card: card("old-loose"), decks: [], personal: true } })).json.card;
+  assert.ok(deck && own && loose, "the My space material was not made");
+  const gone = await retireMySpace();
+  assert.ok(gone >= 3, `only ${gone} went`);
+  const store = getStore("arabic-courses");
+  for (const key of [`deck:${deck.id}`, `card:${own.id}`, `card:${loose.id}`]) {
+    assert.equal(await store.get(key, { type: "text" }), null, `${key} is still there`);
+  }
+  const decks = (await api("my-decks", { key: main.teacher.key })).json.decks;
+  assert.ok(!decks.some((/** @type {any} */ d) => d.personal), "a personal deck is still listed");
+  const cards = (await api("my-cards", { key: b.teacher.key })).json.cards;
+  assert.ok(!cards.some((/** @type {any} */ c) => c.personal), "a personal card is still listed");
+  /* The space's own material is untouched. */
+  assert.ok(decks.some((/** @type {any} */ d) => d.id === main.deck.id), "the space's deck went too");
+  assert.ok(await store.get(`card:${main.card.id}`, { type: "text" }), "the space's card went too");
+  /* And a second run finds nothing left. */
+  assert.equal(await retireMySpace(), 0);
+});

@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.719 — 27 November 2026
+
+**My space is gone, and what was in it is deleted.** Teaching no longer
+has a My space tab for anyone: the bar is Home, Material and You. Every
+module and card still in a teacher's My space, in every school, is deleted
+when this release goes live, and again at each later update, so anything a
+phone on an older version still makes there goes too. Nothing in Material
+is touched.
+
+**Trade-off:** this cannot be undone. A teacher who kept drafts in My space
+loses them, along with their own practice on them.
+
 ## 0.718 — 27 November 2026
 
 **The card table fits a desktop page, and its three dots have no border.**
