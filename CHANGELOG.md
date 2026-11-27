@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.717 — 27 November 2026
+
+**Card tiles and the card table, tidied.**
+
+- On a teacher's card tile, the three dots are in the top right corner,
+  with no border, rather than on a line of their own at the foot.
+- The table's first column is headed **Card** rather than Word, since a
+  sentence or a scene is in it as often as a word. What it shows is cut
+  after 20 characters, with "…", so a long sentence no longer makes the
+  column wide; hover over it to read the whole thing. The same goes for a
+  learner's table.
+
+To check by hand: a long card on a desktop still makes the table a little
+wider than the page, so Status may need a short scroll sideways.
+
 ## 0.716 — 27 November 2026
 
 **The card status panel no longer opens with a "Now: …" line.** Under

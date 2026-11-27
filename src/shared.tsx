@@ -1348,7 +1348,7 @@ function Written({ text }: { text?: string | null }) {
  * The card is a form rather than a `Card` or an `Item`, because both
  * sides show these: only the wording is read, and that is all a form is.
  */
-export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, className }: {
+export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className }: {
   /* A card, not one of its forms: the tile shows the card's own word —
      the first of them — and says what the card is called, which is a fact
      about the card. */
@@ -1369,6 +1369,9 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, cla
    */
   bar?: { pct: number } | null;
   actions?: Node;
+  /** Drawn in the tile's top corner rather than along its foot: a card's
+      three dots (0.717), so the tile is the card and nothing under it. */
+  corner?: Node;
   onClick?: () => void;
   className?: string;
 }) {
@@ -1383,7 +1386,7 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, cla
   const face = isDialog(card) ? firstOfEach(linesOf(card)[0]).ar : lead.ar || String(card.numeral || "");
   return (
     <div
-      className={`at-minicard${className ? " " + className : ""}`}
+      className={`at-minicard${corner ? " cornered" : ""}${className ? " " + className : ""}`}
       /* Which card, for a test asking whether a question is about it: the
          words on the tile are not always on the question. */
       data-card={card.id || undefined}
@@ -1468,6 +1471,7 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, cla
         </div>
       ) : null}
       {actions ? <div className="at-miniacts">{actions}</div> : null}
+      {corner ? <div className="at-minicorner">{corner}</div> : null}
     </div>
   );
 }
@@ -2138,22 +2142,47 @@ export const cardSubtypeLabel = (card: Record<string, any>, lang?: Lang | null):
  * word beside nothing; `en` and `lat` are each alone, for the table's
  * columns of them.
  */
-export function cardWords(card: Record<string, any>, lang?: Lang | null): { word: Node; meaning: Node; en: Node; lat: Node } {
+export function cardWords(card: Record<string, any>, lang?: Lang | null): { word: Node; short: Node; meaning: Node; en: Node; lat: Node } {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   /* A scene is known by its first line, its meaning as much as its words. */
   const lead = firstOfEach(isDialog(card as any) ? linesOf(card as any)[0] : leadOf(card));
   const face = lead.ar || String(card.numeral || "");
   const said = asMeaning(card.name || lead.en);
+  const style = { ...(L.fontStack ? { fontFamily: L.fontStack } : null), ...scriptVars(L) };
+  /* And as the table's first column shows them (0.717): cut after twenty
+     characters, the whole of them on hover. */
+  const whole = shownAlternatives(face);
+  const cut = clipped(whole);
   return {
     word: (
-      <span className="ar" lang={L.id} dir={L.direction} style={{ ...(L.fontStack ? { fontFamily: L.fontStack } : null), ...scriptVars(L) }}>
+      <span className="ar" lang={L.id} dir={L.direction} style={style}>
         <Written text={face} />
+      </span>
+    ),
+    short: (
+      <span className="ar" lang={L.id} dir={L.direction} style={style} title={cut !== whole ? whole : undefined}>
+        <Written text={cut} />
       </span>
     ),
     meaning: said ? <span dir="auto"><Written text={said} /></span> : lead.lat ? <span className="at-lat"><Written text={lead.lat} /></span> : null,
     en: said ? <span dir="auto"><Written text={said} /></span> : null,
     lat: lead.lat ? <Written text={lead.lat} /> : null,
   };
+}
+
+/*
+ * A card's words cut to the first `n` characters, with "…" where some were
+ * left off — for the table's first column, which would otherwise be as wide
+ * as the longest sentence in the list (0.717, the owner's wish). Counted as
+ * a reader counts them, a letter with its harakat being one, where the
+ * browser can say so.
+ */
+export function clipped(text: string, n = 20): string {
+  const Seg = (Intl as any).Segmenter;
+  const chars: string[] = Seg
+    ? Array.from(new Seg(undefined, { granularity: "grapheme" }).segment(text), (s: any) => s.segment)
+    : Array.from(text);
+  return chars.length > n ? chars.slice(0, n).join("").trimEnd() + "…" : text;
 }
 
 /*

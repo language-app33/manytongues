@@ -128,6 +128,7 @@ import {
   cardKindOf,
   cardKindLabel,
   cardWords,
+  clipped,
   CheckList,
   ClipList,
   clipHashes,
@@ -6239,8 +6240,10 @@ function StatusMenu({ card, disabled, onStatus }: {
    was an empty column across every phone. What went — transliteration,
    subtype, recording, review and the two dates — the filter and sort
    still reach; a missing recording is said in Status. */
+/* The first is "Card" rather than "Word" (0.717, the owner's wish): a
+   sentence or a scene is in it as often as a word. */
 const TEACHER_COLUMNS = [
-  { key: "word", label: "Word" },
+  { key: "word", label: "Card" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
   { key: "decks", label: "Modules" },
@@ -7349,7 +7352,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         </>
       }
       onClick={() => openCard(c)}
-      actions={cardActions(c)}
+      corner={cardActions(c)}
     />
   );
   /*
@@ -7366,7 +7369,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     row: (c): CardRow => {
       if (isNumberPart(c)) {
         return {
-          cells: { word: c.label, kind: "Numbers", status: <span className="at-statusbadge">Word set</span> },
+          cells: { word: clipped(c.label), kind: "Numbers", status: <span className="at-statusbadge">Word set</span> },
           open: () => {},
           actions: actGroup ? actGroup(c) : undefined,
         };
@@ -7374,7 +7377,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       if (isPronounGroup(c)) {
         const said = cardWords(c, languages[c.lang as LangId]);
         return {
-          cells: { word: said.word, meaning: said.en, kind: "Pronouns", status: <span className="at-statusbadge">Word set</span> },
+          cells: { word: said.short, meaning: said.en, kind: "Pronouns", status: <span className="at-statusbadge">Word set</span> },
           open: () => setPronouning(c.lang as LangId),
           actions: actGroup ? actGroup(c) : undefined,
         };
@@ -7385,7 +7388,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         .filter(Boolean);
       return {
         cells: {
-          word: said.word,
+          word: said.short,
           meaning: said.en,
           kind: cardKindLabel(c),
           decks: titles.join(", "),
@@ -9692,7 +9695,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             lang={langOfCard(it)}
             meta={statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}
             onClick={() => openCard(it)}
-            actions={manageMenu(it)}
+            corner={manageMenu(it)}
           />
         )
         : cardTile(it);

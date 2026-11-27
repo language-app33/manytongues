@@ -9461,6 +9461,9 @@ const openPronounTables = async () => {
     check("a tile carries three dots, and no Edit or Remove of its own",
       acts.includes("More for this card") && !acts.includes("Edit") && !acts.some((a) => /^Remove/.test(a)),
       acts.join(" | ") || "(no tile)");
+    /* In the tile's top corner, not along its foot (0.717). */
+    check("and the dots are in the tile's corner",
+      !!tile && !!tile.querySelector(".at-minicorner .at-morebtn") && !tile.querySelector(".at-miniacts"));
     check("and no date", !!tile && !/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d/.test(tile.textContent || ""),
       tile ? (tile.textContent || "").slice(0, 80) : "(no tile)");
   }
@@ -9477,7 +9480,7 @@ const openPronounTables = async () => {
     String(localStorage.getItem("arabic-trainer-view:teacher-deck")));
   const heads = [...document.querySelectorAll(".at-cardtable thead th")].map((th) => (th.textContent || "").trim()).filter(Boolean);
   check("the table has five columns, status last",
-    heads.join(" | ") === "Word | Meaning | Kind | Modules | Status",
+    heads.join(" | ") === "Card | Meaning | Kind | Modules | Status",
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));

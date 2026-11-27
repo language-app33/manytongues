@@ -40,7 +40,7 @@ const { shapeOf, shapeChoices, shapeLabel, categoryChoices, categoryOffers, tabl
    same way. They are one subject with the sorting above: what a card is
    called, on the device and on the server. */
 const built3 = await buildOnce(["shared.tsx"]);
-const { localIdFor, cardToItem, serverCardId, foldCourses, moduleSize, notReaching } = await import(path.join(built3, "shared.js"));
+const { localIdFor, cardToItem, serverCardId, foldCourses, moduleSize, notReaching, clipped } = await import(path.join(built3, "shared.js"));
 
 /* And which recording a question leads with, which is a plain function of a
    card's progress and belongs with the rest of them. The trainer is bundled
@@ -3163,4 +3163,16 @@ test("Uncountable is never a box beside the others, and is offered on a noun onl
   }
   /* A person or an animal keeps a side for each gender. */
   assert.deepEqual(nounBoxes(LANGUAGES["ar-PS"], "paired", true).map((/** @type {any} */ b) => b.title), ["Masculine word", "Feminine word"]);
+});
+
+/* A table's first column is cut after twenty characters (0.717), counted
+   as a reader counts them: a letter with its harakat is one. */
+test("a card's words are cut after twenty characters for the table", () => {
+  assert.equal(clipped("بيت"), "بيت");
+  assert.equal(clipped("12345678901234567890"), "12345678901234567890");
+  assert.equal(clipped("I would like a cup of tea, please"), "I would like a cup o…");
+  /* كِتَابٌ is four letters to a reader, with its harakat: four of them and
+     their spaces are 19 and stay whole; a fifth takes it past twenty. */
+  assert.equal(clipped("كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ"), "كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ");
+  assert.equal(clipped("كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ"), "كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ…");
 });
