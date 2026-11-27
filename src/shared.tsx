@@ -3248,12 +3248,12 @@ function ReadForm({ form, lang, title, what, reader }: {
   return (
     <section className="at-panel">
       <p className="at-eyebrow">{title}</p>
-      <p className="at-hint">{what}</p>
+      {what ? <p className="at-hint">{what}</p> : null}
       <ReadSaid form={form} lang={lang} />
       <ReadSound form={form} />
       {reader === "teacher" ? <ReadAsked form={form} /> : null}
       {form.note ? <ReadRow label="Note">{String(form.note)}</ReadRow> : null}
-      <ReadReference form={form} lang={lang} />
+      {reader === "student" ? null : <ReadReference form={form} lang={lang} />}
     </section>
   );
 }
@@ -3573,6 +3573,9 @@ export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: 
 }) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   const teacher = reader === "teacher";
+  /* The student's own card page (0.704): no "What it is", no line about
+     what is asked, no Reference. See Reader in card-facts.ts. */
+  const student = reader === "student";
   const forms: Record<string, any>[] = formsOf(card);
   const tables = tablesOn(card, L);
   /* The forms that are not cells of a table: a cell is a form like any
@@ -3698,7 +3701,7 @@ export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: 
           offered and which blanks it fills without anybody ticking one.
           First, because it is the first question the editor asks — before
           the editor opens, in the case of the three shapes. */}
-      <ReadKind card={card} lang={L} />
+      {student ? null : <ReadKind card={card} lang={L} />}
 
       {loose.map((f, i) => (
         <React.Fragment key={String(f.id || i)}>
@@ -3709,7 +3712,7 @@ export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: 
             title={i === 0 ? "The card" : `Other form ${i}`}
             what={
               i === 0
-                ? "What a student is asked, and what counts as the answer."
+                ? student ? "" : "What a student is asked, and what counts as the answer."
                 : "Another way the same thing is said. It is practiced on its own."
             }
           />

@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.704 — 27 November 2026
+
+**A student's card page is shorter.** Tapping a card now shows the word, how
+it sounds, what it means, and one line of progress with a four-step bar. The
+sections written for teachers ("What it is", "Reference") are no longer
+shown to students. The explanation of levels now matches how the app works:
+answer right twice in a row to move up a level. "High priority" is now
+called "Practise this first" on this page and is explained in one sentence.
+Teachers' screens are unchanged.
+
 ## 0.703 — 27 November 2026
 
 **The line at the end of a session is in plain words.** A session with no

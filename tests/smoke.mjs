@@ -4335,7 +4335,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   for (const id of ids) {
     click(must(document.querySelector(`.at-cardgrid .at-minicard[data-card="${id}"]`), `the tile of ${id}`));
     await sleep(350);
-    click(must(buttonNamed(on ? /^Mark as high priority$/ : /High priority — tap to clear/), `the priority button on ${id}`));
+    click(must(buttonNamed(on ? /^Practise this first$/ : /Practising first — tap to stop/), `the priority button on ${id}`));
     await sleep(300);
     backOut();
     await sleep(350);
@@ -4749,13 +4749,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(firstTile);
   await sleep(350);
 
-  const markBtn = buttonNamed(/^Mark as high priority$/);
+  const markBtn = buttonNamed(/^Practise this first$/);
   check("a learner can mark a card high priority from their own card list", !!markBtn,
     (document.body.textContent || "").slice(-160).replace(/\s+/g, " "));
   click(markBtn);
   await sleep(300);
   check("and the button then says how to take it off",
-    !!buttonNamed(/High priority — tap to clear/),
+    !!buttonNamed(/Practising first — tap to stop/),
     (document.body.textContent || "").slice(-120).replace(/\s+/g, " "));
 
   backOut();
@@ -4806,7 +4806,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(400);
   click(must(document.querySelector(".at-cardgrid .at-minipri"), "the marked tile").closest(".at-minicard"));
   await sleep(350);
-  click(must(buttonNamed(/High priority — tap to clear/), "the button that clears it"));
+  click(must(buttonNamed(/Practising first — tap to stop/), "the button that clears it"));
   await sleep(300);
   backOut();
   await sleep(350);

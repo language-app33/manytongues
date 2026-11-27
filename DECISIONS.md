@@ -9420,3 +9420,13 @@ The old lines only made sense to someone who knows how cards are spaced
 out. The five lines under the score on the session-complete screen keep
 their conditions and their order (`practice`, `session.due === 0`, some not
 due, all first-time right, otherwise); only the words changed.
+
+## A student's card page shows only what a student uses (0.704)
+
+The page was the teacher's readout shown to students, and its level rule
+was out of date. `Reader` gains `"student"`: everything `"both"` gets
+except `ReadKind`, the lede of "The card" and `ReadReference`. Only
+`CardScreen` passes it; the teacher's flagged-card screen keeps the default.
+`CardLadder`'s four rows became one four-part bar (`at-levelbar`, filled in
+`--jade`); `TenseLadder` is unchanged. "High priority" is renamed on the
+card screen only; filters, tiles and sessions keep the old words.

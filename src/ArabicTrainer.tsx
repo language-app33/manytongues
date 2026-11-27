@@ -18913,23 +18913,12 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
   if (!levels.length || !at) return null;
   return (
     <Section title="Progress" lede={standingLabel(at)}>
-      <div className="at-ladder">
-        {levels.map((row) => (
-          <div className={`at-ladderrow${row.level === at.level ? " on" : ""}`} key={row.level}>
-            <span className="num" style={{ color: LEVEL_COLOR[row.level] }}>
-              {row.level}
-            </span>
-            <span className="nm">{LEVEL_NAME[row.level] || `Level ${row.level}`}</span>
-            <span className="st" style={{ color: STATUS_COLOR[row.status] }}>
-              {STATUS_LABEL[row.status] || row.status}
-            </span>
-            {/* The count only where it means something: on the level being
-                worked on, where it says how much of what has to hold for
-                the next one to open does. */}
-            <span className="ct">
-              {row.level === at.level && row.status !== "done" ? `${row.done} of ${row.of}` : ""}
-            </span>
-          </div>
+      {/* One bar of four (0.704): the level the card is on, filled up to
+          it. The levels by name are not listed: the line above says where
+          the card is, and the bar how far up. */}
+      <div className="at-levelbar" role="img" aria-label={`Level ${at.level} of 4`}>
+        {[1, 2, 3, 4].map((n) => (
+          <span key={n} className={n <= at.level ? "at-levelbar-on" : undefined} />
         ))}
       </div>
       <Help>
@@ -18937,7 +18926,7 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
           ? "Missing the same question twice running closes the levels above it. Nothing is lost — this opens again as soon as the level under it is back."
           : at.status === "done"
           ? "Every level is done. The card still comes back, just further and further apart."
-          : "A level opens once everything under it is through the learning steps and back in review. The last one waits longer: everything under it has to hold for four days."}
+          : "Answer right twice in a row to move up a level."}
       </Help>
     </Section>
   );
@@ -19047,7 +19036,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
            sound and what it means, without the teacher's side of it — which
            decks carry it, what other cards call it, which of its forms are
            lent out. See Reader in card-facts.ts. */
-        reader="both"
+        reader="student"
       />
 
       {tenseFormsOf(live).length ? (
@@ -19058,14 +19047,8 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
 
       {onPriority && (
         <div className="at-card at-mt4">
-          <p className="at-eyebrow">High priority</p>
-          <Help>
-            For a card you want to get on with. Marked, it joins your very next
-            session whatever its schedule says, and opens it — and it stays in
-            every session until you take the mark off. Nothing else about it
-            changes: what you have learnt, and when it would have come round
-            anyway, are both still there underneath.
-          </Help>
+          <p className="at-eyebrow">Practise this first</p>
+          <Help>Puts this card at the start of every session until you turn it off.</Help>
           <div className="at-row at-mt3">
             <Button
               variant={live.priority ? "primary" : "default"}
@@ -19073,7 +19056,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
               icon="star"
               onClick={() => onPriority(live.id, !live.priority)}
             >
-              {live.priority ? "High priority — tap to clear" : "Mark as high priority"}
+              {live.priority ? "Practising first — tap to stop" : "Practise this first"}
             </Button>
           </div>
         </div>

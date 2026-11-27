@@ -78,8 +78,11 @@ export type Where = "card" | "form" | "line" | "answer";
  * everything that is about the word itself, which is what a student is
  * looking at when they open a card between sessions. Nothing is a
  * student's alone — there is no fact about a card its teacher may not see.
+ * `student` (0.704) is `both` without the parts written for teachers: what
+ * kind of card it is, the line saying what a student is asked, and the
+ * reference rows never asked in an exercise. It is the student's card page.
  */
-export type Reader = "teacher" | "both";
+export type Reader = "teacher" | "both" | "student";
 
 export interface FactCtx {
   lang: Lang;

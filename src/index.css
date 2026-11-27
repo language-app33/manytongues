@@ -2665,6 +2665,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-savedtile .bar { display:block; height:5px; border-radius:999px; background: var(--surface); overflow:hidden; }
 .at-savedtile .bar i { display:block; height:100%; border-radius:999px; background: var(--jade); }
 
+/* ---- a card's level, on the student's card screen (0.704) ----
+   Four equal parts in a row, filled up to the level the card is on, in the
+   app's green. */
+.at-levelbar { display:flex; gap:4px; margin: 4px 0 10px; }
+.at-levelbar > span { flex:1 1 0; height:8px; border-radius:999px; background: var(--well); }
+.at-levelbar > span.at-levelbar-on { background: var(--jade); }
+
 /* ---- the ladder, on a card's own screen ----
    One row per level the card has material on: which level, what it asks,
    how it is going, and — on the level being worked on — how much of what
