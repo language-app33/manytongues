@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.728 — 27 November 2026
+
+**The app opens on older iPhones and iPads.** On Safari older than 16.4
+(an iPhone or iPad on iOS 16.3 or earlier, or a Mac not updated since
+early 2023) the app showed a blank page and nothing else. It now starts
+there. On the oldest of them, iOS 15 and before, some of the app's look
+may still be missing; that has not been seen on a real device.
+
+**Sounds come back after an interruption on an iPhone.** After a phone
+call, Siri, or the app being left in the background, the sounds for a
+right or wrong answer could stay silent until the app was closed and
+opened again. They now come back with the next answer. To be checked on a
+real iPhone: it cannot be made to happen on a computer.
+
+Both came out of a check of the whole app in Safari's own engine
+(`docs/AUDIT-safari-ios.md`). Practising, the tabs and the teacher's card
+screens ran in it without a fault, in a private window too.
+
 ## 0.727 — 27 November 2026
 
 **An empty course offers one button, not two.** In a course's Modules

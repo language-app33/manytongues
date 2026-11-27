@@ -251,16 +251,22 @@ const swap = (text: string, at: number, end: number, put: string): string => tex
 
 /* The pronouns English names the table's persons with, as the words
    stand: "you (f)" with its note, or "you" without. */
-const PRONOUN = /(?<![\p{L}\p{N}'’])(i|you|he|she|we|they|me|him|her|us|them)(\s*\((?:m|f|pl|f pl)\))?(?![\p{L}\p{N}'’])/giu;
+/* What stands before the word is matched and stepped over, not looked
+   back at (0.728): Safari before 16.4 cannot read a look-behind, and a
+   pattern it cannot read stopped the whole app from starting there. */
+const PRONOUN = /(^|[^\p{L}\p{N}'’])(i|you|he|she|we|they|me|him|her|us|them)(\s*\((?:m|f|pl|f pl)\))?(?![\p{L}\p{N}'’])/giu;
 interface Pronoun { at: number; end: number; said: string; word: string; noted: boolean }
 const pronounsIn = (en: string): Pronoun[] =>
-  [...en.matchAll(PRONOUN)].map((m) => ({
-    at: m.index || 0,
-    end: (m.index || 0) + m[0].length,
-    word: m[1].toLowerCase(),
-    said: `${m[1]}${m[2] ? ` ${m[2].trim()}` : ""}`.toLowerCase().replace(/\s+/g, " "),
-    noted: !!m[2],
-  }));
+  [...en.matchAll(PRONOUN)].map((m) => {
+    const at = (m.index || 0) + m[1].length;
+    return {
+      at,
+      end: at + m[0].length - m[1].length,
+      word: m[2].toLowerCase(),
+      said: `${m[2]}${m[3] ? ` ${m[3].trim()}` : ""}`.toLowerCase().replace(/\s+/g, " "),
+      noted: !!m[3],
+    };
+  });
 
 /* A person's English with its note taken off: "you (f)" is "you". */
 const bare = (said: string): string => said.replace(/\s*\(.*\)\s*$/, "").toLowerCase();
@@ -280,8 +286,16 @@ function colsOf(p: Pronoun, role: "who" | "whom", spec: VerbSpec | null | undefi
    English, notes and all. */
 const whoOf = (col: string): string => (personEnglish(col) || { who: col }).who;
 const whoList = (cols: string[]): string => [...new Set(cols.map(whoOf))].map((w) => `“${w}”`).join(" or ");
-const spelt = (words: string): RegExp =>
-  new RegExp(`(?<![\\p{L}\\p{N}'’])${words.split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+")}(?![\\p{L}\\p{N}'’])`, "iu");
+/* Where the words stand in the English as whole words, or null. Stepped
+   over rather than looked back at, as PRONOUN is. */
+const spelt = (en: string, words: string): { at: number; end: number } | null => {
+  const m = en.match(
+    new RegExp(`(^|[^\\p{L}\\p{N}'’])(${words.split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+")})(?![\\p{L}\\p{N}'’])`, "iu"),
+  );
+  if (!m) return null;
+  const at = (m.index || 0) + m[1].length;
+  return { at, end: at + m[2].length };
+};
 
 type Read<T> = { ok: T; trouble: "" } | { ok: null; trouble: string };
 
@@ -311,10 +325,9 @@ function readEnglish(
   const fail = (trouble: string) => ({ ok: null, trouble }) as const;
   const said = pronounsIn(en);
   const mismatch = (p: Pronoun) => fail(`The English says “${en.slice(p.at, p.end)}”, but ${form} is ${whoList(forms)}.`);
-  const to = en.match(spelt(`to ${plain}`));
+  const to = spelt(en, `to ${plain}`);
   if (to) {
-    const at = to.index || 0;
-    const end = at + to[0].length;
+    const { at, end } = to;
     const before = said.filter((p) => p.end <= at);
     const last = before[before.length - 1];
     /* Somebody else's wish: *I want her to eat*. */
@@ -334,14 +347,14 @@ function readEnglish(
     if (!col) col = forms.find((c) => !/^(i|you)\b/.test(bare(whoOf(c)))) || forms[0];
     return { ok: { en: swap(en, at, end, `{{${VERB_SLOT}-to}}`), col, wish: col }, trouble: "" };
   }
-  const verb = en.match(spelt(plain));
+  const verb = spelt(en, plain);
   if (!verb) return fail(`Write the verb in the English as “${plain}” or “to ${plain}”.`);
-  const at = verb.index || 0;
+  const at = verb.at;
   const subject = said.filter((p) => p.end <= at && colsOf(p, "who", spec).length).pop();
   if (!subject) return fail(`Say who in the English, such as “${bare(whoOf(forms[0]))}”, so it can change for each person.`);
   const col = forms.find((c) => colsOf(subject, "who", spec).includes(c));
   if (!col) return mismatch(subject);
-  const made = swap(swap(en, at, at + verb[0].length, `{{${VERB_SLOT}-plain}}`), subject.at, subject.end, `{{${VERB_SLOT}-who}}`);
+  const made = swap(swap(en, at, verb.end, `{{${VERB_SLOT}-plain}}`), subject.at, subject.end, `{{${VERB_SLOT}-who}}`);
   return { ok: { en: made, col, wish: "" }, trouble: "" };
 }
 

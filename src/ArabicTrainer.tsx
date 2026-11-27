@@ -8622,7 +8622,11 @@ function ctx() {
   if (!Ctx) return null;
   if (!audioCtx) audioCtx = new Ctx();
   // Browsers start it suspended until you've interacted with the page.
-  if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  /* Anything but running is woken, not only "suspended" (0.728): an iPhone
+     has a state of its own, "interrupted", for a call, Siri or the app
+     going to the background, and does not always come back from it by
+     itself — so the sounds stayed silent until the app was reopened. */
+  if (audioCtx.state !== "running" && audioCtx.state !== "closed") audioCtx.resume().catch(() => {});
   return audioCtx;
 }
 
