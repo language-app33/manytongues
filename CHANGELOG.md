@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.737 — 27 November 2026
+
+**The cross that closes a sheet is just the cross**, as chosen on the page
+of mock-ups.
+
+Every sheet (Sort, Filter, Join a course, Custom tags, the subtype and
+deck lists and the rest) closed with a cross inside a grey square with an
+outline. The outline and the grey square are gone; the cross stands on its
+own at the end of the title's line. The area that answers a tap is as
+large as before. With a mouse, the cross turns green under the pointer.
+
 ## 0.736 — 27 November 2026
 
 **A calmer module screen and a more rewarding Numbers set**, as chosen on
