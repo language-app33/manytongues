@@ -101,6 +101,8 @@ export function confirmStrength({ permanent, affectsOthers, name }: {
    ------------------------------------------------------------------ */
 
 const ICONS: Record<string, string> = {
+  /* Three stops joined by a line, climbing: a course's path (0.733). */
+  path: "M6 15.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM18 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.4 15.2l2.4-2.4 1.4 1.4-2.4 2.4zM13.4 9.2l2.4-2.4 1.4 1.4-2.4 2.4z",
   /* An empty ring of dashes: not out yet — the draft beside Published's
      tick. */
   draft: "M20.92 13.17A9 9 0 0 1 19.14 17.48L17.55 16.26A7 7 0 0 0 18.94 12.91zM17.48 19.14A9 9 0 0 1 13.17 20.92L12.91 18.94A7 7 0 0 0 16.26 17.55zM10.83 20.92A9 9 0 0 1 6.52 19.14L7.74 17.55A7 7 0 0 0 11.09 18.94zM4.86 17.48A9 9 0 0 1 3.08 13.17L5.06 12.91A7 7 0 0 0 6.45 16.26zM3.08 10.83A9 9 0 0 1 4.86 6.52L6.45 7.74A7 7 0 0 0 5.06 11.09zM6.52 4.86A9 9 0 0 1 10.83 3.08L11.09 5.06A7 7 0 0 0 7.74 6.45zM13.17 3.08A9 9 0 0 1 17.48 4.86L16.26 6.45A7 7 0 0 0 12.91 5.06zM19.14 6.52A9 9 0 0 1 20.92 10.83L18.94 11.09A7 7 0 0 0 17.55 7.74z",
@@ -813,12 +815,15 @@ export function Section({ title, count, lede, action, children, className = "", 
 /* --- Empty --------------------------------------------------------
    Sixteen different ad-hoc versions of "there is nothing here",
    fifteen of which did not use the class that existed for it. */
-export function Empty({ title, children, action, art }: { title?: Node; children?: Node; action?: Node;
+export function Empty({ title, children, action, art, slim }: { title?: Node; children?: Node; action?: Node;
   /** A small picture above the words, where the screen is otherwise bare
       (0.642: the home screen with nothing to practise). */
-  art?: Node }) {
+  art?: Node;
+  /** On one row, picture beside the words, about a third of the height:
+      a quiet To do on Teaching's Home (0.733). */
+  slim?: boolean }) {
   return (
-    <div className="at-empty2">
+    <div className={`at-empty2${slim ? " slim" : ""}`}>
       {art ? <div className="at-emptyart" aria-hidden="true">{art}</div> : null}
       {title ? <p className="at-eyebrow">{title}</p> : null}
       {children ? <p className="at-hint">{children}</p> : null}
@@ -1361,7 +1366,7 @@ function Written({ text }: { text?: string | null }) {
  * The card is a form rather than a `Card` or an `Item`, because both
  * sides show these: only the wording is read, and that is all a form is.
  */
-export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className }: {
+export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className, standIn }: {
   /* A card, not one of its forms: the tile shows the card's own word —
      the first of them — and says what the card is called, which is a fact
      about the card. */
@@ -1387,6 +1392,10 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
   corner?: Node;
   onClick?: () => void;
   className?: string;
+  /** What goes in the meaning's place on a card with no meaning (0.733,
+      the teacher's grids): its transliteration, or that it is a picture
+      or a recording. See standIn in cards.ts. Left out, the line is blank. */
+  standIn?: { kind: string; text: string } | null;
 }) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   /* A conversation has no front of its own: its first line stands in for
@@ -1463,6 +1472,10 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
         */}
       {card.name
         ? <div className="at-minien at-mininame" dir="auto">{asMeaning(card.name)}</div>
+        : !lead.en && standIn
+        ? standIn.kind === "lat"
+          ? <div className="at-minien standin"><i>{standIn.text}</i></div>
+          : <div className="at-minien standin"><Icon name={standIn.kind === "picture" ? "image" : "play"} size={14} /> {standIn.text}</div>
         : <div className="at-minien"><Written text={asMeaning(lead.en)} /></div>}
       {showLat && lead.lat ? <div className="at-minilat"><Written text={lead.lat} /></div> : null}
       {/* One line of small print, and the caller decides what it says.
@@ -2096,6 +2109,10 @@ export interface CardRow {
   cells: Record<string, Node>;
   open?: () => void;
   actions?: Node;
+  /** What the phone's list says under the meaning where `decks` is empty
+      (0.733): "In no module", for a card; left out for a word set, whose
+      line then holds only its badge. */
+  noDecks?: string;
 }
 export interface CardViews<T> {
   /** Which list this is, for remembering the view it was left at. */
@@ -2205,6 +2222,117 @@ export function clipped(text: string, n = 20): string {
 }
 
 /*
+ * What makes a row of a card list a thing to press, shared by the table
+ * and the phone's list (0.733) so the two answer a tap, a key and a held
+ * finger alike: pressing opens the card, or ticks it while selecting.
+ */
+function rowPress(selecting: boolean, picked: Set<string>, toggle: (id: string) => void) {
+  const press = (id: string, row: CardRow) => (selecting ? toggle(id) : row.open && row.open());
+  const keys = (id: string, row: CardRow) => (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    press(id, row);
+  };
+  const tick = (on: boolean) =>
+    selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
+  const pressable = (id: string, row: CardRow) =>
+    selecting || row.open
+      ? {
+          tabIndex: 0,
+          onClick: () => press(id, row),
+          onKeyDown: keys(id, row),
+          ...(selecting ? { "aria-pressed": picked.has(id) } : null),
+        }
+      : {};
+  return { press, keys, tick, pressable };
+}
+
+/*
+ * Whether the screen is phone-narrow: under 640px wide (0.733). Where the
+ * browser cannot say — the smoke walk's, which has no matchMedia — it is
+ * not, so that walk keeps seeing the table it checks.
+ */
+export function useNarrow(): boolean {
+  const query = "(max-width: 639px)";
+  const [narrow, setNarrow] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    setNarrow(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  return narrow;
+}
+
+/*
+ * The table's view on a phone, as a list (0.733, the owner's choice): one
+ * card a row, its meaning over a line of where it is, what kind when it is
+ * not a plain word, and its badge; its word on the right. A table five
+ * columns wide scrolled sideways on a phone and showed two of them.
+ * Same props as CardTable, and the same press, tick and hold.
+ */
+function CardRows<T>({ views, page, itemKey, selecting, picked, toggle, hold, swallowed, headingAt }: {
+  views: CardViews<T>;
+  page: T[];
+  itemKey: (item: T) => string;
+  selecting: boolean;
+  picked: Set<string>;
+  toggle: (id: string) => void;
+  hold: (id: string) => Record<string, any>;
+  swallowed: (e: React.MouseEvent) => boolean;
+  headingAt: (item: T, i: number) => { label: string; n: number } | null;
+}) {
+  const rows = page.map((it) => ({ id: itemKey(it), row: views.row(it) }));
+  const { tick, pressable } = rowPress(selecting, picked, toggle);
+  return (
+    <div className="at-cardrows">
+      {rows.map(({ id, row }, i) => {
+        const head = headingAt(page[i], i);
+        const on = picked.has(id);
+        const kind = typeof row.cells.kind === "string" && row.cells.kind && row.cells.kind !== "Word or phrase" ? ` · ${row.cells.kind}` : "";
+        const where = row.cells.decks || row.noDecks || null;
+        return (
+          <React.Fragment key={id}>
+            {head && (
+              <div className="at-grouprow" role="heading" aria-level={4}>
+                {head.label} <span>{head.n}</span>
+              </div>
+            )}
+            <div className={`at-cardrow${row.open || selecting ? " opens" : ""}${on ? " picked" : ""}`} data-card={id}
+              {...hold(id)}
+              onClickCapture={(e) => { swallowed(e); }}
+              {...((selecting || row.open) ? { role: "button" } : null)}
+              {...pressable(id, row)}>
+              {tick(on)}
+              <span className="at-cardrow-main">
+                <span className="at-cardrow-meaning">{row.cells.meaning}</span>
+                <span className="at-cardrow-sub">
+                  {where}{where ? kind : kind.replace(/^ · /, "")}
+                  {row.cells.status ? <span className="at-cardrow-status">{row.cells.status}</span> : null}
+                </span>
+              </span>
+              <span className="at-cardrow-word">{row.cells.word}</span>
+              {!selecting && row.actions ? (
+                <span className="at-cardrow-acts" onClick={(e) => e.stopPropagation()}>{row.actions}</span>
+              ) : null}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/*
  * A card list drawn as a table, for ItemList.
  *
  * A row does what its tile does: pressing it opens the card, and while
@@ -2229,24 +2357,7 @@ function CardTable<T>({ views, page, itemKey, selecting, picked, toggle, hold, s
   headingAt: (item: T, i: number) => { label: string; n: number } | null;
 }) {
   const rows = page.map((it) => ({ id: itemKey(it), row: views.row(it) }));
-  const press = (id: string, row: CardRow) => (selecting ? toggle(id) : row.open && row.open());
-  const keys = (id: string, row: CardRow) => (e: React.KeyboardEvent) => {
-    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
-    e.preventDefault();
-    press(id, row);
-  };
-  const tick = (on: boolean) =>
-    selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
-  /* What makes a row a thing to press. */
-  const pressable = (id: string, row: CardRow) =>
-    selecting || row.open
-      ? {
-          tabIndex: 0,
-          onClick: () => press(id, row),
-          onKeyDown: keys(id, row),
-          ...(selecting ? { "aria-pressed": picked.has(id) } : null),
-        }
-      : {};
+  const { tick, pressable } = rowPress(selecting, picked, toggle);
 
   const acts = !selecting && rows.some((r) => r.row.actions);
   const span = views.columns.length + (selecting ? 1 : 0) + (acts ? 1 : 0);
@@ -2895,7 +3006,11 @@ export function ItemList<T>({
   const viewAt = views ? Math.max(0, VIEWS.findIndex((v) => v.id === view)) : 0;
   const at = VIEWS[viewAt];
   const then = VIEWS[(viewAt + 1) % VIEWS.length];
-  const viewLabel = `View: ${at.name} — press for ${then.name.toLowerCase()}`;
+  /* On a phone the table is drawn as a list (0.733), and called one. */
+  const narrowScreen = useNarrow();
+  const nameOf = (v: { id: ListView; name: string }) => (narrowScreen && v.id === "table" ? "List" : v.name);
+  const viewLabel = `View: ${nameOf(at)} — press for ${nameOf(then).toLowerCase()}`;
+  const TableOrRows = narrowScreen ? CardRows : CardTable;
   const drawn: ListView = views ? at.id : "small";
 
   const startSelecting = () => {
@@ -3033,7 +3148,9 @@ export function ItemList<T>({
   /* Kept while a filter has emptied the list, so what was typed and the
      way back out are both still there: "0 of 14", Clear and the chips. */
   const any = items.length > 0 || whole > 0;
-  const box = any && !outside;
+  /* No match, no box: a search that cannot narrow anything is a bar with
+     nothing in it. Teaching's Home leaves it out under six courses (0.733). */
+  const box = any && !outside && !!match;
   const filterBtn = liveFilters.length > 0 && !bare;
   /* The dots: Select first, where there is anything to select, then the
      list's own. Select alone is its own icon rather than dots opening onto
@@ -3173,7 +3290,7 @@ export function ItemList<T>({
                     saveView(viewKey, then.id);
                   }}
                 >
-                  <Icon name={at.icon} />
+                  <Icon name={narrowScreen && at.id === "table" ? "viewList" : at.icon} />
                 </button>
               ) : null}
             </>
@@ -3218,7 +3335,7 @@ export function ItemList<T>({
           it read as a table with something missing, above the empty
           panel or the "nothing matches" line. */}
       {views && drawn === "table" ? (
-        page.length === 0 ? null : <CardTable
+        page.length === 0 ? null : <TableOrRows
           views={views}
           page={page}
           itemKey={itemKey}

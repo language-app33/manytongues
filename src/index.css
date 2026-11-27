@@ -1225,6 +1225,11 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 
 .at-openrow .at-deckrow2, .at-openrow .at-deckmain,
 .at-openrow .at-decktitle, .at-openrow .at-deckmeta { display:block; }
+/* A kind on the New module panel (0.733): its picture beside its words,
+   at the top of them, and the description on as many lines as it takes. */
+.at-openrow.withicon .at-deckrow2 { display:flex; align-items:flex-start; gap:12px; }
+.at-openrow.withicon .at-deckmain { flex:1 1 0; }
+.at-kindicon { flex:none; width:40px; height:40px; border-radius: var(--r-sm); background: var(--jade-bg); color: var(--jade); display:grid; place-items:center; }
 
 .at-flagfoot > .at-hint { margin:0; }
 
@@ -1389,6 +1394,28 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   padding:0; flex:none; color: var(--muted); }
 .at-minicorner .at-morebtn:hover, .at-minicorner .at-morebtn.on { color: var(--ink); }
 .at-minicard.cornered > .ar, .at-minicard.cornered > .at-minikind { padding-right:26px; }
+/* The teacher's card grids (0.733, the owner's 5a): two a row on a phone,
+   every tile the same height, the word and the meaning one line each, cut
+   with … — thinner outlines and more room. Only the teaching side passes
+   `teach`; the learner's tiles are as they were. */
+.at-cardgrid:has(> * > .at-minicard.teach) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+.at-minicard.teach { border-width:1px; padding:10px 12px; gap:2px; }
+.at-minicard.teach .ar, .at-minicard.teach .at-minien { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.at-minicard.teach .at-minien { min-height:1.4em; }
+/* Selected keeps its colour at the thinner edge, and gains a ring inside
+   it so it still stands out from the tiles beside it. */
+.at-minicard.teach.on { border-width:1px; box-shadow: inset 0 0 0 1px var(--jade); }
+.at-tilewrap.picked > .at-minicard.teach { box-shadow: inset 0 0 0 1px var(--accent); }
+/* The badge for a card students cannot fully see yet, at the tile's foot:
+   its own width, wrapping rather than cut ("Changes ready for review"). */
+.at-minicard.teach .at-minimeta { white-space:normal; overflow:visible; text-overflow:clip;
+  display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px; }
+.at-minicard.teach .at-minimeta:empty { display:none; }
+.at-minicard.teach .at-statusbadge { margin:0; max-width:100%; white-space:normal; }
+/* What stands for a missing meaning: a transliteration in italics, or a
+   small picture or play mark before "Picture" or "Recording". */
+.at-minien.standin svg, .at-standin svg { vertical-align:-2px; }
+.at-standin { color: var(--muted); }
 /* The tick that puts something into a bulk selection. */
 .at-ckbox.pick { position:absolute; top:8px; right:8px; width:22px; height:22px;
   border:2px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
@@ -1426,6 +1453,30 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-cardtable .at-grouprow > th { font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.06em;
   text-transform:uppercase; color: var(--muted); padding-top:12px; }
 .at-cardtable .at-grouprow span { font-weight:700; letter-spacing:0; color: var(--faint); }
+
+/* The table's view on a phone, as a list (0.733, the owner's choice): one
+   card a row, its meaning and where it is on the left, its word on the
+   right, cut with … at half the row. */
+.at-cardrows { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+.at-cardrow { display:flex; align-items:center; gap:10px; padding:8px 12px; background: var(--surface);
+  border:1px solid var(--line); border-radius: var(--r-sm); color: var(--text); min-width:0; }
+.at-cardrow.opens { cursor:pointer; }
+.at-cardrow.picked { background: var(--tag-bg); border-color: var(--accent); }
+.at-cardrow:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-cardrow .at-ckbox.pick { position:static; flex:none; }
+.at-cardrow-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-cardrow-meaning { font-size:14px; font-weight:700; overflow-wrap:anywhere; }
+.at-cardrow-sub { font-size:12px; color: var(--muted); line-height:1.5; }
+.at-cardrow-status:not(:empty) { margin-inline-start:6px; }
+.at-cardrow-status .at-statusbadge, .at-cardrow-status .at-statuspill { vertical-align:1px; }
+.at-cardrow-word { flex:0 1 auto; max-width:50%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-cardrow-word .ar { font-size:calc(18px * var(--sscale, 1)); }
+.at-cardrow-acts { flex:none; display:flex; }
+.at-cardrow-acts .at-morebtn { border:none; background:transparent; width:32px; height:32px;
+  min-height:32px; padding:0; flex:none; color: var(--muted); }
+.at-cardrows > .at-grouprow { font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.06em;
+  text-transform:uppercase; color: var(--muted); padding:8px 2px 0; }
+.at-cardrows > .at-grouprow span { font-weight:700; letter-spacing:0; color: var(--faint); }
 
 .at-ckbox { flex-shrink:0; width:24px; height:24px; border-radius:7px; border:2px solid var(--line);
   display:inline-flex; align-items:center; justify-content:center; background: var(--well);
@@ -2953,6 +3004,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-todoacts { display:flex; flex-wrap:wrap; gap:8px; }
 .at-empty2 .at-hint { margin:0 auto; max-width: 46ch; }
 .at-empty2 .at-row { justify-content:center; margin-top: var(--s4); }
+/* Teaching's To do with nothing in it (0.733, the owner's choice): the
+   same box and cup on one row, a third of the height, so the courses
+   under it come up the screen. */
+.at-empty2.slim { display:flex; align-items:center; gap: var(--s3); text-align:left; padding: var(--s3) var(--s4); }
+.at-empty2.slim .at-emptyart { margin:0; flex:none; }
+.at-empty2.slim .at-teaart { width:48px; }
+.at-empty2.slim .at-hint { margin:0; }
 /* --- Segmented: pick one of a few ---
 
    One control, not a row of buttons. It was three separate pills with a
@@ -3609,7 +3667,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    above Parts, Check a number's above The number — keeps room above its
    rule, as much as the head leaves above those words, so the rule has room
    either side. The band's own margin zeroed it and the rule sat on the
-   last line of the lede (0.733). */
+   last line of the lede (0.734). */
 .at-screen.cardform .at-screeninner > :not(.at-section) + .at-section { margin-top:18px; }
 .at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
   font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;

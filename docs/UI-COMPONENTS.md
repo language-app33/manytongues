@@ -277,6 +277,21 @@ is missing.
 `itemKey` defaults to reading `.id`, so items need one unless you pass your
 own.
 
+**No `match`, no search box** (0.733): a box that cannot narrow anything is
+left out, and a bar with nothing else in it is not drawn at all.
+
+**On a phone the table is a list** (0.733). Under 640px wide (`useNarrow()`,
+which reads `(max-width: 639px)` and says no where there is no
+`matchMedia`) the table view is drawn by `CardRows`: one card a row, its
+`meaning` cell over a line of its `decks` cell (or the row's `noDecks`,
+"In no module" for a teacher's card), its `kind` where it is not "Word or
+phrase", and its `status`; its `word` on the right, cut with … at half the
+row. The rows press, tick, answer Enter and Space, and start selecting on a
+held finger exactly as the table's rows do — both use the same helpers. The
+view switch says "List" and shows the list icon there. Sort is from the
+Sort control, since the list has no column headings. `CardRow` gained
+`noDecks` for this.
+
 `groups` is `[{ key, label }]` and `groupOf` is `(item) => key`. Together they
 split the list into labelled runs, each headed with how many are in it
 altogether rather than how many the page has reached. **The list is sorted
@@ -291,7 +306,19 @@ learning and not started.
 ### `CardTile` — 2 uses
 One card tile for both the learner's and the teacher's lists.
 
-`card, lang, showLat, meta, actions, onClick, className`
+`card, lang, showLat, meta, actions, corner, onClick, className, standIn`
+
+**The teacher's grids pass `className="teach"`** (0.733): two tiles a row
+on a phone, every tile the same height, the word and the meaning one line
+each and cut with …, a 1px outline, and the status badge at the tile's foot
+at its own width, wrapping rather than cut. The grid around them picks up
+the wider columns from the class (`:has()`). The learner's tiles pass
+nothing and are as they were.
+
+`standIn` (0.733) is what goes in the meaning's place on a card with no
+meaning and no name: `standIn(card)` from `cards.ts` gives the first
+transliteration (drawn in italics), else "Picture" or "Recording" with a
+small symbol, else nothing.
 
 `meta` is the one line of small print, and the caller decides what it says.
 It replaced a `moduleTitles` prop, which this file and the gallery both went
@@ -302,6 +329,25 @@ in the interface face rather than the taught script's, and it stands in for
 the meaning line rather than sitting above it. The script keeps its own line
 underneath. Nothing is passed for this — the tile reads it off the card —
 and only a verb whose own word is a cell of its table has one.
+
+### `CoursesPage` — spaces.tsx, 2 uses
+The list of someone's courses: Teaching's Home and the learner's Courses.
+`joinButton` (0.733, Teaching only) puts joining at the foot of My courses
+as a dashed button, `label`, opening a `PickSheet` titled `title` with the
+code box; `noneAtAll` says the person has no course at all, and then a
+`Nudge` saying `none` with a `first` button stands in for the list.
+Without `joinButton` the join box is the section it always was.
+`searchFrom` searches the courses only from that many on (Teaching: six).
+
+### `OpenRow` — spaces.tsx
+A row that opens something, drawn as a module's tile. `icon` (0.733) puts
+a picture in a soft green square beside the words, at the top of them, and
+lets the line under the title take as many lines as it needs: the kinds on
+the New module panel.
+
+### `Empty`
+`slim` (0.733) draws it on one row, the picture beside the words, a third
+of the height: To do on Teaching's Home with nothing in it.
 
 ### `Tile` — 7 uses
 The generic deck/course tile. `title, meta, onOpen, actions, footer`
