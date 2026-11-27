@@ -9636,3 +9636,45 @@ a phone, a new order needs Apply, and every bulk action is one press
 further. Nothing was removed. `menus` and `count` went from `ItemList`'s
 inputs for `sort`, `filter` and `total`.
 
+## Simpler teacher screens (0.732)
+
+The owner chose each of these on a page of mock-ups (answers `1a, 2b→7a,
+3b, 4a, 5a, 6 none, 7a, 8a, 9a`).
+
+- **Manage cards folded into the module's screen.** A module had two
+  screens over the same cards: one to read them and one to change which
+  they were. The reading one now holds what the managing one did — New
+  card, Add existing cards, Select, Import, Remove from this module — and
+  the managing one is gone. The list is the Cards tab's list, with the
+  same bar, so there is one way to work a list of cards.
+- **Edit replaced by a pencil and a menu.** The module's only fields were
+  its name and its courses, and the courses already saved as they were
+  tapped (0.725). So Edit opened a whole mode for one text box. The name
+  is the heading, and its pencil turns it into a box with Save and Cancel
+  in place; Export and Delete went behind three dots on the title line.
+  Back still asks first when a rename is half typed. Cost: Rename, Export
+  and Delete are each one press further.
+- **A card being read is still the locked editor**, with the card drawn on
+  top. `docs/PROPOSAL-view-only-parity.md` made reading the editor held
+  still so that reading never falls behind editing; that is kept. What
+  changed is only what the Basic tab opens with while locked: a hero (the
+  word, how it is said, what it means, Export behind its dots), with "This
+  card", the advanced tick-box, the stars and the no-vowel-marks note held
+  back until Edit. The note became a "to improve" list with a button that
+  turns the screen to editing. The hero sits above the fields' lock, so its
+  dots work while the rest is held still.
+- **The Content block is hidden only when the hero already says all of
+  it**: one spelling, one way of saying it, one English, nothing recorded
+  or pictured (`onlyWords`). A card with more keeps the block, so nothing
+  on it is out of sight while it is read.
+- **"What is practised" in words while read.** A table of tick-boxes that
+  cannot be ticked read as a form to fill in; one line per form saying
+  where it comes up reads as a fact. Edit brings the tick-boxes back.
+- **Not changed:** the exercise tiles on the Exercises tab, and the
+  Advanced tab, which a card being read shows as before. Courses, which
+  already save on tap, are untouched.
+- **Two departures from the mock-ups.** The line "Students choose and write
+  this word" was a misreading of the Description's own role line, so it is
+  not shown; the Description shows only when one is written. The card's
+  first tab keeps its name, "Basic".
+

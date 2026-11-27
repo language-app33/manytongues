@@ -230,8 +230,9 @@ from there), the search box taking what is left, Filter (with the count of
 filters on, and its word from 640px), `narrow`, and three dots. The dots hold
 Select first, where there is anything to select, then `more` (Import, where a
 list has it); where Select would be alone in them it is an icon of its own
-and there are no dots. `tools`, the screen's worded button ("Manage this
-deck's cards"), is on a row of its own above the bar. Each part is left out
+and there are no dots. `tools`, a screen's own worded button, is on a row of its own above
+the bar. (A module's screen had one, "Manage this deck's cards", until
+0.732, when it took in Manage cards and its list became the Cards tab's.) Each part is left out
 when it would hold nothing, and with `emptyPanel` showing the bar stands
 aside.
 
