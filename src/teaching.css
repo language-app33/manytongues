@@ -989,6 +989,14 @@ fieldset.at-cardlock:disabled input[type="checkbox"]:disabled { opacity:.55; }
    width of the list, under its toolbar. */
 .at-managefor { margin:0 0 var(--s3); font-weight:700; color: var(--text-soft); }
 .at-blockbtn { width:100%; justify-content:center; }
+/* "Add existing cards" on a module's card list (0.725): where the cards
+   go, said where there is room for it on one line, and the short form
+   on a phone. Both are in the button; this picks one. */
+.at-addexisting .at-longlabel { display:none; }
+@media (min-width: 640px) {
+  .at-addexisting .at-longlabel { display:inline; }
+  .at-addexisting .at-shortlabel { display:none; }
+}
 .at-answerpair.headed { gap:0 6px; }
 .at-answerpair.headed > .at-answerhead { grid-column:1 / -1; }
 /* A heading with what acts on its list at the right of its line. */
