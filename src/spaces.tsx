@@ -5026,7 +5026,7 @@ function lockedDeleteNote(titles: string[]): string {
  */
 /* The three kinds a new module can be (0.633), fixed once it is made.
    Chosen first, on a sheet, from New module and from To do's Create a
-   module (0.720, as before 0.710). A unit can also be made from a
+   module (0.721, as before 0.710). A unit can also be made from a
    course's path. */
 type NewKind = "deck" | "unit" | "set";
 const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
@@ -5664,37 +5664,6 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
   return (
     <span className={`at-quality ${qualityTone(quality.score)}`} title="Quality, out of 100">
       {` · Quality ${quality.score}`}
-    </span>
-  );
-}
-
-/* A module's quality on its tile in the list (0.689, the owner's 3b and
-   4b): the number alone, in a ring filled as far round as the score goes,
-   in the score's colour. A module with no sentence and no recording yet
-   has no ring at all (0.709): its number would only say it is new. */
-const RING_R = 17;
-const RING_LEN = 2 * Math.PI * RING_R;
-function QualityRing({ quality }: { quality?: Quality | null }) {
-  if (!quality || quality.score === null || !qualityShown(quality)) return null;
-  const score = quality.score;
-  const tone = qualityTone(score);
-  const said = `Quality: ${score} out of 100`;
-  const filled = Math.max(0, Math.min(100, score)) / 100;
-  return (
-    <span className={`at-qring ${tone}`} role="img" aria-label={said} title={said}>
-      <svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-        <circle className="at-qringtrack" cx="22" cy="22" r={RING_R} />
-        {filled > 0 ? (
-          <circle
-            className="at-qringfill"
-            cx="22"
-            cy="22"
-            r={RING_R}
-            strokeDasharray={`${(RING_LEN * filled).toFixed(2)} ${RING_LEN.toFixed(2)}`}
-          />
-        ) : null}
-      </svg>
-      <span className="at-qringnum" aria-hidden="true">{score}</span>
     </span>
   );
 }
@@ -6686,7 +6655,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      (0.695): it is made in that course's language and put in it. */
   const [namingFor, setNamingFor] = useState<Course | null>(null);
   /* What kind of module naming makes: chosen on a sheet first (0.633,
-     back in 0.720 after 0.710 took it out), except in My space, where
+     back in 0.721 after 0.710 took it out), except in My space, where
      only a deck can be made. */
   const [choosingKind, setChoosingKind] = useState(false);
   const [newKind, setNewKind] = useState<NewKind>("deck");
@@ -10611,7 +10580,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {choosingKind && (
             <PickSheet title="New module" lede="What kind of module? This can't be changed once it is made." onClose={() => { setChoosingKind(false); setNamingFor(null); }}>
               {/* Spaced as every list of tiles is (0.683); a personal set
-                  only where the App admin switched them on (0.720). */}
+                  only where the App admin switched them on (0.721). */}
               <div className="at-decklist2">
                 {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
                   <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
@@ -11102,7 +11071,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                /* A personal set is on New module's sheet again (0.720), not
+                /* A personal set is on New module's sheet again (0.721), not
                    here. */
                 more={modules.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
                 onNew={mineSide ? undefined : newModule}
@@ -11151,11 +11120,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   return (
                     <Tile
                       title={d.title}
-                      /* Its quality left of its name (0.715, the owner's
-                         3a): one column of scores down the list. */
-                      lead={<QualityRing quality={qualities.get(d.id)} />}
                       /* One line under the name (0.715, the owner's 1c):
-                         what in it needs looking at, then who can see it.
+                         what in it needs looking at, who can see it, and
+                         its quality score last (0.720, the owner's wish:
+                         no ring left of the name). No score until there is
+                         something to score (0.709).
                          Its language and size are off the tile (0.689),
                          and so is how many of its cards send students
                          nothing yet (0.701): its own screen says that. */
@@ -11165,6 +11134,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                            lacks, so it is seen from the list. */
                         const lost = cards.filter((c) => ids.has(c.id) && cardLostRecordings(c)).length;
                         const waiting = moduleWaiting(d).replace(/^ · /, "");
+                        const quality = qualities.get(d.id);
+                        const score = quality && quality.score !== null && qualityShown(quality) ? quality.score : null;
                         const reach = d.personal ? (
                           /* My space (0.545, 59b): whether you practise it. */
                           d.practise !== false ? "Practised in your Learning" : "Not practised"
@@ -11185,11 +11156,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
                           !d.personal && d.set ? <span key="s">Personal set</span> : null,
                           <span key="r">{reach}</span>,
+                          score !== null ? <span key="q" data-el="module-score">{`score: ${score}`}</span> : null,
                         ].filter(Boolean) as React.ReactElement[];
                         return (
                           <TileNote live={d.personal ? d.practise !== false : live}>
                             <LockMark locked={d.locked && MODULE_LOCKS} />
-                            {parts.flatMap((p, i) => (i ? [" · ", p] : [p]))}
+                            {/* The dot stays with the word before it, so a
+                                wrapped line never starts with one. */}
+                            {parts.flatMap((p, i) => (i ? ["\u00a0· ", p] : [p]))}
                           </TileNote>
                         );
                       })()}
@@ -11202,6 +11176,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                             label={`More for ${d.title}`}
                             title={d.title}
                             ghost
+                            bare
                             items={[
                               { label: `Export ${moduleKind(d)}`, icon: "download", onClick: () => exportModules([d.id]) },
                               /* A My space deck into the space (0.549; 2a, 9b, 10a). */

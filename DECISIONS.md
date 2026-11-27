@@ -9546,7 +9546,7 @@ failure). Creating personal records through the server still works, for
 the tests and for old phones; whatever is made is deleted at the next
 start. The app offers no way in.
 
-## New module asks what kind again (0.720)
+## New module asks what kind again (0.721)
 
 The owner's word: bring back the sheet 0.710 removed. `newModule()` opens
 the `PickSheet` of `NEW_KINDS` again (outside My space), and To do's

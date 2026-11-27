@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.720 — 27 November 2026
+## 0.721 — 27 November 2026
 
 **New module asks what kind again.** In Teaching › Material, New module
 opens a sheet with **Deck**, **Unit** and, where personal sets are switched
@@ -18,6 +18,22 @@ and a deck or personal set is put in it. The sheet says the kind can't be
 changed once the module is made, which is still true. "New personal set" is
 no longer in the three dots beside New module, since the sheet has it. A
 unit can still be made from a course's Path too.
+
+## 0.720 — 27 November 2026
+
+**A module's score is now a few words at the end of the line under its
+name, and the three dots lose their box.** In Teaching › Material ›
+Modules:
+
+- The score ring left of the name is gone. The score is the last thing on
+  the line under the name: "Available to students in the course Arabic 101
+  · score: 38". A module with nothing to score yet still shows no score.
+- The three dots on the right of a module's tile have no outline, just the
+  dots, as a card tile's are since 0.717. They are as easy to tap as
+  before.
+
+Trade-off: the score no longer stands in one column down the list, and it
+is plain grey text rather than coloured.
 
 ## 0.719 — 27 November 2026
 
