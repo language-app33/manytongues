@@ -1069,6 +1069,12 @@ export type Card = {
   personal?: boolean;
   id: string;
   owner?: string;
+  /** Who last changed it (0.711): stamped by the server; absent on anything not changed since. */
+  editedBy?: string;
+  /** Its owner's display name, sent with a teacher's lists (0.711); never stored. */
+  ownerName?: string;
+  /** `editedBy`'s display name, sent with a teacher's lists (0.711); never stored. */
+  editedByName?: string;
   lang: LangId;
   /** The card's own word first, then the alternates it carries. */
   forms: CardForm[];
@@ -1276,6 +1282,12 @@ export interface ModuleLink {
 export interface Module {
   id: string;
   owner: string;
+  /** Who last changed it (0.711): stamped by the server; absent on anything not changed since. */
+  editedBy?: string;
+  /** Its owner's display name, sent with a teacher's lists (0.711); never stored. */
+  ownerName?: string;
+  /** `editedBy`'s display name, sent with a teacher's lists (0.711); never stored. */
+  editedByName?: string;
   title: string;
   description?: string;
   lang: LangId;
@@ -1362,6 +1374,8 @@ export interface Course {
   pathLive?: Record<string, Millis>;
   /** The ids of the path units a teacher has opened early for this course's class. */
   opened?: string[];
+  /** Display names of its teachers and students by handle (0.707): sent to its teachers only, never stored. */
+  people?: Record<string, string>;
 }
 
 /**

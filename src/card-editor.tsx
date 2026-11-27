@@ -6854,7 +6854,9 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, modules, chosen, onToggleModule, onSetModules, onCreateModule, onExport, onToSpace, onDelete, setOnly = false }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, modules, chosen, onToggleModule, onSetModules, onCreateModule, onExport, onToSpace, onDelete, setOnly = false, made = "" }: {
+  /** "Made by … · last changed by …" (0.711), under the heading; empty while creating. */
+  made?: string;
   /** In personal sets and nothing else: the advanced card is not offered,
       unless the card is one already (0.634). */
   setOnly?: boolean;
@@ -6942,6 +6944,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           </span>
         ) : null}
       </div>
+      {made ? <Help>{made}</Help> : null}
       {/* ---- basic or advanced ----
           The one question between a quick card and the whole editor, first
           because the rest of the screen follows from it. Said in no more
@@ -10882,8 +10885,10 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, modules, inModules, onCreateModule, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
+export function CardEditor({ card, lang, modules, inModules, onCreateModule, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null, made = "" }: {
   card: Card | null;
+  /** Who made the card and who last changed it, as one line (0.711); empty while creating. */
+  made?: string;
   /** Why the last save failed, said inside this screen, which covers the
       space it opened from (0.580, audit finding 12). */
   error?: string | null;
@@ -11259,6 +11264,7 @@ export function CardEditor({ card, lang, modules, inModules, onCreateModule, all
           <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}>
             <SetOnly.Provider value={setOnly}>
             <BasicBlock
+              made={made}
               lang={lang}
               scene={scene}
               word={word}

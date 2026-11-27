@@ -5,8 +5,9 @@
  * them in a module of the same course used to send that course's students
  * two of everything. Now a word set is shared with a space as one teacher's
  * set, listed in Material beside the others, editable by any teacher there,
- * and a course uses one teacher's set of each kind: the one chosen on it,
- * or the earliest of those reaching it until somebody chooses.
+ * and a course uses one teacher's set of each kind. Since 0.713 that is the
+ * school's: one per kind and language in a space, the first written; a
+ * course's stored choice is no longer read.
  *
  * Replaces numbers-choice.test.mjs: whose numbers a module used was chosen
  * on the module from 0.541, and is the course's choice now.
@@ -101,61 +102,60 @@ async function pronounsSent(/** @type {string} */ key) {
     .map((/** @type {any} */ c) => `${c.person}=${c.forms[0].ar}`);
 }
 
-test("two teachers' pronouns on one course reach its students once, the course's choice", async () => {
-  const { course, a, b, s } = await classroom("pron");
+/** A space of its own (0.713): the school's set is one per space, so a
+    test that asks whose it is starts from a space with none. */
+async function aSpace(/** @type {string} */ tag) {
+  const made = await ok("admin-create-org", { key: admin.key, body: { name: `Space ${tag}`, slug: `space-${tag}`, adminName: `Admin ${tag}` } });
+  return made.org.id;
+}
+
+test("two teachers' pronouns on one course reach its students once, the school's set", async () => {
+  const { course, a, b, s } = await classroom("pron", await aSpace("pron"));
   await pronounsModule(a, "A", course.id);
   await pronounsModule(b, "B", course.id);
 
-  /* Before anybody chooses: the earliest written, which is A's — and only
+  /* The school's set is the one written first, which is A's — and only
      A's, in both modules. */
   let sent = await pronounsSent(s.key);
   assert.equal(sent.length, PERSONS.length * 2, "each module still holds the set");
   assert.equal(new Set(sent).size, PERSONS.length, "but one teacher's set, not two");
   assert.ok(sent.every((x) => x.endsWith(`=A-${x.split("=")[0]}`)), sent.join(", "));
 
-  /* The course says so, and offers both. */
   let sets = (await ok("course-word-sets", { key: b.key, params: { course: course.id } })).sets;
   assert.equal(sets.pronouns.using, a.handle);
-  assert.equal(sets.pronouns.chosen, false);
   assert.deepEqual(sets.pronouns.reaching.sort(), [a.handle, b.handle].sort());
-  assert.deepEqual(sets.pronouns.options.map((/** @type {any} */ o) => o.handle).sort(), [a.handle, b.handle].sort());
 
-  /* Any teacher of the course chooses (5a); students then get B's. */
+  /* A course's choice is no longer read (0.713): choosing B changes
+     nothing students get. */
   await ok("set-course-word-set", { key: b.key, body: { courseId: course.id, kind: "pronouns", from: b.handle } });
   sent = await pronounsSent(s.key);
   assert.equal(new Set(sent).size, PERSONS.length);
-  assert.ok(sent.every((x) => x.includes("=B-")), sent.join(", "));
+  assert.ok(sent.every((x) => x.includes("=A-")), sent.join(", "));
   sets = (await ok("course-word-sets", { key: a.key, params: { course: course.id } })).sets;
-  assert.equal(sets.pronouns.using, b.handle);
-  assert.equal(sets.pronouns.chosen, true);
+  assert.equal(sets.pronouns.using, a.handle);
 
   /* A student can't choose or look; a stranger can't be chosen. */
   assert.equal((await api("set-course-word-set", { key: s.key, body: { courseId: course.id, kind: "pronouns", from: s.handle } })).status, 403);
   assert.equal((await api("course-word-sets", { key: s.key, params: { course: course.id } })).status, 403);
   assert.equal((await api("set-course-word-set", { key: a.key, body: { courseId: course.id, kind: "pronouns", from: s.handle } })).status, 400);
-
-  /* Back to automatic. */
-  await ok("set-course-word-set", { key: a.key, body: { courseId: course.id, kind: "pronouns", from: "" } });
-  assert.equal((await ok("course-word-sets", { key: a.key, params: { course: course.id } })).sets.pronouns.chosen, false);
 });
 
 test("an edit to the chosen teacher's pronouns reaches modules that hold the other set", async () => {
-  const { course, a, b, s } = await classroom("edit");
+  const { course, a, b, s } = await classroom("edit", await aSpace("edit"));
   await pronounsModule(a, "A", course.id);
   await pronounsModule(b, "B", course.id);
-  await ok("set-course-word-set", { key: a.key, body: { courseId: course.id, kind: "pronouns", from: b.handle } });
   const before = await ok("my-material", { key: s.key });
-  /* A teacher edits B's shared pronoun (2a): it stays B's. */
-  const shared = (await ok("space-word-sets", { key: a.key })).pronouns.find((/** @type {any} */ p) => p.owner === b.handle);
+  /* Another teacher edits the school's pronoun, A's (2a): it stays A's. */
+  const shared = (await ok("space-word-sets", { key: b.key })).pronouns.find((/** @type {any} */ p) => p.owner === a.handle);
   const he = shared.cards.find((/** @type {any} */ c) => c.person === "he");
-  const saved = await ok("save-card", { key: a.key, body: { card: { ...he, forms: [{ ...he.forms[0], ar: "B-he-fixed" }] }, decks: he.decks } });
-  assert.equal(saved.card.owner, b.handle);
+  const saved = await ok("save-card", { key: b.key, body: { card: { ...he, forms: [{ ...he.forms[0], ar: "A-he-fixed" }] }, decks: he.decks } });
+  assert.equal(saved.card.owner, a.handle);
   const after = await ok("my-material", { key: s.key, params: { version: before.version } });
   assert.ok(!after.unchanged, "the student's device is told to fetch");
-  assert.ok((await pronounsSent(s.key)).includes("he=B-he-fixed"));
+  assert.ok((await pronounsSent(s.key)).includes("he=A-he-fixed"));
 });
 
-test("two teachers' numbers on one course: one set for both modules, the course's choice", async () => {
+test("two teachers' numbers on one course: one set for both modules, the school's set", async () => {
   const { course, a, b, s } = await classroom("num");
   /** @type {Record<string, any>} */
   const sys = {};
@@ -166,12 +166,32 @@ test("two teachers' numbers on one course: one set for both modules, the course'
     await ok("set-deck-parts", { key: t.key, body: { deckId: deck.id, parts: ["numbers:0-10"] } });
   }
   const filed = async () => (await ok("my-material", { key: s.key })).decks.map((/** @type {any} */ d) => d.numbersSystemId);
-  assert.deepEqual(await filed(), [sys.A.id, sys.A.id], "the earliest, in both modules");
+  assert.deepEqual(await filed(), [sys.A.id, sys.A.id], "the first written, in both modules");
+  /* A course's choice is no longer read (0.713). */
   await ok("set-course-word-set", { key: a.key, body: { courseId: course.id, kind: "numbers", from: b.handle } });
-  assert.deepEqual(await filed(), [sys.B.id, sys.B.id]);
+  assert.deepEqual(await filed(), [sys.A.id, sys.A.id]);
   /* Both are listed in Material, already used by the space's modules. */
   const listed = (await ok("space-word-sets", { key: a.key })).numbers.map((/** @type {any} */ n) => n.owner);
   assert.ok(listed.includes(a.handle) && listed.includes(b.handle));
+});
+
+test("numbers saved in a space with none become the school's without sharing", async () => {
+  const { a } = await classroom("auto", await aSpace("auto"));
+  const before = await ok("space-word-sets", { key: a.key });
+  assert.equal(before.numbers.length, 0, "the space starts with no numbers");
+  await ok("save-system", { key: a.key, body: { kind: "numbers", system: system("auto-one") } });
+  const after = await ok("space-word-sets", { key: a.key });
+  assert.ok(after.numbers.some((/** @type {any} */ n) => n.owner === a.handle), "not listed without a Share");
+  assert.equal(after.school.numbers["ar-PS"], a.handle);
+});
+
+test("space-word-sets names the school's set", async () => {
+  const { course, a, b } = await classroom("names", await aSpace("names"));
+  await pronounsModule(a, "A", course.id);
+  await pronounsModule(b, "B", course.id);
+  const sets = await ok("space-word-sets", { key: b.key });
+  assert.equal(sets.pronouns.length, 2, "both teachers' pronouns are in the space");
+  assert.equal(sets.school.pronouns["ar-PS"], a.handle);
 });
 
 test("sharing pronouns copies them into the space, once per teacher", async () => {
@@ -201,6 +221,8 @@ test("sharing pronouns copies them into the space, once per teacher", async () =
 });
 
 test("sharing numbers lists them in the space, where another teacher may edit them", async () => {
+  /* In the space the numbers test above gave a school set (0.713), so a
+     second teacher's numbers are theirs until shared. */
   const { a, b } = await classroom("sharenum");
   const mine = (await ok("save-system", { key: a.key, body: { kind: "numbers", system: system("one") } })).system;
   const listed = async () => (await ok("space-word-sets", { key: b.key })).numbers.filter((/** @type {any} */ n) => n.owner === a.handle);
