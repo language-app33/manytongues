@@ -243,8 +243,6 @@ export function Onboarding({ onDone, place = {} }: {
   const [error, setError] = useState("");
   const [made, setMade] = useState<User & { key: string } | null>(null);
   const [showKey, setShowKey] = useState(false);
-  /* "I've saved my key somewhere safe", ticked before carrying on (19b). */
-  const [keyTicked, setKeyTicked] = useState(false);
   /* An invitation or a course code: what decides which space a new account
      is in (24b). Pre-filled from an invite link. */
   const [signupCode, setSignupCode] = useState(place.joinCode || "");
@@ -530,24 +528,15 @@ export function Onboarding({ onDone, place = {} }: {
 
         {!elsewhere && step === "key" && made && (
           <>
-            <h2>Keep this somewhere safe</h2>
+            <h2>Save your sign-in key</h2>
             <Lede>
-              This is your sign-in key. It brings your cards to another device, and it is the only
-              way back into your account. Save it in a password manager, or write it down somewhere
-              safe. If you lose it, only your space's admin can give you a new one.
+              It is the only way back into your account. Keep it in a password manager or write it down.
             </Lede>
             <CodeBox label="Your sign-in key" code={made.key} />
-            {made.keyOnly === false && made.linkKey && made.org && typeof made.org === "object" && made.org.slug ? (
-              <CodeBox
-                long
-                label="Your private sign-in link"
-                hint="Opening it signs you in on any device, with nothing to type. Anyone who has it is you, so never share it."
-                code={signInLink(window.location.origin, made.org.slug, made.linkKey)}
-              />
-            ) : null}
             <Help>
-              You are <strong>{made.displayName}</strong> · <span className="at-handle">{made.handle}</span>
-              . Share the handle freely; never the key.
+              {made.keyOnly === false && made.linkKey
+                ? "Your sign-in link and handle are in Settings."
+                : "Your handle is in Settings."}
             </Help>
             {/* Submitting a form that holds the key is what prompts a password
                 manager to offer to remember it, which is much the best place
@@ -555,7 +544,6 @@ export function Onboarding({ onDone, place = {} }: {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!keyTicked) return;
                 /* Recorded, so the reminder isn't shown again; carrying on
                    doesn't wait for it. */
                 API.keySaved().catch(() => {});
@@ -582,12 +570,8 @@ export function Onboarding({ onDone, place = {} }: {
                 aria-hidden="true"
                 className="at-hiddenuser"
               />
-              <label className="at-tickrow at-mt4">
-                <input type="checkbox" checked={keyTicked} onChange={(e) => setKeyTicked(e.target.checked)} />
-                <span>I've saved my key somewhere safe</span>
-              </label>
-              <Button variant="primary" wide className="at-mt4" type="submit" disabled={!keyTicked}>
-                Carry on
+              <Button variant="primary" wide className="at-mt4" type="submit">
+                I've saved it, carry on
               </Button>
             </form>
           </>

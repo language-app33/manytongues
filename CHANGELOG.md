@@ -16,6 +16,16 @@ off the tile. Open the module and it is still there, with the reasons: how
 many are drafts, waiting for review, or need their number words written.
 To do on Home still says it for each course too.
 
+## 0.698 — 27 November 2026
+
+**Signing up asks for less.** The screen after you choose your name now
+shows your sign-in key, one Copy button and one line about keeping it safe.
+The sign-in link and your handle are no longer repeated there; both are in
+Settings. The tick-box is gone: the button works straight away.
+
+To check by hand: on a phone, that the password manager still offers to
+save the key when the button is pressed.
+
 ## 0.697 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
