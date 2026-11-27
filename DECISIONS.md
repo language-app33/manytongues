@@ -9390,3 +9390,16 @@ Settings (where `AccountPanel` already shows the link and the handle), and
 the hidden username and password inputs that prompt a password manager.
 The `keyTicked` tick-box is gone; the button is always live and still calls
 `API.keySaved()` before `onDone`.
+
+## A selected tab is green, like everything chosen (0.699)
+
+0.685 made the selected tab in a page grey with a dark grey outline, partly
+so tabs would not read as a `Segmented`, whose chosen option is solid green.
+Side by side on a phone, that left tabs the one place where chosen was not
+the accent colour, and in the light theme the outline was the darkest line
+on the screen. The owner chose the bar's way of marking a section (1a): the
+accent on an 18% wash of it, with an accent outline. That keeps the
+distinction from a `Segmented` (a faint wash, not a solid fill) and drops
+`--tab-stroke`. Names are in ordinary lettering at the bar's 14px (2a), so
+four tabs on the narrowest phone step down to 11px rather than 9px; and the
+track's edge is the 2px everything else has (3a).
