@@ -1239,7 +1239,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
 /* A three-dots button with no outline (0.720, the owner's wish, on a
    module's tile): the icon alone, the 44px it can be pressed in kept. */
-.at-morebtn.bare { border-color: transparent; }
+.at-morebtn.bare, .at-morebtn.bare.on { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
 .at-reachtext b { color: var(--ink); font-weight:700; }
 /* A card shown rather than edited: label on the left, value on the right,
@@ -3605,6 +3605,12 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* And the first of them has nothing above it to be ruled off from, as the
    editor's first block has none. */
 .at-screen.cardform .at-screeninner > .at-section:first-child { border-top:0; }
+/* A section that follows the screen's opening words — the Numbers lede
+   above Parts, Check a number's above The number — keeps room above its
+   rule, as much as the head leaves above those words, so the rule has room
+   either side. The band's own margin zeroed it and the rule sat on the
+   last line of the lede (0.733). */
+.at-screen.cardform .at-screeninner > :not(.at-section) + .at-section { margin-top:18px; }
 .at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
   font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
   color: var(--ink); }
