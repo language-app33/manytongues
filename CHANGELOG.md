@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.706 — 27 November 2026
+
+**A teacher's first screen is Teaching.** Signing in on a new device as
+someone who teaches a course now opens Teaching straight away. It used to
+open Learning the first time, with "Ask your teacher for a course code".
+Learning is still one tap away on the switch at the top.
+
+To check by hand: a teacher's very first sign-in from a real invitation, on
+a phone.
+
 ## 0.705 — 27 November 2026
 
 **Progress shows three groups.** The seven tiles of "The ladder" are now

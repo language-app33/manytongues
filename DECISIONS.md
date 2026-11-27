@@ -9440,3 +9440,13 @@ filled as before and gains a derived `learning` bucket (l1–l4 in order);
 the `all` bucket and tile went. Learning's list is grouped by `STATUS_RUNS`
 with `standingShort` as small print and no per-level bar, which would
 compare different climbs. One stacked `at-sharebar` above the tiles.
+
+## A teacher's first screen is Teaching (0.706)
+
+A teacher told to ask their teacher for a code assumes the invitation
+failed. `space` still starts from `loadTeaches()`; in `refreshCourses`,
+when the device had no stored answer (`teachesKey()` absent, read before
+`saveTeaches`) and the answer says they teach, Learning switches to
+Teaching — unless the person already chose (`pickedSpace`, set by
+`pickMode` and `goToSpace`), the page was opened with `?open=`, or the
+space is being tried. A stored "0" still opens Learning.

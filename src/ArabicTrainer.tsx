@@ -11707,6 +11707,13 @@ export default function ArabicTrainer() {
     if (open === "teach") return "teach";
     return loadTeaches() ? "teach" : "learn";
   });
+  /* Whether the person has chosen where to be on this launch, and whether
+     the page was opened to a place (0.706). A teacher's first sign-in on a
+     device has no stored answer, so it opens in Learning; when the first
+     answer says they teach, it moves to Teaching — unless either of these
+     has already said where to be. */
+  const pickedSpace = useRef(false);
+  const openedTo = useRef(new URLSearchParams(window.location.search).has("open"));
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (!q.has("open")) return;
@@ -13818,7 +13825,18 @@ export default function ArabicTrainer() {
           materialVersion.current,
           dataRef.current.parked || {},
         );
+        /* Whether this device had no answer yet (0.706), read before the
+           answer below is kept. */
+        let firstTimeHere = false;
+        try {
+          firstTimeHere = localStorage.getItem(teachesKey()) === null;
+        } catch (e) {
+          firstTimeHere = false;
+        }
         setTeaches(r.teaches);
+        if (r.teaches && firstTimeHere && !pickedSpace.current && !TRYING && !openedTo.current) {
+          setSpace((s) => (s === "learn" ? "teach" : s));
+        }
         /* Trying a space (0.574): its answer is not yours to keep. */
         if (!TRYING) {
           saveTeaches(r.teaches);
@@ -16229,6 +16247,7 @@ export default function ArabicTrainer() {
   /* Going to another space is going to its address, as it always was:
      every screen then agrees about where you are. */
   const goToSpace = (to: { id: string; slug: string }, open = "") => {
+    pickedSpace.current = true;
     const then = open ? `?open=${open}` : "";
     if (to.id === "super") {
       /* Super admin is shown only at one of your own addresses: from a
@@ -16285,6 +16304,7 @@ export default function ArabicTrainer() {
   /* A mode beside a space. Learning there is Learning narrowed to it;
      another space's mode is gone to at its address (0.610). */
   const pickMode = (row: WhereRow, mode: string) => {
+    pickedSpace.current = true;
     setWhereOpen(false);
     if (!row.here) {
       if (mode === "learn" && where.multi) setSpaceFilter(row.id);

@@ -781,6 +781,12 @@ const dayLater = (s) =>
 /* ---- what the device held before this build: a signed-in account and a
    document from an older build carrying its own private sync key ---- */
 localStorage.setItem("arabic-account", JSON.stringify(account));
+/* And it has been opened before, in Learning: a device with no answer yet
+   about whether its person teaches moves to Teaching when the first answer
+   says so (0.706), and the walks below start in Learning. The walk of a
+   teacher's very first sign-in clears this itself. */
+localStorage.setItem("arabic-trainer-teaches:", "0");
+localStorage.setItem("arabic-trainer-teaches:main", "0");
 const legacyKey = "raven-saffron-thistle-velvet-9f9f";
 localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
   version: 3, items: [], tombstones: {}, log: {}, settings: { language: "ar-PS" },
@@ -11812,6 +11818,33 @@ const openPronounTables = async () => {
   r.unmount();
   host.remove();
   teachesTwo = false;
+}
+
+/* ---- a teacher's first sign-in on a device opens Teaching (0.706) ----
+   No stored answer yet about whether they teach: the device opens in
+   Learning, and when the first answer says they teach, it moves to
+   Teaching by itself, without the switch being touched. */
+{
+  const before = errors.length;
+  await sleep(1500);
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith("arabic-trainer-teaches:")) localStorage.removeItem(k);
+  }
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(2500);
+  const said = (host.textContent || "").replace(/\s+/g, " ");
+  check("a teacher's first sign-in on a device opens Teaching's Home, not Learning's",
+    !!host.querySelector(".at-screen.bare") && /My courses/.test(said) && !/Join a course to get started/.test(said),
+    said.slice(0, 200));
+  check("and nothing threw on the way", errors.length === before, errors.slice(before, before + 3).join(" | "));
+  r.unmount();
+  host.remove();
 }
 
 /* ---- a number at the top of its ladder ----
