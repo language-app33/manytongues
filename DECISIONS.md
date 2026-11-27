@@ -9371,3 +9371,14 @@ opens.
 **The empty state** is `Empty` with `TeaArt`, a cup drawn in the logo's
 loops and colours, its dot in the page's ink.
 
+**Getting a course started (0.695).** The owner asked To do to stay out
+of the way until there is a course, then to say what a course is missing:
+a module, then cards. Read off the space's modules linked to each course
+on screen (units count; a number part counts as a card). Create a module
+opens `NewModule` with `namingFor` holding the course: no language asked,
+the course's used, and the deck attached to the course before it opens.
+Add cards opens the course's first module, whose own empty panel offers
+New card, Add existing cards and Import. A teacher in no course does not
+reach Teaching at all; the hidden case is an administrator, or courses
+all in languages switched off.
+

@@ -1726,8 +1726,8 @@ export function verifyBackup(file: any) {
  * an empty To do reads as done rather than as broken.
  */
 function TodoSection({ items, actionsOf }: {
-  items: { key: string; icon: string; text: string; course?: string }[];
-  actionsOf: (item: { key: string; icon: string; text: string; course?: string }) => Node;
+  items: { key: string; icon: string; text: string; course?: string; module?: string }[];
+  actionsOf: (item: { key: string; icon: string; text: string; course?: string; module?: string }) => Node;
 }) {
   return (
     <section className="at-section at-coursesection" data-el="todo">
@@ -6681,6 +6681,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     signed?: Record<string, number | null>;
   } | null>(null);
   const [naming, setNaming] = useState<"new" | null>(null);
+  /* The course a new module is being made for, from To do on Home
+     (0.695): it is made in that course's language and put in it. */
+  const [namingFor, setNamingFor] = useState<Course | null>(null);
   /* What kind of deck "New deck" makes: chosen on a sheet first, outside
      My space, where only a regular deck can be made (0.633). */
   const [choosingKind, setChoosingKind] = useState(false);
@@ -6715,12 +6718,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const [numbering, setNumbering] = useState<LangId | null>(null);
   /* Which language's pronouns are open. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
-  /* Whose set is open from Material's Word sets (0.695): another teacher's
+  /* Whose set is open from Material's Word sets (0.696): another teacher's
      shared set, or null for the teacher's own. Read by the pronouns and the
      numbers screens alike, and cleared as either closes. */
   const [setOwner, setSetOwner] = useState<string | null>(null);
   /* Every teacher's word sets shared with the space, for Material's Word
-     sets screen (0.695) — fetched as it opens, and again after a save. */
+     sets screen (0.696) — fetched as it opens, and again after a save. */
   const [spaceSets, setSpaceSets] = useState<{ pronouns: API.SharedPronouns[]; numbers: API.SharedNumbers[] } | null>(null);
   const loadSpaceSets = useCallback(async () => {
     const r = await API.spaceWordSets();
@@ -6732,7 +6735,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      language's under its name, which is where Numbers and Pronouns are
      opened from. It replaced an icon for each and a "Which language?" step
      before either. */
-  /* Material's Word sets lists every teacher's shared sets (0.695): fetched
+  /* Material's Word sets lists every teacher's shared sets (0.696): fetched
      each time the tab opens, so a set shared from another device is there. */
   useEffect(() => {
     if (tab !== "wordsets" || mineSide) return;
@@ -7441,9 +7444,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * badge on Home while the teacher is in My space, whose cards students
    * never see.
    */
-  const todo: { key: string; icon: string; text: string; course?: string }[] | null = useMemo(() => {
+  const todo: { key: string; icon: string; text: string; course?: string; module?: string }[] | null = useMemo(() => {
     if (mineSide || personalOnly) return null;
-    const out: { key: string; icon: string; text: string; course?: string }[] = [];
+    const out: { key: string; icon: string; text: string; course?: string; module?: string }[] = [];
+    /* First, a course with nothing in it yet (0.695): no module, or
+       modules with no card. Getting a course started comes before
+       anything else on the list. */
+    for (const c of onCourses) {
+      const held = allModules.filter((d) => !d.personal && (d.courses || []).some((l) => l.courseId === c.id));
+      if (!held.length)
+        out.push({ key: `start:${c.id}`, icon: "folder", course: c.id,
+          text: `${c.title} has no modules yet. Create one so your students have something to practise.` });
+      else if (!held.some((d) => (d.cardIds || []).length + (d.parts || []).length > 0))
+        out.push({ key: `fill:${c.id}`, icon: "cards", course: c.id, module: held[0].id,
+          text: held.length === 1
+            ? `${held[0].title} in ${c.title} has no cards yet. Add some so your students have something to practise.`
+            : `The modules in ${c.title} have no cards yet. Add some so your students have something to practise.` });
+    }
     if (lostCards > 0)
       out.push({ key: "lost", icon: "mic", text: lostCards === 1
         ? "A recording is missing on 1 card. Record it again so students can hear it."
@@ -7862,7 +7879,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return run(async () => {
       const r = await API.saveSystem(kind, system, owner);
       const saved = kind === "times" ? readTimeSystem(r.system) : readNumberSystem(r.system);
-      /* Another teacher's shared set (0.695): theirs, so it is the space's
+      /* Another teacher's shared set (0.696): theirs, so it is the space's
          list that is read again, not this teacher's own systems. */
       if (owner) {
         await loadSpaceSets();
@@ -8150,10 +8167,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         kind={newKind}
         courses={courses.map((c) => ({ id: c.id, title: c.title }))}
         choices={choicesOn}
-        mustAsk={mustAskOn}
-        initialLang={knownOn.length === 1 ? soleLangOn : ""}
+        mustAsk={mustAskOn && !namingFor}
+        initialLang={namingFor ? (namingFor.language as LangId) : knownOn.length === 1 ? soleLangOn : ""}
         busy={busy}
-        onClose={() => setNaming(null)}
+        onClose={() => { setNaming(null); setNamingFor(null); }}
         onSave={(title, lang, courseId) =>
           run(
             async () => {
@@ -8161,9 +8178,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                  deck made, then marked as a set (0.633). */
               const r: any = newKind === "unit"
                 ? await API.createUnit(courseId, title)
-                : await API.createModule(title, "", lang || soleLangOn, mineSide);
+                : await API.createModule(title, "", namingFor ? (namingFor.language as LangId) : lang || soleLangOn, mineSide);
               if (newKind === "set" && r && r.deck && r.deck.id) await API.saveSet(r.deck.id, emptySet());
+              /* Made from To do for a course: put in that course. */
+              if (namingFor && newKind === "deck" && r && r.deck && r.deck.id) await API.attachModule(r.deck.id, namingFor.id);
               setNaming(null);
+              setNamingFor(null);
               await refresh();
               if (newKind === "unit") setUnitCourse(courseId);
               if (r && r.deck && r.deck.id) setOpenModule(r.deck.id);
@@ -8694,7 +8714,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     ...((composerFor(langId) || { ranges: () => [] }).ranges()),
     ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
   ];
-  /* One teacher's pronouns (0.695): the named teacher's, or else the
+  /* One teacher's pronouns (0.696): the named teacher's, or else the
      viewer's own where they have any here, or else the earliest written —
      the set a course uses until someone chooses. Material can hold several
      teachers' sets, and "the pronouns" a deck takes is one of them. */
@@ -8768,7 +8788,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
   /* The pronouns into a deck or out of it, from their own screen (0.569):
      every pronoun card of the language, as Add existing cards does it. */
-  /* A module holds one teacher's pronouns (0.695): putting a set in takes
+  /* A module holds one teacher's pronouns (0.696): putting a set in takes
      any other teacher's out, and taking them out takes out every one. */
   const pronounsInModule = (langId: LangId, moduleId: string, on: boolean, set?: Card[]) =>
     run(async () => {
@@ -8783,7 +8803,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }
     }, on ? "Added to the module" : "Taken out of the module");
 
-  /* ---- the Word sets tab (0.569; a tab since 0.689; by teacher since 0.695) ----
+  /* ---- the Word sets tab (0.569; a tab since 0.689; by teacher since 0.696) ----
      My space: the teacher's own sets, each with the way to share it with
      the space. Material: the teacher's own sets, then every set another
      teacher has shared with the space, under that teacher's name, any of
@@ -8965,7 +8985,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       setPronouning(null);
       return null;
     }
-    /* Whose set (0.695): one opened from Material's Word sets is that
+    /* Whose set (0.696): one opened from Material's Word sets is that
        teacher's, as the server last listed it with anything saved here
        since laid over it; otherwise the one set this side shows. */
     const shared = setOwner && !mineSide && spaceSets
@@ -9011,7 +9031,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     if (!systems) {
       return <FetchingSystems name={numLang.name} load={loadSystems} onBack={() => setNumbering(null)} />;
     }
-    /* Another teacher's numbers, opened from Material's Word sets (0.695):
+    /* Another teacher's numbers, opened from Material's Word sets (0.696):
        as the server last listed them, saved back as theirs. */
     const theirs = setOwner && setOwner !== account.handle && !mineSide && spaceSets
       ? spaceSets.numbers.find((n) => n.owner === setOwner && n.lang === numbering) || null
@@ -10149,7 +10169,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               if (waiting) {
                 /* A My space module's numbers are the teacher's own; a
                    space module's are whichever teacher's its course chose
-                   (0.695), so it opens the shared sets to pick from. */
+                   (0.696), so it opens the shared sets to pick from. */
                 const ours = !!d.personal;
                 notes.push({
                   key: "numbers",
@@ -10597,7 +10617,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }}
       /* How many things To do holds, on Home's own button, so they are
          seen from every tab (0.693, the owner's 5a). */
-      counts={todoCount > 0 && !personalOnly ? { courses: todoCount } : undefined}
+      counts={todoCount > 0 && !personalOnly && onCourses.length ? { courses: todoCount } : undefined}
       error={error}
       busy={busy}
     >
@@ -10649,7 +10669,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               languages={languages}
               busy={busy}
               error={error}
-              top={todo ? (
+              /* No To do until there is a course to teach (0.695). */
+              top={todo && onCourses.length ? (
                 <TodoSection
                   items={todo}
                   actionsOf={(item) => {
@@ -10675,6 +10696,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       </>;
                     if (item.key === "meanings")
                       return <Button size="sm" variant="primary" onClick={() => setSplitting(true)}>Review</Button>;
+                    if (item.key.startsWith("start:")) {
+                      const c = onCourses.find((x) => x.id === item.course);
+                      return <Button size="sm" variant="primary" icon="add" onClick={() => {
+                        setSide("space");
+                        setNewKind("deck");
+                        setNamingFor(c || null);
+                        setNaming("new");
+                      }}>Create a module</Button>;
+                    }
+                    if (item.module) {
+                      const m = item.module;
+                      return <Button size="sm" variant="primary" icon="add" onClick={() => {
+                        const d = allModules.find((x) => x.id === m);
+                        if (d && isPathUnit(d)) setUnitCourse(item.course || null);
+                        setOpenModule(m);
+                      }}>Add cards</Button>;
+                    }
                     if (item.course)
                       return <Button size="sm" variant="primary" onClick={() => setCourseView(item.course)}>Open the course</Button>;
                     return null;
@@ -11410,7 +11448,7 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
 }
 
 /*
- * Whose word sets a course uses (0.695; 3a, 5a, 6a, 7a).
+ * Whose word sets a course uses (0.696; 3a, 5a, 6a, 7a).
  *
  * One teacher's set of each kind, so two teachers' versions of a pronoun
  * or a number never reach the same students. Any teacher of the course

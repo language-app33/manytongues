@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.695 — 27 November 2026
+## 0.696 — 27 November 2026
 
 **One teacher's word set per course.** When two teachers had each written
 the pronouns (or the numbers) and both sets reached one course, its
@@ -44,6 +44,21 @@ To check by hand: on a phone, with two teachers whose pronouns are both on
 one course, open the course as a student and check each pronoun comes
 once; then choose the other teacher on the course page and check the
 student gets theirs after a refresh.
+
+## 0.695 — 27 November 2026
+
+**To do helps you get a course started.** In Teaching › Home:
+
+- **A course with no modules** shows "*Arabic 101* has no modules yet.
+  Create one so your students have something to practise." **Create a
+  module** opens the new-module screen, and the module you save is put in
+  that course, in the course's language.
+- **A course whose modules have no cards** shows "*Lesson 1* in
+  *Arabic 101* has no cards yet. Add some so your students have something
+  to practise." **Add cards** opens the module, where you can make a new
+  card, add ones you already have, or import.
+- These come first in To do and count towards the number on Home.
+- **To do is hidden until you have a course** to teach.
 
 ## 0.694 — 27 November 2026
 

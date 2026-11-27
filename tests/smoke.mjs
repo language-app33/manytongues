@@ -596,7 +596,7 @@ const fakeFetch = async (input, opts = {}) => {
       lockedModules.push(body);
       return json({ ok: true });
     }
-    /* Word sets shared with the space, and whose a course uses (0.695):
+    /* Word sets shared with the space, and whose a course uses (0.696):
        nobody here has shared any. */
     if (action === "space-word-sets") return json({ ok: true, pronouns: [], numbers: [] });
     if (action === "course-word-sets") {
