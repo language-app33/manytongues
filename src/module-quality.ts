@@ -674,6 +674,17 @@ export function moduleQuality(cards: Held[], options: QualityOptions): Quality {
   return { score: Math.round(earned), checks, fixes, words: wordRows, untaught };
 }
 
+/** Whether a module has enough in it for its score to be shown:
+    at least one sentence, or at least one recording (0.709). Below
+    that, the number only says the module is new. */
+export function qualityShown(q: Quality): boolean {
+  if (q.score === null) return false;
+  const has = (key: string) => q.checks.find((c) => c.key === key);
+  const sentences = has("long");
+  const recordings = has("recordings");
+  return !!(sentences && sentences.applies) || !!(recordings && recordings.share > 0);
+}
+
 /** Which colour a score is shown in. */
 export const qualityTone = (score: number): "good" | "fair" | "poor" =>
   score >= GOOD_FROM ? "good" : score >= FAIR_FROM ? "fair" : "poor";

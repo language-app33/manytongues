@@ -9469,3 +9469,12 @@ way; under it one line per mode (`MODE_SAYS`). The rows of switches are
 drawn only when the mode is `custom`. Under a preset, switches left in
 `off` from an earlier Custom still apply (src/course-practice.ts is
 unchanged), and one `Help` line says how many.
+
+## The quality score waits until there is something to score, and is never red (0.709)
+
+A teacher's first module opened on 11 out of 100 in red. `qualityShown`
+in src/module-quality.ts: a score, and either a sentence (the `long` check
+applies exactly when there is one) or a recording (`recordings` has a share
+above 0). `QualityRing`, `QualityMark` and the module page's quality `Field`
+draw nothing below that; the ring's dash state is gone. `poor` is drawn in
+the neutral muted colour, never rose; `qualityTone` is unchanged.

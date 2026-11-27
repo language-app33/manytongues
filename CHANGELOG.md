@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.709 — 27 November 2026
+
+**A module's quality score waits until there is something to score.** A
+new module of plain words no longer shows a score. The score appears, on the
+module's tile and on its page, once the module has at least one sentence or
+one recording. A low score is now shown in a neutral colour, never red. The
+line above the score now says why it favours sentences: "Words stick better
+when students meet them in sentences." The scoring rules themselves have not
+changed. Trade-off: a teacher with a words-only module sees no tips until
+they add a first recording or sentence.
+
 ## 0.708 — 27 November 2026
 
 **A course's Exercises tab fits on one screen.** It now shows the four

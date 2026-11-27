@@ -94,7 +94,7 @@ import type { NumberSystem, TimeSystem } from "./numbers/types.ts";
 import { partsNow } from "./numbers/types.ts";
 import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
 import type { PartSentences } from "./review.ts";
-import { moduleQuality, FIXES_SHOWN, qualityTone } from "./module-quality.ts";
+import { moduleQuality, FIXES_SHOWN, qualityTone, qualityShown } from "./module-quality.ts";
 import { moduleKind, moduleKindCap } from "./modules.ts";
 import type { ModuleKind } from "./modules.ts";
 import type { Quality } from "./module-quality.ts";
@@ -5653,7 +5653,7 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
    ------------------------------------------------------------------ */
 
 function QualityMark({ quality }: { quality?: Quality | null }) {
-  if (!quality || quality.score === null) return null;
+  if (!quality || quality.score === null || !qualityShown(quality)) return null;
   return (
     <span className={`at-quality ${qualityTone(quality.score)}`} title="Quality, out of 100">
       {` · Quality ${quality.score}`}
@@ -5663,15 +5663,16 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
 
 /* A module's quality on its tile in the list (0.689, the owner's 3b and
    4b): the number alone, in a ring filled as far round as the score goes,
-   in the score's colour. A module with no score yet — nothing in it to
-   judge — has the empty ring and a dash, so every tile lines up the same. */
+   in the score's colour. A module with no sentence and no recording yet
+   has no ring at all (0.709): its number would only say it is new. */
 const RING_R = 17;
 const RING_LEN = 2 * Math.PI * RING_R;
 function QualityRing({ quality }: { quality?: Quality | null }) {
-  const score = quality && quality.score !== null ? quality.score : null;
-  const tone = score === null ? "none" : qualityTone(score);
-  const said = score === null ? "Quality: not scored yet" : `Quality: ${score} out of 100`;
-  const filled = score === null ? 0 : Math.max(0, Math.min(100, score)) / 100;
+  if (!quality || quality.score === null || !qualityShown(quality)) return null;
+  const score = quality.score;
+  const tone = qualityTone(score);
+  const said = `Quality: ${score} out of 100`;
+  const filled = Math.max(0, Math.min(100, score)) / 100;
   return (
     <span className={`at-qring ${tone}`} role="img" aria-label={said} title={said}>
       <svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
@@ -5686,7 +5687,7 @@ function QualityRing({ quality }: { quality?: Quality | null }) {
           />
         ) : null}
       </svg>
-      <span className="at-qringnum" aria-hidden="true">{score === null ? "–" : score}</span>
+      <span className="at-qringnum" aria-hidden="true">{score}</span>
     </span>
   );
 }
@@ -5866,7 +5867,7 @@ function UnitChecklist({ live, problems, drafts, textOf, busy, onPublish }: {
 /* What the score is made of, said under the Deck quality heading before
    the score rather than after it, as the card editor explains a section. */
 const QUALITY_LEDE =
-  "Modules with higher scores tend to achieve better learning outcomes.";
+  "Words stick better when students meet them in sentences. Add sentences that use this module's words to raise the score.";
 
 /* The picture beside each suggestion: what it asks you to go and add. */
 const FIX_ICON: Record<string, string> = {
@@ -5887,9 +5888,7 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
   lang: Partial<Lang>;
   onOpenCard: (id: string) => void;
 }) {
-  if (quality.score === null) {
-    return <Help>Nothing to score yet: add words and sentences that use them.</Help>;
-  }
+  if (quality.score === null) return null;
   const fixes = quality.fixes.slice(0, FIXES_SHOWN);
   const gainOf = (g: number) => Math.max(1, Math.round(g));
   const reach = Math.min(100, quality.score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
@@ -10074,13 +10073,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   a filter has left on screen. How much of it is practised
                   in context is part of the same score, so it is read under
                   it rather than under a heading of its own. */}
-              <Field label={`${KindW} quality`} lede={QUALITY_LEDE}>
-                {openQuality && (
+              {/* Only once there is a sentence or a recording to score
+                  (0.709); nothing in its place before then. */}
+              {openQuality && qualityShown(openQuality) && (
+                <Field label={`${KindW} quality`} lede={QUALITY_LEDE}>
                   <ModuleQuality quality={openQuality} cards={held}
                     lang={langOfModule(d) || LANGUAGES[DEFAULT_LANGUAGE]}
                     onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
-                )}
-              </Field>
+                </Field>
+              )}
             </div>
 
             {/* A personal set's wording, lists and ticks (0.632). Only on a
