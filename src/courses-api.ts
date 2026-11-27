@@ -404,7 +404,7 @@ export const setModuleParts = (moduleId: string, parts: string[]) =>
    null for an ordinary deck again (0.629). See src/sets.ts. */
 export const saveSet = (moduleId: string, set: SetConfig | null) => call("save-set", { body: { deckId: moduleId, set } });
 export const myCards = () => call("my-cards");
-/* Word sets shared with a space, and whose a course uses (0.693). A
+/* Word sets shared with a space, and whose a course uses (0.694). A
    course uses one teacher's set of each kind: the one chosen on it, or the
    earliest written of those reaching it — see wordSetPick on the server. */
 export type WordSetKind = "numbers" | "pronouns";
@@ -453,7 +453,7 @@ export type SaveExtra = {
   decksWere?: string[];
   /* Save and publish: what this save writes goes out to students too. */
   publish?: boolean;
-  /** A new pronoun written into another teacher's shared set (0.693), which stays theirs. */
+  /** A new pronoun written into another teacher's shared set (0.694), which stays theirs. */
   forOwner?: string;
 };
 /* `org` is the space the save was made in, for one queued offline and sent
@@ -506,7 +506,7 @@ export const openUnit = (courseId: string, moduleId: string, open: boolean) =>
    carries the document that is there — see `stale-system` in explain. */
 export const mySystems = (): Promise<{ ok: true; systems: any[]; signed?: Record<string, number | null> }> =>
   call("my-systems");
-/* `owner` saves a set another teacher shared with the space (0.693). */
+/* `owner` saves a set another teacher shared with the space (0.694). */
 export const saveSystem = (
   kind: "numbers" | "times",
   system: unknown,
