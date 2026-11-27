@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.729 — 27 November 2026
+## 0.731 — 27 November 2026
 
 **Modules has the line Cards has.** Teaching › Material › Modules now shows
 the same quiet line under its bar: how many modules there are, and the
@@ -19,6 +19,35 @@ order they are in, which you tap to change.
   order waits for Apply.
 - **It starts as before:** oldest added first, the order the tab has always
   had.
+
+## 0.730 — 27 November 2026
+
+**The app opens on older iPhones and iPads.** On Safari older than 16.4
+(an iPhone or iPad on iOS 16.3 or earlier, or a Mac not updated since
+early 2023) the app showed a blank page and nothing else. It now starts
+there. On the oldest of them, iOS 15 and before, some of the app's look
+may still be missing; that has not been seen on a real device.
+
+**Sounds come back after an interruption on an iPhone.** After a phone
+call, Siri, or the app being left in the background, the sounds for a
+right or wrong answer could stay silent until the app was closed and
+opened again. They now come back with the next answer. To be checked on a
+real iPhone: it cannot be made to happen on a computer.
+
+Both came out of a check of the whole app in Safari's own engine
+(`docs/AUDIT-safari-ios.md`). Practising, the tabs and the teacher's card
+screens ran in it without a fault, in a private window too.
+
+## 0.729 — 27 November 2026
+
+**Every module says what kind it is, by its name.** In Teaching › Material
+› Modules, each tile now has a small outlined badge right after the
+module's name: **Deck**, **Unit** or **Personal set**. The words "Unit"
+and "Personal set" are gone from the line under the name, which now says
+only what needs looking at, who can see the module, and its score. On a
+phone, a long name pushes the badge onto the next line. Other lists of
+modules, such as a course's, are unchanged for now.
+
 
 ## 0.728 — 27 November 2026
 

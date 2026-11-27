@@ -6037,7 +6037,7 @@ export const CARD_SORTS: Record<
 };
 
 /*
- * The orders the Modules tab offers (0.729), in the Sort panel's words as
+ * The orders the Modules tab offers (0.731), in the Sort panel's words as
  * CARD_SORTS gives the Cards tab's. `cmp` puts the "up" order first; the
  * list turns it round for "down". "Down" is each one's usual order —
  * oldest first, newest changes, A to Z — because the panel keeps the
@@ -6993,7 +6993,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     [courses, off]
   );
   /* The Modules tab's order, in the line under its bar as on Cards
-     (0.729). A module carries no date it was made, but the server sends
+     (0.731). A module carries no date it was made, but the server sends
      them in the order they were made, so that order is "Added"; until
      somebody picks another it is oldest first, the order the tab has
      always had. */
@@ -11272,6 +11272,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   return (
                     <Tile
                       title={d.title}
+                      /* Every module says what kind it is, right after its
+                         name (0.729, the owner's 1a, 3a, 4a). */
+                      badge={<span className="at-kindbadge" data-el="module-kind">{moduleKindCap(d)}</span>}
                       /* One line under the name (0.715, the owner's 1c):
                          what in it needs looking at, who can see it, and
                          its quality score last (0.720, the owner's wish:
@@ -11300,13 +11303,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         ) : (
                           "Not in a course yet — nobody can see it"
                         );
+                        /* A module's kind is its badge, by the name (0.731):
+                           "Unit" and "Personal set" are off this line. */
                         const parts = [
-                          /* A unit says so (0.688, the owner's 1b): its place
-                             on each path is on its own screen. */
-                          isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
                           waiting ? <span key="w">{waiting}</span> : null,
                           lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
-                          !d.personal && d.set ? <span key="s">Personal set</span> : null,
                           <span key="r">{reach}</span>,
                           score !== null ? <span key="q" data-el="module-score">{`score: ${score}`}</span> : null,
                         ].filter(Boolean) as React.ReactElement[];

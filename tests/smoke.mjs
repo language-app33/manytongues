@@ -13499,15 +13499,24 @@ const openPronounTables = async () => {
   const cardsNow = [...document.querySelectorAll(".at-deckcard")];
   const tiles = cardsNow.map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const tileOf = (/** @type {RegExp} */ re) => tiles.find((t) => re.test(t)) || "";
-  /* The label on its own since 0.689, the language and size it led having
-     come off the tile. */
-  const unitLabel = (/** @type {RegExp} */ re) => {
-    const el = cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "")));
-    return ((el && el.querySelector('[data-el="unit-label"]')) || {}).textContent || "";
+  /* Since 0.729 every module's kind is a badge right after its name, and
+     the line under the name no longer starts with "Unit". */
+  const tileNamed = (/** @type {RegExp} */ re) =>
+    cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
+  const kindOf = (/** @type {RegExp} */ re) => {
+    const el = tileNamed(re);
+    return ((el && el.querySelector('.at-decktitlerow > [data-el="module-kind"]')) || {}).textContent || "";
   };
-  check("in Material's Modules, a unit is labelled Unit and a deck is not",
-    unitLabel(/Greetings unit/) === "Unit" && unitLabel(/Family unit/) === "Unit" && !!tileOf(/Lesson 1/) && !unitLabel(/Lesson 1/),
-    tiles.join(" | ").slice(0, 300) || "no tiles");
+  const lineOf = (/** @type {RegExp} */ re) => {
+    const el = tileNamed(re);
+    return ((el && el.querySelector(".at-deckmain > .at-reach")) || {}).textContent || "";
+  };
+  check("in Material's Modules, each tile's badge says Deck or Unit after the name",
+    kindOf(/^Greetings unit$/) === "Unit" && kindOf(/^Family unit$/) === "Unit" && kindOf(/^Lesson 1$/) === "Deck",
+    cardsNow.map((t) => `${(t.querySelector(".at-decktitle") || {}).textContent} [${(t.querySelector('[data-el="module-kind"]') || {}).textContent || ""}]`).join(" | ") || "no tiles");
+  check("a unit's line under its name no longer starts with Unit",
+    !!tileOf(/Greetings unit/) && !/^\s*Unit\b/.test(lineOf(/^Greetings unit$/)) && !document.querySelector('[data-el="unit-label"]'),
+    lineOf(/^Greetings unit$/) || "(no line)");
   /* A module's tile (0.689): no language or size under its title, and
      Export and Delete behind three dots that do not open the module when
      pressed. Since 0.720 its quality is " · score: N" at the end of the
@@ -13769,7 +13778,11 @@ const openPronounTables = async () => {
   backOut();
   await sleep(400);
   const setTile = [...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Our family/.test(t.textContent || ""));
-  check("a set's tile in the list says Personal set", !!setTile && /Personal set/.test(setTile.textContent || ""), setTile ? setTile.textContent || "" : "no tile");
+  /* Since 0.729 in its badge, by the name, and no longer in the line under it. */
+  check("a set's tile has a Personal set badge, and its line does not say it again",
+    !!setTile && ((setTile.querySelector('[data-el="module-kind"]') || {}).textContent || "") === "Personal set"
+      && !/Personal set/.test((setTile.querySelector(".at-deckmain > .at-reach") || {}).textContent || ""),
+    setTile ? setTile.textContent || "" : "no tile");
   await openTile(/Our family/);
   check("a set's deck has its section, with no switch to turn it off",
     !!section() && !/^(On|Off)$/m.test([...(section() || document).querySelectorAll(".at-segmented button")].map((b) => (b.textContent || "").trim()).join("\n")),
