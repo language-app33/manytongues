@@ -34,6 +34,7 @@ const code = filesIn(src).filter((f) => !f.endsWith(".css")).map((f) => readFile
 const BUILT = new Set([
   /* CardTable's cells: at-cardtable-${column key} — shared.tsx, with the
      keys from the card columns in spaces.tsx. */
+  "at-cardtable-decks",
   "at-cardtable-meaning",
   "at-cardtable-status",
   "at-cardtable-word",

@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.718 — 27 November 2026
+
+**The card table fits a desktop page, and its three dots have no border.**
+In the card table, a card's modules wrap onto two lines rather than
+widening the table, so even with a long sentence in the first column the
+whole table, Status included, fits the page on a desktop. The three dots
+at the end of each row have no border, as on the tiles.
+
+On a phone the table still scrolls sideways: only Card and Meaning fit.
+
 ## 0.717 — 27 November 2026
 
 **Card tiles and the card table, tidied.**
@@ -19,9 +29,6 @@ and moves once per batch of work you would notice, not once per commit.
   after 20 characters, with "…", so a long sentence no longer makes the
   column wide; hover over it to read the whole thing. The same goes for a
   learner's table.
-
-To check by hand: a long card on a desktop still makes the table a little
-wider than the page, so Status may need a short scroll sideways.
 
 ## 0.716 — 27 November 2026
 
