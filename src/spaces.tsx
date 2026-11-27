@@ -3420,9 +3420,17 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         {`${d.ownerName} · ${moduleSize(d)}`}
                       </>
                     }
+                    /* Behind three dots, as on Material's tiles (0.692):
+                       the app's one panel of actions on a thing. */
                     actions={
-                        <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
+                      <MoreMenu
+                        label={`More for ${d.title}`}
+                        title={d.title}
+                        items={[{
+                          label: `Delete ${moduleKind(d)}`,
+                          icon: "delete",
+                          danger: true,
+                          onClick: () => {
                             if (d.locked && MODULE_LOCKS) {
                               snack(lockedDeleteNote([d.title]), "warn");
                               return;
@@ -3443,7 +3451,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               ),
                               action: () => API.deleteModule(d.id),
                             });
-                          }} />
+                          },
+                        }]}
+                      />
                     }
                     footer={
                       <TileNote live={d.courseTitles.length > 0}>

@@ -8,6 +8,12 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.692 — 27 November 2026
+
+**Admin › Modules tiles use the three dots too.** Each module's Delete
+button there has moved behind three dots that open the same panel as in
+Material, headed with the module's name. Delete still asks first.
+
 ## 0.691 — 26 November 2026
 
 **A card's status and "Filter by who made it" open the same panel too.**
