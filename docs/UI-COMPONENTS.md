@@ -174,8 +174,14 @@ clicks stop at it, so a tile it sits on does not open as well.
 
 ### `SheetAction`
 One row of that panel: its icon in a round well, its name, and a line under
-it where it cannot be done and why. `icon, label, note, danger, disabled,
+it — where it cannot be done and why, or, in a panel that offers ways of
+doing one thing, what each does. `icon, label, note, danger, disabled,
 on, onClick`
+
+A module's green + opens one of these panels (0.735): "Add to the deck
+“…”" with **New card** and **Cards you already have**, each with its
+`note`. A list whose + could mean more than one thing asks this way rather
+than adding a second worded button under the list.
 
 `on` marks the choice that holds now, edged and ticked, where the panel
 chooses one of a few rather than acting (0.691): a card's status

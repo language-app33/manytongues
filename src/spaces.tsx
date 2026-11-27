@@ -5942,7 +5942,7 @@ const FIX_ICON: Record<string, string> = {
 
 /* What the top suggestions would take the score to, and the score's
    colour: worked out once for the quality row on the module's screen and
-   for the advice screen it opens (0.734), so the two draw the same bar. */
+   for the advice screen it opens (0.735), so the two draw the same bar. */
 function qualityPlan(quality: Quality) {
   const score = quality.score || 0;
   const fixes = quality.fixes.slice(0, FIXES_SHOWN);
@@ -5964,7 +5964,7 @@ function QualityBar({ quality }: { quality: Quality }) {
 }
 
 /*
- * A module's quality as one row on its screen (0.734, the owner's choice):
+ * A module's quality as one row on its screen (0.735, the owner's choice):
  * the score, how many ways there are to raise it, and its bar. The advice
  * itself is a press away on a screen of its own, so the cards follow
  * straight after on the first screen rather than under three cards of
@@ -5998,7 +5998,7 @@ function QualityRow({ quality, kindW, onOpen }: { quality: Quality; kindW: strin
  * A deck's quality (0.561): the score with a bar and where the top
  * suggestions would take it; the suggestions, each with what to do,
  * why, what it is worth and, where it is about particular cards, those
- * cards to tap (0.563). On a screen of its own since 0.734, each
+ * cards to tap (0.563). On a screen of its own since 0.735, each
  * suggestion a row that opens: closed, the rows are compared by their
  * points at a glance; open, one says why and which words. How many more
  * sentences a word needs is in its chip's title, no longer a "+2" on it.
@@ -6917,9 +6917,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The open deck, being edited: null while it is only read. */
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
   const [discardingModule, setDiscardingModule] = useState(false);
-  /* The open module's quality advice, on a screen of its own (0.734). */
+  /* The open module's quality advice, on a screen of its own (0.735). */
   const [qualityOpen, setQualityOpen] = useState(false);
-  /* The panel the green + opens inside a module (0.734): a new card or
+  /* The panel the green + opens inside a module (0.735): a new card or
      cards the teacher already has. */
   const [addingHow, setAddingHow] = useState(false);
   /* Both belong to the module that was open: another module, or none,
@@ -10108,7 +10108,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* No Edit and no Save (0.732, the owner's 1a): the name is renamed
            by its pencil, and Export and Delete wait behind three dots. */
         action={
-          /* The dots alone, no outline (0.734, the owner's wish), as on
+          /* The dots alone, no outline (0.735, the owner's wish), as on
              a module's tile. */
           <MoreMenu
             bare
@@ -10389,7 +10389,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             </Nudge>
           ) : undefined}
           match={matchEntry}
-          /* One green + for both ways of filling a module (0.734, the
+          /* One green + for both ways of filling a module (0.735, the
              owner's choice): it asks which, in place of a second button
              under the list. */
           onNew={() => setAddingHow(true)}
@@ -10422,7 +10422,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               </div>
             ) : null}
 
-        {/* The advice behind the quality row (0.734), on its own screen.
+        {/* The advice behind the quality row (0.735), on its own screen.
             Drawn before the card's, so a card opened from it comes up
             over it and Back returns to the advice. */}
         {qualityOpen && openQuality && qualityShown(openQuality) && (
@@ -10436,7 +10436,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           </Screen>
         )}
 
-        {/* What the green + adds (0.734): the module's kind and its name
+        {/* What the green + adds (0.735): the module's kind and its name
             in quotes, since italics do not exist in every script. */}
         {addingHow && (
           <PickSheet title={`Add to the ${kindW} \u201c${d.title}\u201d`} className="at-addhow" onClose={() => setAddingHow(false)}>

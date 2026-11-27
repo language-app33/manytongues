@@ -366,7 +366,7 @@
 .at-qualitybar > .now.poor { background: var(--muted); }
 .at-qualitybar > .then { background: var(--jade-soft); border-radius:0 999px 999px 0; opacity:.7; }
 .at-qualityreach { margin:12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
-/* The quality row on a module's screen (0.734): a tile like the app's
+/* The quality row on a module's screen (0.735): a tile like the app's
    others, white and outlined, which opens the advice. Never the green
    outline and fill that mean "chosen". */
 .at-qualityrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; cursor:pointer;
@@ -382,7 +382,7 @@
 /* Each suggestion a card of its own: what to add, what it is worth, and
    the words it is about, each one tap from its card. */
 .at-qfixes { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
-/* Each a row that opens (0.734): picture, what to do, points, chevron;
+/* Each a row that opens (0.735): picture, what to do, points, chevron;
    open, why and which words under it. */
 .at-qfix { border:2px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
 .at-qfixhead { display:flex; align-items:center; gap:12px; width:100%; padding:12px 14px; cursor:pointer;
@@ -866,7 +866,7 @@
   font-weight:400; letter-spacing:0; text-transform:none; color: var(--muted);
   unicode-bidi:isolate; }
 .at-numhint { margin:0 0 10px; font-size:13px; line-height:1.5; }
-/* Inside a part (0.734): an explanation shared by a run of numbers, said
+/* Inside a part (0.735): an explanation shared by a run of numbers, said
    once above them across the whole width; and a run of numbers with two
    boxes each, as rows — the number, then its two boxes under the run's
    column headings, each box with how it sounds and its recording under it
@@ -1139,10 +1139,10 @@ fieldset.at-cardlock:disabled .at-reqstar { display:none; }
    words where it comes up, no tick-boxes (0.732, the owner's 5a). */
 .at-practice.said .at-practicerow { grid-template-columns: minmax(0, 1fr); }
 .at-practicesaid { flex: 0 0 100%; font-size: 13px; color: var(--muted); }
-/* "Add to the deck “…”" (0.734): a long name wraps inside the heading
+/* "Add to the deck “…”" (0.735): a long name wraps inside the heading
    rather than pushing the close button off the panel. */
 .at-addhow h3 { overflow-wrap:anywhere; }
-/* Word sets › Numbers (0.734): what students can do now, large, with no
+/* Word sets › Numbers (0.735): what students can do now, large, with no
    box, fill or border — it is a statement, not something to press — and
    a thin step for each part, green once it is ready. */
 .at-numhero { margin:4px 0 0; }

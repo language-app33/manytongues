@@ -9718,3 +9718,67 @@ learner's Courses page and card grids look and behave as before.
   key handling rather than copying it, and `useNarrow` says no where there
   is no `matchMedia`, so the smoke walk keeps checking the table.
 
+
+## A calmer module screen and a more rewarding Numbers set (0.735)
+
+All chosen by the owner on a page of mock-ups.
+
+- **Quality as a row and a screen, so the cards are on the first screen.**
+  The score and three cards of advice stood between a module's name and
+  its cards. The row (`QualityRow`) says the score, how many ways there
+  are to raise it and how many sentences to look at, with the same bar
+  (`QualityBar`, drawn from `qualityPlan` so the row and the screen agree).
+  The advice (`ModuleQuality`) moved to a `Screen` of its own, drawn
+  before the card's so a card opened from a word comes up over it and
+  Back returns to the advice. The row is white and outlined like a tile:
+  it opens something, it is not chosen.
+- **Advice as rows, compared by their points.** Closed, each piece of
+  advice is its picture, what to do and its points, so the three can be
+  weighed at a glance; open, it says why and lists its words. The "+2" on
+  each word chip told how many more sentences the word needs; it was
+  noise next to the word, and it lives on in the chip's `title`, which a
+  computer shows on pointing and a screen reader reads.
+- **One + inside a module.** The green + used to make a new card at once
+  and a second button under the list added existing ones. The + now asks
+  which (`PickSheet` with two `SheetAction` rows). The panel names the
+  module's kind and its name in curly quotes — "Add to the deck “At
+  home”" — rather than in italics, because italics do not exist in every
+  script a module can be named in. The Cards tab's own + is untouched: a
+  card made there belongs to no module yet. The empty module's box keeps
+  its two buttons.
+- **A finished part is marked by a tick, never by the green outline and
+  fill.** Green outline and fill mean "chosen" everywhere else in the app
+  (a course pill, a ticked row). A finished part is an ordinary tile with
+  a solid green tick before its name.
+- **A fixed sample line.** A finished part shows its first four numbers
+  as the app says them, always from the start of the part, so the line
+  does not change between visits (the owner asked). In the language's own
+  numerals where it has them, one line, cut with … when long.
+- **The headline has no box.** "Students can count to 19" is a statement,
+  not something to press, so it is large text on the page with a muted
+  line and a row of steps, and no fill or border. It counts the unbroken
+  run of finished parts from the start, because a later part ready on its
+  own does not let a student count up to it. Before anything is written it
+  asks for the first part's missing words, counted as that part's tile
+  counts them, so the two never disagree. There is no number-to-words
+  helper, so it says "10 words", not "ten words".
+- **The moment of finishing.** The editor keeps, in a ref, which parts
+  were open when it opened and after each save that went through; a save
+  that opens a part says so in one message (the last part named, "and N
+  more" for the rest) and marks the tile "Just finished" with one soft
+  glow, held in state that dies with the editor, so leaving Numbers clears
+  it. No animation under `prefers-reduced-motion`.
+- **Parts named by their range.** "Numbers" before each part was said six
+  times under a screen already called Numbers. The labels are data in
+  `NUMBER_RANGES`; `partName` puts "Numbers · " back wherever a part's
+  name stands alone (its screen's title, its entry in a module, the word
+  set picker, its skill card), and `spanWords` gives the figures for
+  sentences ("A number from 0 to 9"), where "Thousands and millions"
+  would not read.
+- **Rows only for numbers with exactly two forms.** Two boxes fit side by
+  side on a phone; three do not, and one has nothing to sit beside. So 3
+  to 19 are rows under column headings, and 0, 1 and 2 keep a box each,
+  with a single form now labelled too so it looks like its neighbours. A
+  run of numbers with the same explanation and the same number of boxes
+  shares one explanation above it. The boxes keep their names
+  (`"3, counting"`), which the tests and screen readers go by.

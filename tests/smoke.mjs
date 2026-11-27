@@ -9832,7 +9832,7 @@ const openPronounTables = async () => {
     check("and under it its courses and quality, with no name box",
       labels().join(" | ") === "Courses | Deck quality" && !must(thisModule(), "the block").querySelector("input"),
       labels().join(" | ") || "(no first block)");
-    /* Deck quality is one row since 0.734 (the owner's choice): the
+    /* Deck quality is one row since 0.735 (the owner's choice): the
        score, its bar and how many ways to raise it, opening the advice on
        a screen of its own, so the cards follow straight after. */
     {
@@ -10050,7 +10050,7 @@ const openPronounTables = async () => {
     await sleep(150);
     await stopSelecting(sheet);
   }
-  /* One green + inside a module since 0.734 (the owner's choice): no
+  /* One green + inside a module since 0.735 (the owner's choice): no
      "Add existing cards" button under the list; the + asks which. */
   check("inside a deck with cards there is no Add existing cards button in the list",
     !buttonNamed(/^Add existing cards/) && !document.querySelector(".at-addexisting"),
@@ -10269,7 +10269,7 @@ const openPronounTables = async () => {
 {
   const { NumberSystemEditor } = await import(path.join(out, "number-system-editor.js"));
   const { SnackbarProvider } = await import(path.join(out, "shared.js"));
-  /** Every message the screen put up, in order (0.734). */
+  /** Every message the screen put up, in order (0.735). */
   const snacks = /** @type {string[]} */ ([]);
   const { LANGUAGES } = await import(path.resolve("src/languages.ts"));
   const { emptyNumberSystem, emptyTimeSystem, readNumberSystem } = await import(path.resolve("src/numbers/schema.ts"));
@@ -10381,7 +10381,7 @@ const openPronounTables = async () => {
       !!tileNamed("20 to 99") && !!tileNamed("Thousands and millions") &&
       !!tileNamed("A billion and over"),
     tiles.map((t) => (t.textContent || "").trim()).join(" | "));
-  /* Since 0.734 (the owner's choice) the screen opens on what students can
+  /* Since 0.735 (the owner's choice) the screen opens on what students can
      do now, as a headline with no box, and the parts are named by their
      range alone, under no heading of their own. */
   const heroText = (/** @type {string} */ sel) => ((panel().querySelector(`.at-numhero ${sel}`) || {}).textContent || "").trim();
@@ -10483,7 +10483,7 @@ const openPronounTables = async () => {
     up().querySelectorAll(".at-numtile").length + up().querySelectorAll(".at-numrow.at-numpair").length === 10 &&
       !boxNamed("10, counting") && !boxNamed("40, counting"),
     `${up().querySelectorAll(".at-numtile").length} panels, ${up().querySelectorAll(".at-numrow.at-numpair").length} rows`);
-  /* Since 0.734 (the owner's choice) a number with two boxes is a row:
+  /* Since 0.735 (the owner's choice) a number with two boxes is a row:
      its figure, then its two boxes side by side under column headings. A
      number with one box (0) or three (1 and 2) keeps a panel of its own. */
   const tileOf = (/** @type {string} */ n) =>
@@ -10820,7 +10820,7 @@ const openPronounTables = async () => {
     (up().textContent || "").slice(0, 200).replace(/\s+/g, " "));
   await goBack();
 
-  /* The moment a part becomes ready (0.734, the owner's choice): saving
+  /* The moment a part becomes ready (0.735, the owner's choice): saving
      that finishes 0 to 9 says so in a message, and its tile glows and is
      marked Just finished until the teacher leaves Numbers. Drawn afresh
      on an empty set, typed in box by box, as a teacher would. */

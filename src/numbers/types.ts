@@ -508,7 +508,7 @@ export const NUMBER_CEILING = 99999999999;
  * a million and below, so the thousands stay as open as they were.
  */
 /*
- * Named by their range alone since 0.734 (the owner's choice): on the
+ * Named by their range alone since 0.735 (the owner's choice): on the
  * Numbers screen, under the language's name, "Numbers" before each was
  * said six times over. Where a part's name stands on its own — a screen's
  * title, an entry in a module, a skill card — partName puts it back.
@@ -603,14 +603,14 @@ export function partsNow(parts: string[]): string[] {
 }
 
 /** A part's name where it stands on its own, away from the Numbers screen
-    that says what it is a part of: "Numbers · 0 to 9" (0.734). A part of
+    that says what it is a part of: "Numbers · 0 to 9" (0.735). A part of
     the clock is named in full already. */
 export function partName(range: { kind?: string; label: string }): string {
   return range.kind === "numbers" ? `Numbers · ${range.label}` : range.label;
 }
 
 /** A part's numbers in figures, for a sentence: "0 to 9", "1,000 to
-    999,999,999", "1,000,000,000 and over" (0.734). */
+    999,999,999", "1,000,000,000 and over" (0.735). */
 export function spanWords(range: { from: number; to: number }): string {
   return range.to >= NUMBER_CEILING
     ? `${range.from.toLocaleString("en")} and over`

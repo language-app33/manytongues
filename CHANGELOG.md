@@ -8,6 +8,74 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.735 — 27 November 2026
+
+**A calmer module screen and a more rewarding Numbers set**, as chosen on
+the page of mock-ups.
+
+**A module's screen**
+
+- **Deck quality is one row** under Courses: the score, its bar and "3
+  ways to raise it". Tapping it opens the advice on a screen of its own,
+  so the cards follow straight after, on the first screen.
+- **On that advice screen each piece of advice is one row**: its picture,
+  what to do and its points. Tapping a row opens its explanation and its
+  words. The small "+2" beside each word is gone (it still shows when you
+  point at the word on a computer).
+- **One green + in the card list.** The separate "Add existing cards"
+  button is gone. The + opens a panel headed "Add to the deck “At home”"
+  (or "the unit", "the personal set") with two rows: **New card** and
+  **Cards you already have**, each with a picture and a line saying what
+  it does. Import stays in the three dots.
+- "Students in these courses see this deck." stays.
+
+**Word sets › Numbers**
+
+- **The top of the screen says what students can do now**, large and with
+  no box: "Students can count to 19", then "2 of 6 parts ready. Next: 20
+  to 99." and a row of steps that fill in. Before anything is written it
+  reads "Write 10 words to begin" with the instruction under it. "Any
+  teacher here can edit it." is now small print at the foot.
+- **A finished part** keeps its white tile and grey outline and gains a
+  solid green tick in front of its name. Under the name are the part's
+  first numbers as the app says them, always the same ones ("٠ صفر · ١
+  واحد · ٢ اتنين…").
+- **A part under way** shows a thin bar of how much is written.
+- **When saving finishes a part**, a message says "0 to 9 is ready.
+  Students can now be asked these numbers. Next: 10 to 19.", and that
+  part's tile glows green for a moment and is marked **Just finished**
+  until you leave the screen. No movement for people whose phone is set
+  to reduce motion.
+- **Parts are named by their range alone**: "0 to 9", "10 to 19", "20 to
+  99", "100 to 999", "Thousands and millions", "A billion and over". The
+  "Parts" heading is gone. Where a part's name stands on its own — the
+  part's own screen, an entry in a module's card list, the list of word
+  sets to add to a module — it reads "Numbers · 0 to 9".
+
+**Inside one part**
+
+- **An explanation shared by several numbers is said once**, above them,
+  in place of once per number.
+- **A number with exactly two forms is one row**: its figure, then its two
+  boxes side by side under column headings.
+- A number with one form (0) or three (1 and 2) keeps a box of its own
+  with its forms stacked full width, each labelled.
+- Once a word is typed, its transliteration box and Record button appear
+  under it, as before. In a row they sit under each box, in the same
+  column, so a filled row is taller than the empty rows in the pictures.
+- The screen still opens with Modules.
+
+The learner's side is unchanged, except that a numbers card is named
+"Numbers · 0 to 9" where it was "Numbers 0 to 9".
+
+**Trade-offs:** quality advice is one press further, and its words a
+second press; a new card inside a module is two presses; the boxes in a
+row are about half the width they were.
+
+**To check by hand:** on a real phone, typing Arabic into the half-width
+boxes with the phone's own keyboard and with the on-screen keys, and how
+the green glow looks.
+
 ## 0.734 — 27 November 2026
 
 **Two tidy-ups on the teacher screens.**
