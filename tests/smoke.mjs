@@ -4875,10 +4875,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
-  check("and it opens the app's menu of what can be done from there",
-    statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
-  if (statusBtn) click(statusBtn);
+  /* In the app's one panel since 0.690: a row per choice, the one that
+     holds now ticked. */
+  const statusLines = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
+    .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
+  check("and it opens the app's panel of what can be done from there, the status now ticked",
+    statusLines.join(" | ") === "Published ✓ | Unpublish", statusLines.join(" | ") || "(no panel)");
+  click(document.querySelector('.at-statussheet [aria-label="Close"]'));
   await sleep(100);
   /* On the title's own line since 0.484, as icons, each named out loud,
      with Export by the "This card" heading rather than among them. */
@@ -8536,7 +8539,7 @@ const openPronounTables = async () => {
 {
   takeSaves = true;
   const frameNow = () => /** @type {any} */ (document.querySelector(".at-screen.bare") || document);
-  /* Said in To do on Home since 0.690, not over the Cards list. */
+  /* Said in To do on Home since 0.693, not over the Cards list. */
   check("the Cards list no longer carries a line about cards with more than one meaning",
     !/more than one meaning on/.test(frameNow().textContent || ""), "(line still there)");
   const dockTab = (/** @type {RegExp} */ re) => /** @type {any} */ ([...document.querySelectorAll(".at-dock [role=tab]")]
@@ -9196,12 +9199,16 @@ const openPronounTables = async () => {
     top ? (top.textContent || "").replace(/\s+/g, " ").trim() + ` · ${top.querySelectorAll("input, button").length} controls` : "no row");
   click(one(".at-morebtn", top));
   await sleep(150);
-  const moreLines = () => [...document.querySelectorAll(".at-moremenu [role=menuitem]")].map((b) => (b.textContent || "").trim());
-  check("and the three dots hold Import",
-    moreLines().join(" | ") === "Import", moreLines().join(" | ") || "(no menu)");
-  click(one(".at-morebtn", top));
+  /* The app's one context menu (0.690): the sheet a saved session's dots
+     open, named for what it acts on, a row per action. */
+  const moreLines = () => [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("and the three dots open a sheet named Cards, holding Import",
+    moreLines().join(" | ") === "Import" &&
+      ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Cards",
+    moreLines().join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
   await sleep(150);
-  check("pressed again, they close", !document.querySelector(".at-moremenu"));
+  check("and its cross closes it", !document.querySelector(".at-moresheet"));
   const searchRow = /** @type {any} */ (rows()[1]);
   check("and the search box is on a line of its own under it",
     !!searchRow && searchRow.classList.contains("at-toolbar-search") &&
@@ -13159,11 +13166,12 @@ const openPronounTables = async () => {
       lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
     click(lesson ? lesson.querySelector(".at-morebtn") : null);
     await sleep(150);
-    const lines = [...document.querySelectorAll(".at-moremenu [role=menuitem]")].map((b) => (b.textContent || "").trim());
-    check("and its three dots hold Export and Delete, without opening it",
-      lines.join(" | ") === "Export deck | Delete deck" && !document.querySelector(".at-screen.cardform"),
-      lines.join(" | ") || "(no menu)");
-    click(lesson ? lesson.querySelector(".at-morebtn") : null);
+    const lines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+    check("and its three dots open its sheet, with Export and Delete, without opening it",
+      lines.join(" | ") === "Export deck | Delete deck" && !document.querySelector(".at-screen.cardform") &&
+        ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Lesson 1",
+      lines.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
     await sleep(150);
   }
   withPath = false;

@@ -9291,7 +9291,7 @@ offered twice on one screen. The list label does not show places, so a
 whole path in order is still read on the course page.
 
 
-## Teaching's Home and its To do (0.690)
+## Teaching's Home and its To do (0.693)
 
 **27 November 2026** · `TeachSpace`, `TodoSection` and `CoursesPage` in
 `src/spaces.tsx`; `TeaArt` and `SpaceFrame` in `src/shared.tsx`;

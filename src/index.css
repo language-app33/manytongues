@@ -1440,7 +1440,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-dockitem:hover, .at-docktabs .at-tab2:not(.on):hover, .at-dockitem.open { background: var(--press); }
 .at-docklabel { display:block; }
 /* A count on a section's button in the bar — what Teaching's To do holds,
-   on Home (0.690) — sits on the icon's shoulder as a small badge, rather
+   on Home (0.693) — sits on the icon's shoulder as a small badge, rather
    than as a third line under the name. */
 .at-docktabs .at-tabcount { position:absolute; top:5px; left:calc(50% + 6px);
   min-width:18px; height:18px; padding:0 5px; border-radius:999px;
@@ -1891,42 +1891,12 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-toolbar .at-pickbtn { flex:0 0 auto; width:44px; height:44px; min-height:44px;
   padding:0; box-sizing:border-box; }
 .at-toolbar .at-pickbtn.on { border-color: var(--brass); color: var(--brass); }
-/* Hangs under its button and is allowed to be taller than the list is
-   long — every teacher who has made a deck can be in here — so it scrolls
-   rather than running off the foot of the screen. Right-aligned: the
-   button sits at the right-hand end of the toolbar, and a menu opening
-   leftward from it stays on a phone. */
-.at-pickmenu { position:absolute; top:50px; right:0; z-index: var(--z-chrome);
-  min-width:210px; max-width: calc(100vw - 32px); max-height:60vh; overflow-y:auto;
-  background: var(--surface); border:2px solid var(--line); border-radius:18px;
-  padding:8px; box-shadow:0 14px 40px rgba(0,0,0,.45); }
-.at-pickline { display:flex; align-items:center; gap:10px; width:100%; background:none;
-  border:0; cursor:pointer; border-radius:12px; padding:10px; color: var(--text);
-  text-align:left; font-family: var(--ui); font-size:13px; font-weight:600; }
-.at-pickline:hover { background: var(--raised); }
-.at-pickline.on { color: var(--ink); font-weight:800; }
-.at-pickmark { width:16px; flex:0 0 auto; display:inline-flex; align-items:center;
-  justify-content:center; color: var(--brass); }
-.at-picktext { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* The three dots (0.689, see MoreMenu): a menu of actions rather than of
-   choices, so each line has its icon where a choice has its tick, and the
-   one that destroys something is in the colour that says so. */
-.at-moremenu .at-pickmark { width:18px; color: var(--muted); }
-.at-moremenu .at-pickline { font-size:14px; padding:11px 12px; }
-.at-moremenu .at-pickline.danger, .at-moremenu .at-pickline.danger .at-pickmark { color: var(--rose); }
+/* The three dots (0.689, see MoreMenu), sized like the icons beside them
+   in a list's top row and on a tile. Their panel is a PickSheet. */
+.at-morewrap { display:flex; flex:0 0 auto; }
 .at-morebtn.on { border-color: var(--accent); color: var(--accent); }
 .at-toolbar .at-morebtn { flex:0 0 auto; width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
 .at-deckacts .at-morewrap .at-morebtn { width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
-/* On a tile it opens on the left of its button and under it, over the
-   tiles below. */
-.at-deckacts .at-moremenu { top:50px; }
-/* In the top row the dots sit at the start, beside New, so their menu opens
-   rightward from them. */
-.at-toolbar-top .at-moremenu { right:auto; left:0; }
-/* Opened upward where below would run behind the bar at the foot of the
-   window (see MoreMenu). */
-.at-moremenu.up { top:auto; bottom:50px; }
-.at-picknote { flex:0 0 auto; font-size:11px; font-weight:700; color: var(--muted); }
 .at-eyebrow { font-family: var(--ui); font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); margin:0 0 12px; }
 .at-hint { font-size:14px; font-weight:500; color: var(--muted); line-height:1.6; margin:10px 0 0; }
 /* The same voice as a hint, said before the answer rather than after it —
@@ -2678,6 +2648,10 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-sheetacttext { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .at-sheetacttext b { font-size:16px; font-weight:800; }
 .at-sheetacttext i { font-style:normal; font-size:13px; font-weight:600; color: var(--muted); }
+/* In a sheet of choices (a card's status, whose modules to show), the one
+   that holds now: edged in the accent and ticked at the end of its row. */
+.at-sheetact.on { border-color: var(--accent); }
+.at-sheetacton { flex:0 0 auto; display:inline-flex; color: var(--accent); }
 .at-savedtile .nm { font-family: var(--ui); font-size: var(--fs-sm); font-weight:700; line-height:1.25;
   color: var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-savedtile .pc { font-family: var(--ui); font-size:20px; line-height:1; font-weight:800;
@@ -2912,10 +2886,10 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-joinsheet .at-btn { width:100%; }
 .at-emptyart { display:flex; justify-content:center; margin:0 0 var(--s4); color: var(--muted); }
 .at-chatart { display:block; width:128px; height:auto; }
-/* The cup of tea under an empty To do (0.690), the Home card's size of
+/* The cup of tea under an empty To do (0.693), the Home card's size of
    line at a smaller scale. */
 .at-teaart { display:block; width:150px; height:auto; color: var(--text); }
-/* To do on Teaching's Home (0.690): one Nudge per thing waiting, a gap
+/* To do on Teaching's Home (0.693): one Nudge per thing waiting, a gap
    between, and the buttons of each in a row that wraps on a phone. */
 .at-todolist { display:flex; flex-direction:column; gap:10px; }
 .at-todoacts { display:flex; flex-wrap:wrap; gap:8px; }

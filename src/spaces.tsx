@@ -183,10 +183,10 @@ import {
   useRun,
   useReach,
   useReachHold,
-  Popover,
   ModuleSwitch,
   ModulePickScreen,
   PickSheet,
+  SheetAction,
   BrandMark,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
@@ -1719,7 +1719,7 @@ export function verifyBackup(file: any) {
 
 
 /*
- * To do, at the top of Teaching's Home (0.690): everything waiting on the
+ * To do, at the top of Teaching's Home (0.693): everything waiting on the
  * teacher, each with the way to it, gathered from where it used to be said
  * — bands across the top, lines over the Cards list, a note inside each
  * course. With nothing waiting it says so warmly, under a cup of tea, so
@@ -1767,7 +1767,7 @@ export function CoursesPage({
   top,
 }: {
   courses: Course[];
-  /** What comes before the courses: Teaching's To do (0.690). */
+  /** What comes before the courses: Teaching's To do (0.693). */
   top?: Node;
   /** The courses under a heading each, in place of one "My courses" list:
       a learner's spaces, when they are in more than one (memberships). */
@@ -1775,7 +1775,7 @@ export function CoursesPage({
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
-  /** A line over the list. Neither side has one since 0.690: the tiles say
+  /** A line over the list. Neither side has one since 0.693: the tiles say
       what opening one does. */
   lead?: Node;
   emptyLead?: Node;
@@ -2830,8 +2830,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   }
   moduleMakers.sort((a, b) => a.label.localeCompare(b.label));
   const moduleOwnerOptions = [
-    { value: "", label: "Anyone", note: String(modules.length) },
-    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: String(m.count) })),
+    { value: "", label: "Anyone", note: plural(modules.length, "module") },
+    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: plural(m.count, "module") })),
   ];
   /* Filtered before the list sees them, so the count line, "select all" and
      every bulk action work on what is on screen rather than on what a
@@ -3457,9 +3457,17 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         {`${d.ownerName} · ${moduleSize(d)}`}
                       </>
                     }
+                    /* Behind three dots, as on Material's tiles (0.692):
+                       the app's one panel of actions on a thing. */
                     actions={
-                        <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
+                      <MoreMenu
+                        label={`More for ${d.title}`}
+                        title={d.title}
+                        items={[{
+                          label: `Delete ${moduleKind(d)}`,
+                          icon: "delete",
+                          danger: true,
+                          onClick: () => {
                             if (d.locked && MODULE_LOCKS) {
                               snack(lockedDeleteNote([d.title]), "warn");
                               return;
@@ -3480,7 +3488,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               ),
                               action: () => API.deleteModule(d.id),
                             });
-                          }} />
+                          },
+                        }]}
+                      />
                     }
                     footer={
                       <TileNote live={d.courseTitles.length > 0}>
@@ -6111,6 +6121,16 @@ const STATUS_ICON: Record<string, string> = {
   review: "view",
   changed: "refresh",
 };
+/* Each choice's icon in the status panel: what it leaves the card as. */
+const CHOICE_ICON: Record<string, string> = {
+  draft: "draft",
+  review: "view",
+  published: "verify",
+  "changes:draft": "draft",
+  "changes:review": "view",
+  discard: "refresh",
+  unpublish: "block",
+};
 /* The status as the menu reads while it is shut — "Published", "Draft",
    "Changes in draft". */
 const statusLabel = (card: Card): string =>
@@ -6138,8 +6158,6 @@ function StatusMenu({ card, disabled, onStatus }: {
 }) {
   const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
   const [open, setOpen] = useState(false);
-  /* The same close-on-anything-else the filter menus use, registered only
-     while it is open. */
   const now = statusNow(card);
   const choices = statusChoices(card);
   const shown = statusLabel(card);
@@ -6162,10 +6180,10 @@ function StatusMenu({ card, disabled, onStatus }: {
           className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
           aria-label={`Status: ${shown}`}
           title={`Status: ${shown}`}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={open}
           disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
         >
           {/* Where the card stands, in words and in its colour, opening
               like the other menus on the screen. */}
@@ -6173,23 +6191,23 @@ function StatusMenu({ card, disabled, onStatus }: {
           {shown}
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
+        {/* The statuses open in the app's one panel (0.690, the owner's
+            1a), its status now ticked. */}
         {open && (
-          <Popover className="at-pickmenu at-statuspick" role="menu" onClose={() => setOpen(false)}>
-            {choices.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                role="menuitem"
-                className={`at-pickline${c.value === now ? " on" : ""}`}
-                onClick={() => pick(c.value)}
-              >
-                <span className="at-pickmark">
-                  {c.value === now ? <Icon name="check" size={16} /> : null}
-                </span>
-                <span className="at-picktext">{c.label}</span>
-              </button>
-            ))}
-          </Popover>
+          <PickSheet title="Card status" lede={`Now: ${shown}`} className="at-statussheet" onClose={() => setOpen(false)}>
+            <div className="at-sheetacts">
+              {choices.map((c) => (
+                <SheetAction
+                  key={c.value}
+                  icon={CHOICE_ICON[c.value] || "verify"}
+                  label={c.label.replace(/…$/, "")}
+                  danger={c.value === "discard" || c.value === "unpublish"}
+                  on={c.value === now}
+                  onClick={() => pick(c.value)}
+                />
+              ))}
+            </div>
+          </PickSheet>
         )}
       </span>
       {asking === "discard" && (
@@ -6549,7 +6567,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   });
 
   const [courseView, setCourseView] = useState<any | null>(null);
-  /* Which part of the open course is on screen (0.690, the owner's 4b):
+  /* Which part of the open course is on screen (0.693, the owner's 4b):
      Course, People or Exercises. Each course opens on Course. */
   const [courseTab, setCourseTab] = useState("course");
   useEffect(() => setCourseTab("course"), [courseView]);
@@ -7394,7 +7412,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   );
 
   /*
-   * What is waiting on the teacher, for To do at the top of Home (0.690).
+   * What is waiting on the teacher, for To do at the top of Home (0.693).
    *
    * Each of these used to be said where it was found — two bands across
    * the top of every tab, two above the Cards list, one inside each
@@ -10163,7 +10181,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <Screen title="Course" className="cardform" onBack={() => setCourseView(null)}>
             <Notice kind="error">{error}</Notice>
             {/* Three parts, in the tabs Material's lists are chosen with
-                (0.690, the owner's 4b): what the course is and teaches,
+                (0.693, the owner's 4b): what the course is and teaches,
                 who is in it, and what its students are asked. */}
             <Tabs
               label="Course, people or exercises"
@@ -10329,7 +10347,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     <SpaceFrame
       space="Teaching"
       tabs={[
-        /* Home (0.690, Courses until then): To do, then the courses. The
+        /* Home (0.693, Courses until then): To do, then the courses. The
            key stays "courses", which a resumed session may hold. */
         ["courses", "Home", "school"],
         /* Material is the space's decks and cards, My space the teacher's
@@ -10353,7 +10371,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }
       }}
       /* How many things To do holds, on Home's own button, so they are
-         seen from every tab (0.690, the owner's 5a). */
+         seen from every tab (0.693, the owner's 5a). */
       counts={todoCount > 0 && !personalOnly ? { courses: todoCount } : undefined}
       error={error}
       busy={busy}
@@ -10372,7 +10390,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           )}
           {/* Missing recordings and what an import brought in used to be
               bands across the top of every tab here. Both are in To do on
-              Home since 0.690 (the owner's 5a), with its count on Home's
+              Home since 0.693 (the owner's 5a), with its count on Home's
               button in the bar. */}
           {splitting && (
             <MeaningSplits
@@ -10545,7 +10563,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
               {/* Sentences waiting for review and cards with more than one
                   meaning used to be said here, above the list. They are in
-                  To do on Home since 0.690 (the owner's 7a); the Review
+                  To do on Home since 0.693 (the owner's 7a); the Review
                   filter still finds the sentences. */}
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a module so students get it.
@@ -10933,6 +10951,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                               three dots (0.689; the owner's 1a). */}
                           <MoreMenu
                             label={`More for ${d.title}`}
+                            title={d.title}
                             ghost
                             items={[
                               { label: `Export ${moduleKind(d)}`, icon: "download", onClick: () => exportModules([d.id]) },
