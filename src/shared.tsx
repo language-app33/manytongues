@@ -1653,18 +1653,14 @@ export function dateTime(ms?: Millis) {
 /* --- Tile ---------------------------------------------------------
    The deck and course tile. Lived in spaces.tsx, which meant the one
    library the docs point at did not actually hold it. */
-export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
+export function Tile({ title, meta, onOpen, actions, footer, note }: {
   title?: Node;
   meta?: Node;
   onOpen?: () => void;
   actions?: Node;
   footer?: Node;
-  /** Before the title, centred on it and what is under it: a module's
-      quality ring (0.715, the owner's 3a), so the scores of a list stand
-      in one column down its left. */
-  lead?: Node;
-  /** A line straight under the title, inside the column beside `lead`,
-      where `footer` sits under the whole row (0.715). */
+  /** A line straight under the title, inside the title's column, where
+      `footer` sits under the whole row (0.715). */
   note?: Node;
 }) {
   return (
@@ -1672,7 +1668,6 @@ export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
        get the hover treatment. */
     <div className="at-deckcard" onClick={onOpen} data-open={onOpen ? "" : undefined}>
       <div className="at-deckrow2">
-        {lead ? <div className="at-decklead">{lead}</div> : null}
         <div className="at-deckmain">
           <div className="at-decktitle">{title}</div>
           {meta ? <div className="at-deckmeta">{meta}</div> : null}
@@ -2428,7 +2423,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
  * place with `&&`.
  */
 export type MoreItem = { label: string; icon: string; danger?: boolean; note?: string; disabled?: boolean; onClick: () => void };
-export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
+export function MoreMenu({ label = "More", title, lede, items, ghost = true, bare = false }: {
   /** What the button is called, to a screen reader and on hover. */
   label?: string;
   /** The panel's heading: the thing it acts on. */
@@ -2437,6 +2432,8 @@ export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
   lede?: string;
   items: (MoreItem | null | false | undefined)[];
   ghost?: boolean;
+  /** No outline round the button, the dots alone (0.717). */
+  bare?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const shut = useCallback(() => setOpen(false), []);
@@ -2446,7 +2443,7 @@ export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
     <div className="at-morewrap" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${open ? " on" : ""}`}
+        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${bare ? " bare" : ""}${open ? " on" : ""}`}
         title={label}
         aria-label={label}
         aria-haspopup="dialog"

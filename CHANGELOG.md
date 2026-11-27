@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.717 — 27 November 2026
+
+**A module's score is now a few words at the end of the line under its
+name, and the three dots lose their box.** In Teaching › Material ›
+Modules:
+
+- The score ring left of the name is gone. The score is the last thing on
+  the line under the name: "Available to students in the course Arabic 101
+  · score: 38". A module with nothing to score yet still shows no score.
+- The three dots on the right of a module's tile have no outline, just the
+  dots. They are as easy to tap as before. The three dots elsewhere, such
+  as on a card's tile, are unchanged.
+
+Trade-off: the score no longer stands in one column down the list, and it
+is plain grey text rather than coloured.
+
 ## 0.716 — 27 November 2026
 
 **The card status panel no longer opens with a "Now: …" line.** Under
