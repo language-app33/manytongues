@@ -9561,3 +9561,13 @@ the cards are. The import band in To do is unchanged.
 **Revisit if** teachers miss that a course's students see nothing: a line for
 a course whose cards *none* reach students is the narrow way back.
 
+## New module asks what kind again (0.722)
+
+The owner's word: bring back the sheet 0.710 removed. `newModule()` opens
+the `PickSheet` of `NEW_KINDS` again (outside My space), and To do's
+"Create a module" opens it too, keeping `namingFor`: a unit's course
+radio starts on that course (`NewModule`'s `initialCourse`), and a deck
+or a personal set is attached to it. The sheet is drawn at the frame's
+level, beside `MeaningSplits`, so it opens from Home as well as Material.
+"New personal set" left the Material list's `more` menu: one place to
+choose a kind. `PathSection`'s New unit stays.

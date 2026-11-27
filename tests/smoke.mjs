@@ -13301,8 +13301,9 @@ const openPronounTables = async () => {
 }
 
 /* ---- personal sets are the App admin's to switch on (0.683) ----
-   A space whose card does not say so offers no New personal set. New
-   module makes a deck in one step (0.710): no sheet asking which kind. */
+   A space whose card does not say so offers only a deck and a unit on
+   New module's sheet (back in 0.722); the tiles sit in the spaced list
+   every list of tiles uses, not straight on the sheet. */
 {
   const before = errors.length;
   const offOrg = { id: "main", slug: "main", name: "Main", logo: "", colour: "", sets: false };
@@ -13328,19 +13329,14 @@ const openPronounTables = async () => {
   await sleep(400);
   click(tab(/^Modules$/) || null);
   await sleep(500);
-  click(frame().querySelector('[aria-label="More for these modules"]'));
-  await sleep(200);
-  const moreLines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
-  check("with personal sets off in the space, the three dots offer no New personal set",
-    !moreLines.includes("New personal set"), moreLines.join(" | ") || "(no sheet)");
-  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
-  await sleep(200);
   click(buttonNamed(/^New module$/));
   await sleep(300);
-  const madeTitle = (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
-  check("and New module goes straight to naming a deck, with no sheet asking what kind",
-    !document.querySelector(".at-sheet .at-openrow") && madeTitle === "Create deck", madeTitle || "no screen");
-  backOut();
+  const rows = [...document.querySelectorAll(".at-sheet .at-openrow")];
+  const titles = rows.map((b) => (b.querySelector(".at-decktitle") || b).textContent || "").join(" | ");
+  check("with personal sets off in the space, New module offers a deck and a unit only", titles === "Deck | Unit", titles || "no sheet");
+  check("and the kinds sit in the spaced list of tiles", rows.length > 0 && rows.every((b) => !!b.parentElement && b.parentElement.classList.contains("at-decklist2")),
+    rows.map((b) => (b.parentElement && b.parentElement.className) || "").join(", ") || "no rows");
+  click(document.querySelector('.at-sheet button[aria-label="Close"]'));
   await sleep(200);
   whoamiAs = null;
   r.unmount();
@@ -13349,8 +13345,9 @@ const openPronounTables = async () => {
 }
 
 /* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
-   New module makes a deck (0.710); a personal set is made from the three
-   dots, and a unit from a course's path. A personal set is made as a deck
+   New module asks first what kind: a deck, a unit or a personal set
+   (0.633, back in 0.722). A unit asks for its course, and can also be
+   made from a course's path. A personal set is made as a deck
    and marked as a set. An ordinary deck has no Personal set section; a set
    has one, with no switch: its question changed, two lists added, a word
    ticked, the word after the name, saved. */
@@ -13385,12 +13382,29 @@ const openPronounTables = async () => {
   };
   await toModules();
   const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
-  click(buttonNamed(/^New module$/));
-  await sleep(300);
-  check("New module goes straight to naming a deck",
-    !document.querySelector(".at-sheet .at-openrow") && screenTitle() === "Create deck", screenTitle() || "no screen");
+  const sheetRows = () => [...document.querySelectorAll(".at-sheet .at-openrow")].map((b) => (b.querySelector(".at-decktitle") || b).textContent || "");
+  const openSheet = async () => {
+    click(buttonNamed(/^New module$/));
+    await sleep(300);
+  };
+  const pickKind = async (/** @type {RegExp} */ re) => {
+    click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => re.test((b.querySelector(".at-decktitle") || b).textContent || "")) || null);
+    await sleep(400);
+  };
+  await openSheet();
+  check("New module asks what kind: a deck, a unit or a personal set",
+    sheetRows().join(" | ") === "Deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  await pickKind(/^Deck/);
+  check("choosing Deck opens Create deck", screenTitle() === "Create deck", screenTitle() || "no screen");
   backOut();
   await sleep(300);
+  click(frame().querySelector('[aria-label="More for these modules"]'));
+  await sleep(200);
+  const moreLines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("the three dots beside New module no longer offer New personal set",
+    !moreLines.includes("New personal set"), moreLines.join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+  await sleep(200);
   const setValue = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
   const name = async (/** @type {string} */ v) => {
     const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-screen.cardform .at-formblock input.at-input")].pop() || null);
@@ -13404,11 +13418,9 @@ const openPronounTables = async () => {
     click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
     await sleep(700);
   };
-  click(frame().querySelector('[aria-label="More for these modules"]'));
-  await sleep(200);
-  click([...document.querySelectorAll(".at-moresheet .at-sheetact")].find((b) => /New personal set/.test(b.textContent || "")) || null);
-  await sleep(400);
-  check("New personal set, in the three dots, opens Create personal set", screenTitle() === "Create personal set", screenTitle());
+  await openSheet();
+  await pickKind(/Personal set/);
+  check("choosing Personal set opens Create personal set", screenTitle() === "Create personal set", screenTitle());
   const madeBefore = madeModules.length;
   const setsBefore = savedSets.length;
   await name("Grandparents");
@@ -13421,7 +13433,24 @@ const openPronounTables = async () => {
     JSON.stringify({ madeSet, markedSet }));
   backOut();
   await sleep(300);
-  /* A unit is made where it is used: a course's path, New unit (0.710). */
+  await toModules();
+  await openSheet();
+  await pickKind(/^Unit/);
+  check("choosing Unit asks for its course", screenTitle() === "Create unit" && /Course/.test((([...document.querySelectorAll(".at-screen.cardform")].pop() || {}).textContent) || ""),
+    screenTitle());
+  {
+    const unitsBefore = madeUnits.length;
+    await name("Family unit 1");
+    click([...document.querySelectorAll(".at-screen.cardform input[type=radio]")].find((b) => /Arabic 101/.test((b.closest("label") || b).textContent || "")) || null);
+    await sleep(150);
+    await save();
+    const u = madeUnits[madeUnits.length - 1];
+    check("and saved with its course, it is made on that course's path",
+      madeUnits.length === unitsBefore + 1 && !!u && u.courseId === "c1" && u.title === "Family unit 1", JSON.stringify(u));
+  }
+  backOut();
+  await sleep(300);
+  /* A unit can also be made where it is used: a course's path, New unit (0.710). */
   click(tab(/^Home\d*$/) || null);
   await sleep(500);
   click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);

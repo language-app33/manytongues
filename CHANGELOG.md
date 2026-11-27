@@ -8,12 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.722 — 27 November 2026
+## 0.723 — 27 November 2026
 
 **Material no longer opens with an explanation.** The sentence at the top
 of Teaching's Material page, about whose modules are listed and when
 students see them, is gone; the page starts with its Modules and Cards
 tabs.
+
+## 0.722 — 27 November 2026
+
+**New module asks what kind again.** In Teaching › Material, New module
+opens a sheet with **Deck**, **Unit** and, where personal sets are switched
+on, **Personal set**, as it did before 0.710. The same sheet opens from
+**Create a module** in To do on Home; there a unit starts in that course,
+and a deck or personal set is put in it. The sheet says the kind can't be
+changed once the module is made, which is still true. "New personal set" is
+no longer in the three dots beside New module, since the sheet has it. A
+unit can still be made from a course's Path too.
 
 ## 0.721 — 27 November 2026
 
