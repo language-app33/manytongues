@@ -11171,7 +11171,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                               the owner's wish): what is left is whether it
                               is a unit, and what in it needs looking at.
                               How many of its cards send students nothing
-                              yet is off it too (0.700, the owner's wish):
+                              yet is off it too (0.701, the owner's wish):
                               the module's own screen says that, and why. */}
                           {(() => {
                             const ids = new Set(d.cardIds || []);
