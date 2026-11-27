@@ -8,6 +8,57 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.733 — 27 November 2026
+
+**A simpler Home, New module panel and Cards list for teachers.**
+
+**Teaching › Home**
+
+- The "Join a course as a teacher" section is gone. A dashed **Join another
+  course** button sits at the end of My courses and opens a panel from the
+  foot of the screen with the code box. A teacher with no course yet sees a
+  box saying so, with a **Join a course** button that opens the same panel.
+- When there is nothing to do, To do is a slim band: the same dashed box
+  and cup on one row, about a third of the height it was. With something to
+  do it looks as before.
+- **Search courses** shows only with more than five courses.
+
+**The New module panel**
+
+- Each kind has a picture and a new description:
+  - **Deck:** "Cards on one topic, independent of your other decks."
+  - **Unit:** "One lesson on a course's path. Each unit builds on the ones
+    before it, so students do them in order."
+  - **Personal set:** "For words that are different for each student, like
+    My family. Students answer about your pictures once, then practise
+    their own words."
+
+**Teaching › Material › Cards, and the cards inside a module**
+
+- Two tiles a row on a phone, all the same height: the word on one line and
+  the meaning on one line, cut with … when too long. Thinner outlines, more
+  room. The three dots stay on each tile.
+- A card with no English shows its transliteration in italics in the
+  meaning's place; with none, "Picture" or "Recording" with a small symbol;
+  with neither, nothing.
+- The badge for a card students cannot fully see yet (Draft, Ready for
+  review, Changes in draft, Changes ready for review, Recording missing)
+  stays on the tile, at its foot. Published cards show none.
+- On a phone the second view is a **list**, not a table: one card a row
+  with its meaning, and under it its modules, its kind when it is not a
+  plain word, and the same badge. A tablet or computer keeps the full
+  table.
+
+The learner's side is unchanged.
+
+**Trade-offs:** the join code box is one press away; six to eight cards
+show per phone screen where twelve did; on a phone, sorting is done from
+the Sort control, since the list has no column headings.
+
+**To check by hand:** on a real phone, that the join panel stays above the
+keyboard, and that pressing and holding a tile or a list row still starts
+selecting.
+
 ## 0.732 — 27 November 2026
 
 **Simpler teacher screens.** A module, the word sets and a card being read

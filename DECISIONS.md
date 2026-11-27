@@ -9678,3 +9678,43 @@ The owner chose each of these on a page of mock-ups (answers `1a, 2b→7a,
   not shown; the Description shows only when one is written. The card's
   first tab keeps its name, "Basic".
 
+## A simpler teacher Home, New module panel and Cards list (0.733)
+
+All chosen by the owner on a page of mock-ups. Everything here is switched
+on only by the teaching side (a prop or the `teach` class), so the
+learner's Courses page and card grids look and behave as before.
+
+- **Join is a button at the foot of My courses, opening a panel.** A
+  teacher joins a course once; the code box was a whole section on every
+  visit to Home. A teacher with no course at all sees a box saying so with
+  the same button, since the empty list was the screen's whole message.
+  `CoursesPage` takes `joinButton` and `noneAtAll`; without them it draws
+  the old join box, which is what the learner keeps.
+- **The caught-up band kept its cup but went slim.** The cup says "done,
+  not broken"; the height said nothing and pushed My courses down.
+- **Search from six courses.** Five fit on a phone and are read, not
+  searched. `ItemList` now draws no search box at all without `match`
+  (every other list passes one), so "no search" leaves no empty bar.
+- **The three descriptions lead with "independent" and "builds on".**
+  That is the real difference between a deck and a unit. Sharing between
+  courses is not, since a unit can be on several courses' paths too, so
+  neither description mentions it. The personal set's leads with what it
+  is for — words that differ per student — and the owner's example. Each
+  kind has a picture: cards, a new `path` icon (three stops climbing), a
+  person.
+- **Two tiles a row, the three dots kept.** One line for the word and one
+  for the meaning keeps every tile the same height, so the grid reads as a
+  grid; a longer word is a tap away. The dots stay because Edit and
+  Remove on a tile are what a teacher reaches for there. The cost is six
+  to eight cards a phone screen where twelve showed.
+- **A stand-in for a missing meaning.** A card with no English left a
+  blank line that read as broken. Its transliteration is the next best
+  thing to read it by; a picture or recording card says so. `standIn` in
+  `cards.ts`, shared by the tile and the table.
+- **A list on a phone, the table kept for wide screens.** A five-column
+  table scrolled sideways on a phone and showed two columns. The list
+  gives the same facts in a row; sorting moves to the Sort control, which
+  every list already has. `CardRows` shares the table's press, hold and
+  key handling rather than copying it, and `useNarrow` says no where there
+  is no `matchMedia`, so the smoke walk keeps checking the table.
+

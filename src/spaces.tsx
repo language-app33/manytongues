@@ -9,7 +9,7 @@ import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
 import { keyFromLink, signInLink } from "./sign-in-link.ts";
 import type { CardShape } from "./card-editor.tsx";
-import { formsOf, leadOf } from "./cards.ts";
+import { formsOf, leadOf, standIn } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 
 /*
@@ -1728,7 +1728,10 @@ function TodoSection({ items, actionsOf }: {
           ))}
         </div>
       ) : (
-        <Empty art={<TeaArt />}>You&rsquo;re all caught up. Your students have everything they need.</Empty>
+        /* Slim (0.733, the owner's choice): the same dashed box and cup on
+           one row, so a quiet To do takes a third of the room it did and
+           the courses under it come up the screen. */
+        <Empty slim art={<TeaArt />}>You&rsquo;re all caught up. Your students have everything they need.</Empty>
       )}
     </section>
   );
@@ -1750,8 +1753,21 @@ export function CoursesPage({
   footer,
   groups,
   top,
+  joinButton,
+  noneAtAll,
+  searchFrom,
 }: {
   courses: Course[];
+  /** Join as a button at the foot of My courses, opening a panel with the
+      code box, in place of a section of its own (0.733, Teaching's Home).
+      Left out, the join box is drawn as it always was: the learner's side. */
+  joinButton?: { label: string; first: string; none: Node; title: string };
+  /** No course at all, as against none in the languages switched on:
+      Teaching's Home then says so in a box with its Join button. */
+  noneAtAll?: boolean;
+  /** Search the courses only from this many on (0.733): a list of five
+      fits on a screen and is read, not searched. Left out, always. */
+  searchFrom?: number;
   /** What comes before the courses: Teaching's To do (0.693). */
   top?: Node;
   /** The courses under a heading each, in place of one "My courses" list:
@@ -1774,10 +1790,22 @@ export function CoursesPage({
   footer?: Node;
 }) {
   const [code, setCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const asButton = !!joinButton && !!onJoin;
+  const join = () => {
+    if (!onJoin || !code.trim()) return;
+    onJoin(code.trim());
+    setCode("");
+    setJoining(false);
+  };
+  const searchable = searchFrom === undefined || courses.length >= searchFrom;
+  /* Teaching with no course at all: a box saying so, with the way in. */
+  const firstNudge = asButton && noneAtAll;
+  const lineOver = courses.length ? lead : firstNudge ? null : emptyLead;
   return (
     <>
       {top}
-      {(courses.length ? lead : emptyLead) ? <Help>{courses.length ? lead : emptyLead}</Help> : null}
+      {lineOver ? <Help>{lineOver}</Help> : null}
 
       <Notice kind="error">{error}</Notice>
 
@@ -1796,16 +1824,64 @@ export function CoursesPage({
             size="large"
             busy={busy}
             empty="No courses match."
-            match={(c, q) => c.title.toLowerCase().includes(q)}
+            match={searchable ? (c, q) => c.title.toLowerCase().includes(q) : undefined}
             groups={groups ? groups.map((g) => ({ key: g.key, label: String(g.title) })) : undefined}
             groupOf={groups ? (c) => (groups.find((g) => g.courses.includes(c)) || { key: "" }).key : undefined}
             renderItem={renderCourse}
           />
+          {asButton && joinButton ? (
+            <>
+              <Button icon="add" className="at-blockbtn at-joinmore" onClick={() => setJoining(true)}>{joinButton.label}</Button>
+              {joinNote ? <Help>{joinNote}</Help> : null}
+            </>
+          ) : null}
         </section>
       )}
 
+      {/* Teaching with nothing to teach yet (0.733): the box says why the
+          screen is bare and holds the way in. */}
+      {courses.length === 0 && firstNudge && joinButton ? (
+        <section className="at-section at-coursesection" data-el="courses-of-space">
+          <h3 className="at-sectionhead">My courses</h3>
+          <Nudge icon="school" tone="attention" action={<Button variant="primary" icon="add" onClick={() => setJoining(true)}>{joinButton.first}</Button>}>
+            {joinButton.none}
+          </Nudge>
+          {joinNote ? <Help>{joinNote}</Help> : null}
+        </section>
+      ) : courses.length === 0 && asButton && joinButton ? (
+        /* Courses, but none in the languages switched on: the line above
+           says so, and joining another is still one press away. */
+        <section className="at-section at-coursesection">
+          <Button icon="add" className="at-blockbtn at-joinmore" onClick={() => setJoining(true)}>{joinButton.label}</Button>
+          {joinNote ? <Help>{joinNote}</Help> : null}
+        </section>
+      ) : null}
+
+      {joining && joinButton ? (
+        <PickSheet title={joinButton.title} lede={typeof joinHint === "string" ? joinHint : undefined} onClose={() => setJoining(false)}>
+          <div className="at-toolbar">
+            <input
+              className="at-input at-search"
+              placeholder={joinPlaceholder}
+              aria-label={joinPlaceholder}
+              value={code}
+              autoCapitalize="characters"
+              autoFocus
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") join();
+              }}
+            />
+            <Button variant="primary" disabled={!code.trim() || busy} onClick={join}>
+              <Icon name="school" />
+              Join
+            </Button>
+          </div>
+        </PickSheet>
+      ) : null}
+
       {/* The heading names the section; the box holds only the doing. */}
-      {onJoin && (
+      {onJoin && !asButton && (
       <section className="at-section at-coursesection">
         <h3 className="at-sectionhead">{joinTitle}</h3>
         <div className="at-joinbox">
@@ -5049,10 +5125,13 @@ function wordSetLine(s: WordSet): string {
 }
 /* A row that opens something, drawn as a deck's tile is: a real button, so
    it answers a keyboard and a screen reader the way a tap does. */
-function OpenRow({ title, meta, onOpen, label }: { title: Node; meta?: Node; onOpen: () => void; label?: string }) {
+function OpenRow({ title, meta, onOpen, label, icon }: { title: Node; meta?: Node; onOpen: () => void; label?: string;
+  /** A picture ahead of the words: each kind on the New module panel (0.733). */
+  icon?: string }) {
   return (
-    <button type="button" className="at-deckcard at-openrow" data-open="" onClick={onOpen} aria-label={label}>
+    <button type="button" className={`at-deckcard at-openrow${icon ? " withicon" : ""}`} data-open="" onClick={onOpen} aria-label={label}>
       <span className="at-deckrow2">
+        {icon ? <span className="at-kindicon" aria-hidden="true"><Icon name={icon} size={22} /></span> : null}
         <span className="at-deckmain">
           <span className="at-decktitle">{title}</span>
           {meta ? <span className="at-deckmeta">{meta}</span> : null}
@@ -5100,10 +5179,14 @@ function lockedDeleteNote(titles: string[]): string {
    module (0.722, as before 0.710). A unit can also be made from a
    course's path. */
 type NewKind = "deck" | "unit" | "set";
-const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
-  { kind: "deck", title: "Deck", meta: "A set of cards, for any course." },
-  { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
-  { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
+/* Worded by the owner (0.733): what really tells a deck from a unit is
+   that a deck stands alone and a unit builds on the ones before it.
+   Sharing between courses is not it (a unit can be on several paths), so
+   neither says so. */
+const NEW_KINDS: { kind: NewKind; title: string; meta: string; icon: string }[] = [
+  { kind: "deck", title: "Deck", icon: "cards", meta: "Cards on one topic, independent of your other decks." },
+  { kind: "unit", title: "Unit", icon: "path", meta: "One lesson on a course's path. Each unit builds on the ones before it, so students do them in order." },
+  { kind: "set", title: "Personal set", icon: "person", meta: "For words that are different for each student, like My family. Students answer about your pictures once, then practise their own words." },
 ];
 
 function NewModule({
@@ -7429,6 +7512,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const pronounTile = (group: PronounGroup, extra?: Node) => (
     <CardTile
       card={group}
+      /* The teacher's grids (0.733): two a row on a phone, one line each. */
+      className="teach"
       lang={languages[group.lang as LangId]}
       meta={<><span className="at-statusbadge">Word set</span>{plural(group.members.length, "pronoun")}</>}
       onClick={() => setPronouning(group.lang as LangId)}
@@ -7468,6 +7553,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     <CardTile
       card={c}
       lang={langOfCard(c)}
+      /* The teacher's grids (0.733, the owner's 5a): two a row on a phone,
+         one line each, and in a card with no meaning, what stands for it. */
+      className="teach"
+      standIn={standIn(c)}
       /* No date on the tile (0.714, the owner's 4a): Sort still orders
          by it. What is left is only what needs looking at. */
       meta={
@@ -7511,10 +7600,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       const titles = (c.decks || [])
         .map((id: string) => (modules.find((d) => d.id === id) || { title: "" }).title)
         .filter(Boolean);
+      /* No meaning written: what stands for it, as on the tile (0.733). */
+      const stand = said.en ? null : standIn(c);
       return {
+        noDecks: "In no module",
         cells: {
           word: said.short,
-          meaning: said.en,
+          meaning: said.en || (stand
+            ? stand.kind === "lat"
+              ? <i className="at-standin">{stand.text}</i>
+              : <span className="at-standin"><Icon name={stand.kind === "picture" ? "image" : "play"} size={14} /> {stand.text}</span>
+            : null),
           kind: cardKindLabel(c),
           decks: titles.join(", "),
           status: (
@@ -9816,7 +9912,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const matchEntry = (it: any, q: string) =>
       isNumberPart(it) ? it.label.toLowerCase().includes(q) : cardMatches(it, q);
     const numberTile = (n: NumberPart, extra?: Node) => (
-      <div className="at-minicard">
+      <div className="at-minicard teach">
         <div className="at-minikind">Numbers</div>
         <div className="ar">{n.label}</div>
         <div className="at-minimeta"><span className="at-statusbadge">Word set</span></div>
@@ -9855,6 +9951,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           <CardTile
             card={it}
             lang={langOfCard(it)}
+            className="teach"
+            standIn={standIn(it)}
             meta={statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}
             onClick={() => openCard(it)}
             corner={manageMenu(it)}
@@ -10385,7 +10483,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           only where the App admin switched them on (0.722). */}
       <div className="at-decklist2">
         {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
-          <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+          <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} icon={k.icon} onOpen={() => {
             setChoosingKind(false);
             setNewKind(k.kind);
             setNaming("new");
@@ -10844,12 +10942,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }}
                 />
               ) : null}
-              emptyLead={
-                courses.length
-                  ? "None of your courses is in the languages switched on. The language button at the top brings the others back."
-                  : "You aren't teaching a course yet. Ask your administrator to add you, or join with a teacher code below."
-              }
-              joinTitle="Join a course as a teacher"
+              emptyLead={courses.length ? "None of your courses is in the languages switched on. The language button at the top brings the others back." : undefined}
+              /* Join as a button at the foot of My courses and a panel
+                 (0.733, the owner's choice): the code box is wanted once
+                 per course, not every visit. */
+              noneAtAll={courses.length === 0}
+              searchFrom={6}
+              joinButton={{
+                label: "Join another course",
+                first: "Join a course",
+                title: courses.length ? "Join another course" : "Join a course",
+                none: "You aren't teaching a course yet. Ask your administrator to add you, or join with a teacher code.",
+              }}
               joinHint="Paste a teacher code another teacher or your administrator gave you."
               joinPlaceholder="Teacher code"
               joinNote={joinNote}
