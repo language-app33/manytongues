@@ -6036,6 +6036,40 @@ export const CARD_SORTS: Record<
   },
 };
 
+/*
+ * The orders the Modules tab offers (0.729), in the Sort panel's words as
+ * CARD_SORTS gives the Cards tab's. `cmp` puts the "up" order first; the
+ * list turns it round for "down". "Down" is each one's usual order —
+ * oldest first, newest changes, A to Z — because the panel keeps the
+ * direction when another order is picked, and Name after Oldest added
+ * must not land on Z to A. `made` is each module's place in the order the
+ * server sent them, which is the order they were made.
+ */
+export const MODULE_SORTS: Record<
+  string,
+  {
+    label: string;
+    cmp: (a: Module, b: Module, made: Map<string, number>) => number;
+    down: string;
+    up: string;
+    saysDown: string;
+    saysUp: string;
+  }
+> = {
+  added: {
+    label: "Added", cmp: (a, b, made) => (made.get(b.id) || 0) - (made.get(a.id) || 0),
+    down: "Oldest first", up: "Newest first", saysDown: "Oldest added", saysUp: "Newest added",
+  },
+  changed: {
+    label: "Changed", cmp: (a, b) => (a.updated || 0) - (b.updated || 0),
+    down: "Newest first", up: "Oldest first", saysDown: "Newest changes", saysUp: "Oldest changes",
+  },
+  name: {
+    label: "Name", cmp: (a, b) => b.title.localeCompare(a.title),
+    down: "A to Z", up: "Z to A", saysDown: "Names A to Z", saysUp: "Names Z to A",
+  },
+};
+
 export function sortCards(cards: Card[], key: string, newestFirst: boolean = true) {
   const sort = CARD_SORTS[key || ""];
   if (!sort) return cards;
@@ -6958,10 +6992,31 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     () => (off.length ? courses.filter((c) => inPlayWith(off, c.language)) : courses),
     [courses, off]
   );
-  const onModules = useMemo(
-    () => (off.length ? modules.filter((d) => inPlayWith(off, (langOfModule(d) || ({} as Lang)).id)) : modules),
-    [modules, off, langOfModule]
-  );
+  /* The Modules tab's order, in the line under its bar as on Cards
+     (0.729). A module carries no date it was made, but the server sends
+     them in the order they were made, so that order is "Added"; until
+     somebody picks another it is oldest first, the order the tab has
+     always had. */
+  const [moduleSortKey, setModuleSortKey] = useState("added");
+  const [moduleSortDown, setModuleSortDown] = useState(true);
+  const onModules = useMemo(() => {
+    const kept = off.length ? modules.filter((d) => inPlayWith(off, (langOfModule(d) || ({} as Lang)).id)) : modules;
+    const made = new Map(modules.map((d, i) => [d.id, i]));
+    const by = MODULE_SORTS[moduleSortKey] || MODULE_SORTS.added;
+    const dir = moduleSortDown ? -1 : 1;
+    return [...kept].sort((a, b) => (by.cmp(a, b, made) * dir) || ((made.get(a.id) || 0) - (made.get(b.id) || 0)));
+  }, [modules, off, langOfModule, moduleSortKey, moduleSortDown]);
+  const moduleSort: ListSort = {
+    value: moduleSortKey,
+    down: moduleSortDown,
+    options: Object.entries(MODULE_SORTS).map(([k, v]) => ({
+      value: k, label: v.label, down: v.down, up: v.up, saysDown: v.saysDown, saysUp: v.saysUp,
+    })),
+    onApply: (value, down) => {
+      setModuleSortKey(value);
+      setModuleSortDown(down);
+    },
+  };
   const onCards = useMemo(
     () => (off.length ? cards.filter((c) => inPlayWith(off, (langOfCard(c) || ({} as Lang)).id)) : cards),
     [cards, off, langOfCard]
@@ -11139,6 +11194,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               <ItemList
                 noun="module"
                 items={onModules}
+                sort={moduleSort}
                 size="large"
                 busy={busy}
                 empty={

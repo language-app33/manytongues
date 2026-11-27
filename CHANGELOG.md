@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.729 — 27 November 2026
+
+**Modules has the line Cards has.** Teaching › Material › Modules now shows
+the same quiet line under its bar: how many modules there are, and the
+order they are in, which you tap to change.
+
+- **Three orders:** Added (oldest or newest first), Changed (newest or
+  oldest changes first) and Name (A to Z or Z to A). Like on Cards, a new
+  order waits for Apply.
+- **It starts as before:** oldest added first, the order the tab has always
+  had.
+
 ## 0.728 — 27 November 2026
 
 **A simpler bar above every list.** Teaching › Material › Cards had two
