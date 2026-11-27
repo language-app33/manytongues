@@ -3763,12 +3763,15 @@ fieldset.at-cardlock:disabled .at-answerhead { margin-bottom:4px; }
 fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
 
 /* Read, the words at one size: the card's name, each answer and English;
-   how an answer is said a step smaller, in italics (above). */
+   how an answer is said a step smaller, in italics (above). A step under
+   a section's heading and at an ordinary weight (0.699): with no box
+   round them, the same ink at 26px and bold was a second heading under
+   "This card" and "Content". */
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-namefield,
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-input,
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-blanktext,
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-alts > .at-altstack .at-input {
-  font-size:26px !important; font-weight:700 !important; line-height:1.3;
+  font-size:22px !important; font-weight:500 !important; line-height:1.3;
   color: var(--text) !important; -webkit-text-fill-color: var(--text) !important; }
 
 /* The practice player, at a button's size, at the end of the line. */

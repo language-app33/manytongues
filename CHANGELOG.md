@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.699 — 27 November 2026
+
+**A card's words no longer look like headings when you are only reading
+it.** Opened without Edit, a card showed its name, its word and its English
+in the same dark, bold, large type as the headings above them, so "This
+card" over "house" read as two headings in a row. The words are now a
+little smaller and at an ordinary weight; the headings are as they were.
+
+- Editing a card is unchanged: there the words were already in boxes and
+  smaller than the headings.
+- A module's and a space's own screens were checked and did not have the
+  problem.
+
+To check by hand: on a phone, that the words still read comfortably at the
+new size, the Arabic above all.
+
 ## 0.698 — 27 November 2026
 
 **Signing up asks for less.** The screen after you choose your name now
