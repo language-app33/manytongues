@@ -4,7 +4,7 @@ import "./teaching.css";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Course, Module, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
-import type { CardRow, CardViews, FilterGroup, MoreItem, Node } from "./shared.tsx";
+import type { CardRow, CardViews, FilterGroup, ListFilter, ListSort, MoreItem, Node } from "./shared.tsx";
 import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
 import { keyFromLink, signInLink } from "./sign-in-link.ts";
@@ -135,7 +135,6 @@ import {
   ConfirmModal,
   RadioGroup,
   Field,
-  FilterBar,
   formHasAudio,
   FilterMenu,
   MoreMenu,
@@ -165,7 +164,6 @@ import {
   dateTime,
   languageName,
   localIdFor,
-  narrowing,
   plural,
   moduleSize,
   notReaching,
@@ -833,6 +831,7 @@ export function ReportList({ flags, languages, busy, copying = false, copyingSay
         },
         {
           label: "Clear",
+          icon: "delete",
           danger: true,
           onClick: (ids) => onClear(ids),
         },
@@ -3178,6 +3177,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 bulkActions={[
                   {
                     label: "Suspend",
+                    icon: "block",
                     onClick: (handles) => {
                       const them = users.filter((u) => handles.includes(u.handle) && mayAct(u) && !u.suspended);
                       setConfirm({
@@ -3199,6 +3199,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                   },
                   {
                     label: "Remove from this space",
+                    icon: "remove",
                     danger: true,
                     onClick: (handles) => {
                       const them = users.filter((u) => handles.includes(u.handle) && mayAct(u));
@@ -3410,10 +3411,11 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 selected={selModules}
                 onSelectedChange={setSelModules}
                 bulkActions={[
-                  { label: "Add to a course", onClick: () => setModuleAction("add") },
-                  { label: "Remove from a course", onClick: () => setModuleAction("remove") },
+                  { label: "Add to a course", icon: "school", onClick: () => setModuleAction("add") },
+                  { label: "Remove from a course", icon: "remove", onClick: () => setModuleAction("remove") },
                   {
                     label: "Delete",
+                    icon: "delete",
                     danger: true,
                     onClick: (ids) => {
                       const picked = modules.filter((d) => ids.includes(d.id));
@@ -5995,18 +5997,43 @@ export const cardFormCount: (c: Card) => number = (c) => formsOf(c).length;
 export const cardAdded: (c: Card) => number = (c) => c.created || c.updated || 0;
 export const cardChanged: (c: Card) => number = (c) => c.updated || c.created || 0;
 
+/* Each order with the words the list says it in (0.728): `down` and `up`
+   are its two directions in the Sort panel, `saysDown` and `saysUp` what
+   the line over the list reads while it is in force. "Most first" had
+   been the word for every one of them, which was wrong about a date. */
 export const CARD_SORTS: Record<
   string,
-  { label: string; of: (c: Card) => any; numeric?: boolean; then?: (c: Card) => any }
+  {
+    label: string;
+    of: (c: Card) => any;
+    numeric?: boolean;
+    then?: (c: Card) => any;
+    down: string;
+    up: string;
+    saysDown: string;
+    saysUp: string;
+  }
 > = {
-  added: { label: "Added", of: cardAdded, numeric: true },
-  changed: { label: "Changed", of: cardChanged, numeric: true },
+  added: {
+    label: "Added", of: cardAdded, numeric: true,
+    down: "Newest first", up: "Oldest first", saysDown: "Newest added", saysUp: "Oldest added",
+  },
+  changed: {
+    label: "Changed", of: cardChanged, numeric: true,
+    down: "Newest first", up: "Oldest first", saysDown: "Newest changes", saysUp: "Oldest changes",
+  },
   /* Ordering by a yes/no puts one group first and leaves the other
      untouched behind it, so a second key decides within each group —
      otherwise the order inside a group would be whatever the server
      happened to return. */
-  audio: { label: "Recordings", of: (c: Card) => (cardHasAudio(c) ? 1 : 0), then: cardChanged },
-  forms: { label: "Forms", of: cardFormCount, then: cardChanged },
+  audio: {
+    label: "Recordings", of: (c: Card) => (cardHasAudio(c) ? 1 : 0), then: cardChanged,
+    down: "With first", up: "Without first", saysDown: "With recordings first", saysUp: "Without recordings first",
+  },
+  forms: {
+    label: "Forms", of: cardFormCount, then: cardChanged,
+    down: "Most first", up: "Fewest first", saysDown: "Most forms", saysUp: "Fewest forms",
+  },
 };
 
 export function sortCards(cards: Card[], key: string, newestFirst: boolean = true) {
@@ -7128,6 +7155,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* And as the list draws them: each language's pronouns folded into one
      entry that opens the Pronouns screen — see groupPronouns. */
   const listedCards = useMemo(() => groupPronouns(shownCards), [shownCards]);
+  /* How many entries the Cards tab lists before the filter, in the same
+     units — the pronouns folded — for the "5 of 12" over the list. */
+  const onListed = useMemo(() => groupPronouns(onCards).length, [onCards]);
   /* The open deck's cards, the same way: through the Cards tab's sort and
      filter, then with the pronouns folded. Worked out up here rather than
      where the deck is drawn, so a selection made in it can be opened out
@@ -7139,7 +7169,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        is set aside rather than emptying the list. */
     const inside = cardFilter.deckMode === "none" ? { ...cardFilter, deckMode: "any" } : cardFilter;
     const mine = sortCards(filterCards(held, inside, waitingIds), sortKey, newestFirst);
-    return { held, mine, listed: groupPronouns(mine, openModule) };
+    /* And how many entries the deck lists before the filter, in the same
+       units as `listed` — the pronouns folded into one — for "5 of 12". */
+    return { held, mine, listed: groupPronouns(mine, openModule), whole: groupPronouns(held, openModule).length };
   }, [openModule, cards, cardFilter, waitingIds, sortKey, newestFirst]);
   /* The cards a selection stands for. Everything that acts on one goes
      through this, because a pronoun entry is eight cards and no action
@@ -7481,39 +7513,51 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   }, [onCards, langOfCard]);
 
   /*
-   * The menus over a list of cards: how to order it, and what to leave out.
+   * How a list of cards is ordered and what it leaves out.
    *
-   * Built once here and handed to both screens that show cards — the Cards
-   * tab and an open deck — because a teacher moving between the two is
-   * looking at the same material through the same controls, and two copies
-   * of this would be two card lists that sort and narrow differently.
+   * Built once here and handed to every screen that shows cards — the Cards
+   * tab, an open deck, its Manage cards and the cards to add to it —
+   * because a teacher moving between them is looking at the same material
+   * through the same controls, and two copies of this would be two card
+   * lists that sort and narrow differently.
    *
-   * It is one setting for both, too: a deck opened while the list is showing
-   * only cards with recordings opens showing the same, which is what a
-   * filter above a list means everywhere else.
+   * It is one setting for all of them, too: a deck opened while the list is
+   * showing only cards with recordings opens showing the same, which is
+   * what a filter above a list means everywhere else.
+   *
+   * ItemList draws both (0.728): the order as a line of small text over the
+   * list, opening the Sort panel, where a new order waits for Apply; the
+   * filters behind the Filter button, taking hold as they are ticked, with
+   * each one in force a chip that takes it off — which is what `chip` and
+   * `onReset` on every group below are for.
    */
-  const sortGroups: FilterGroup[] = [
-    {
-      key: "sort",
-      label: "Sort",
-      value: sortKey,
-      onChange: setSortKey,
-      quiet: "changed",
-      options: Object.entries(CARD_SORTS).map(([k, v]) => ({ value: k, label: v.label })),
+  const cardSort: ListSort = {
+    value: sortKey,
+    down: newestFirst,
+    options: Object.entries(CARD_SORTS).map(([k, v]) => ({
+      value: k, label: v.label, down: v.down, up: v.up, saysDown: v.saysDown, saysUp: v.saysUp,
+    })),
+    onApply: (value, down) => {
+      setSortKey(value);
+      setNewestFirst(down);
     },
-    {
-      key: "dir",
-      label: "Order",
-      value: newestFirst ? "down" : "up",
-      onChange: (v) => setNewestFirst(v === "down"),
-      quiet: "down",
-      /* Named for what they mean rather than which way the arrow points:
-         "most" is newest for a date and the most forms for a count. */
-      options: [
-        { value: "down", label: "Most first" },
-        { value: "up", label: "Least first" },
-      ],
-    },
+  };
+  /* Each group's chip reads what it is narrowing to, and its cross puts
+     that group alone back to NO_CARD_FILTER. */
+  const pickedLabel = (options: { value: string; label?: Node }[], v: string) => {
+    const o = options.find((x) => x.value === v);
+    return o && typeof o.label === "string" ? o.label : "";
+  };
+  const BLANK_SIDES = [
+    { value: "any", label: "Any card" },
+    { value: "leaves", label: "Leaves one" },
+    { value: "fills", label: "Fills one" },
+    { value: "none", label: "Fills none" },
+  ];
+  const STATUS_OPTIONS = [
+    { value: "any", label: "Any" },
+    { value: "waiting", label: "Waiting to publish" },
+    { value: "published", label: "Published" },
   ];
   const filterGroups: FilterGroup[] = [
     {
@@ -7522,6 +7566,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       value: cardFilter.kinds.length ? "some" : "any",
       quiet: "any",
       wide: true,
+      chip: CARD_KINDS.filter((k) => cardFilter.kinds.includes(k.id)).map((k) => k.label).join(", "),
+      onReset: () =>
+        setCardFilter((f) => ({
+          ...f,
+          kinds: NO_CARD_FILTER.kinds,
+          subtypes: NO_CARD_FILTER.subtypes,
+          sceneKinds: NO_CARD_FILTER.sceneKinds,
+        })),
       /* Ticked rather than pressed, because several at once is the point:
          words and sentences, without the scenes. A kind's subtypes are
          offered under it once it is ticked, and only then — "verbs" says
@@ -7585,11 +7637,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       value: cardFilter.status,
       onChange: (v) => setCardFilter((f) => ({ ...f, status: v })),
       quiet: "any",
-      options: [
-        { value: "any", label: "Any" },
-        { value: "waiting", label: "Waiting to publish" },
-        { value: "published", label: "Published" },
-      ],
+      chip: pickedLabel(STATUS_OPTIONS, cardFilter.status),
+      onReset: () => setCardFilter((f) => ({ ...f, status: NO_CARD_FILTER.status })),
+      options: STATUS_OPTIONS,
     },
     {
       key: "audio",
@@ -7597,6 +7647,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       value: cardFilter.audio,
       onChange: (v) => setCardFilter((f) => ({ ...f, audio: v })),
       quiet: "any",
+      chip: ({ with: "With recordings", without: "Without recordings", lost: "Missing recordings" } as Record<string, string>)[cardFilter.audio],
+      onReset: () => setCardFilter((f) => ({ ...f, audio: NO_CARD_FILTER.audio })),
       options: [
         { value: "any", label: "Any" },
         { value: "with", label: "With" },
@@ -7610,6 +7662,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       value: cardFilter.forms,
       onChange: (v) => setCardFilter((f) => ({ ...f, forms: v })),
       quiet: "any",
+      chip: ({ one: "One form", several: "Several forms" } as Record<string, string>)[cardFilter.forms],
+      onReset: () => setCardFilter((f) => ({ ...f, forms: NO_CARD_FILTER.forms })),
       options: [
         { value: "any", label: "Any" },
         { value: "one", label: "One" },
@@ -7626,6 +7680,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         : "any",
       quiet: "any",
       wide: true,
+      chip: cardFilter.deckMode === "none"
+        ? "In no module"
+        : `${cardFilter.deckMode === "out" ? "Not in" : "In"} ${plural(cardFilter.deckIds.length, "module")}`,
+      onReset: () => setCardFilter((f) => ({ ...f, deckMode: NO_CARD_FILTER.deckMode, deckIds: NO_CARD_FILTER.deckIds })),
       /* Not a row of buttons: which decks is a list as long as the decks a
          teacher has made, and several of them at once. */
       custom: (
@@ -7683,6 +7741,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       value: cardFilter.blankMode,
       quiet: "any",
       wide: true,
+      chip: pickedLabel(BLANK_SIDES, cardFilter.blankMode),
+      onReset: () => setCardFilter((f) => ({ ...f, blankMode: NO_CARD_FILTER.blankMode, blankNames: NO_CARD_FILTER.blankNames })),
       /* Which blank is a list as long as the blanks a teacher has written,
          so it is ticked rather than pressed — the same shape as the decks
          above it, learned once. */
@@ -7691,12 +7751,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           <Segmented
             size={null}
             label="Which side of a blank a card is on"
-            options={[
-              { value: "any", label: "Any card" },
-              { value: "leaves", label: "Leaves one" },
-              { value: "fills", label: "Fills one" },
-              { value: "none", label: "Fills none" },
-            ]}
+            options={BLANK_SIDES}
             value={cardFilter.blankMode}
             onChange={(v: string) => setCardFilter((f) => ({ ...f, blankMode: v }))}
           />
@@ -7752,6 +7807,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       value: cardFilter.review,
       onChange: (v) => setCardFilter((f) => ({ ...f, review: v })),
       quiet: "any",
+      chip: ({ waiting: "Waiting for review", sentences: "All sentences" } as Record<string, string>)[cardFilter.review],
+      onReset: () => setCardFilter((f) => ({ ...f, review: NO_CARD_FILTER.review })),
       options: [
         { value: "any", label: "Any" },
         { value: "waiting", label: "Waiting" },
@@ -7759,23 +7816,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       ],
     },
   ];
-  /* What ItemList draws in its second row, beside Select. */
-  const cardMenus = [
-    {
-      key: "sort",
-      label: "Sort",
-      icon: "sort",
-      busy: narrowing(sortGroups),
-      content: <FilterBar groups={sortGroups} />,
-    },
-    {
-      key: "filter",
-      label: "Filter",
-      icon: "tune",
-      busy: narrowing(filterGroups),
-      content: <FilterBar groups={filterGroups} onClear={() => setCardFilter(NO_CARD_FILTER)} />,
-    },
-  ];
+  const cardFilterProp: ListFilter = { groups: filterGroups, onClear: () => setCardFilter(NO_CARD_FILTER) };
 
   /**
    * A language's numbers and its clock, fetched when they are wanted.
@@ -9466,8 +9507,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const pron = pronounCardsOf(langId);
     const ready = parts.length ? openRanges(langId) : new Set<string>();
     const pronSet = wordSetsOf(langId).find((s) => s.kind === "pronouns");
+    const everyOwn = cards.filter((c) => c.lang === langId && !isPronounCard(c));
     const own = sortCards(
-      filterCards(cards.filter((c) => c.lang === langId && !isPronounCard(c)), cardFilter, waitingIds),
+      filterCards(everyOwn, cardFilter, waitingIds),
       sortKey,
       newestFirst,
     );
@@ -9547,7 +9589,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           <ItemList
             noun="card"
             items={own}
-            menus={cardMenus}
+            total={everyOwn.length}
+            sort={cardSort}
+            filter={cardFilterProp}
             size="small"
             match={cardMatches}
             empty={cards.some((c) => c.lang === langId && !isPronounCard(c)) ? "No cards match the filter." : "You have no cards in this language yet."}
@@ -9638,7 +9682,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        tab uses — this screen showed them in whatever order they arrived and
        offered no way to narrow them at all. See deckView. */
     const held = moduleView ? moduleView.held : [];
-    const mine = moduleView ? moduleView.mine : [];
     const langId = (langOfModule(d) || {}).id || d.lang;
     /* The deck's number ranges, word sets, a range to an entry, ahead of its cards
        — the pronouns are already one entry among them. */
@@ -9646,6 +9689,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       .filter((r) => partsNow(d.parts || []).includes(r.id))
       .map((r) => ({ id: `numbers:${r.id}`, part: r.id, label: r.label, builtin: "numbers" }));
     const listed: any[] = (numberEntries as any[]).concat(moduleView ? moduleView.listed : []);
+    const listedWhole = numberEntries.length + (moduleView ? moduleView.whole : 0);
     const moduleEmpty = !held.length && !numberEntries.length;
     const matchEntry = (it: any, q: string) =>
       isNumberPart(it) ? it.label.toLowerCase().includes(q) : cardMatches(it, q);
@@ -9743,16 +9787,24 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           <ItemList
             noun="card"
             items={listed}
-            count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
+            total={listedWhole}
             /* With the deck empty, Import is in the box below instead. */
             more={moduleEmpty ? [] : [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }]}
-            menus={cardMenus}
+            sort={cardSort}
+            filter={cardFilterProp}
             size="small"
             busy={busy}
             filters={
               listed.length ? (
                 <div className="at-mt3">
-                  <Button icon="add" className="at-blockbtn" onClick={() => openAdding(d)}>Add existing cards</Button>
+                  {/* Both labels, and the stylesheet shows the one that
+                      fits on one line (0.728): the long one says where the
+                      cards go, which a phone has no room for. */}
+                  <Button icon="add" className="at-blockbtn at-addexisting"
+                    onClick={() => openAdding(d)}>
+                    <span className="at-longlabel">{`Add existing cards to this ${kindW}`}</span>
+                    <span className="at-shortlabel">Add existing cards</span>
+                  </Button>
                 </div>
               ) : null
             }
@@ -9781,14 +9833,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             selected={selCards}
             onSelectedChange={setSelCards}
             bulkActions={[
-              { label: `Remove from this ${kindW}`, onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
-              { label: "Add to another module", onClick: () => setCardAction("add") },
-              { label: "Add tags", onClick: () => setTagAction("add") },
-              { label: "Remove tags", onClick: () => setTagAction("remove") },
-              { label: "Change status", onClick: () => setStatusAction({ to: null }) },
+              { label: `Remove from this ${kindW}`, icon: "folderRemove", onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
+              { label: "Add to another module", icon: "folderAdd", onClick: () => setCardAction("add") },
+              { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
+              { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
+              { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
               { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
               {
                 label: "Delete",
+                icon: "delete",
                 danger: true,
                 onClick: (ids) => setConfirm({ kind: "cards", ids: realIds(ids), action: () => {} }),
               },
@@ -10166,13 +10219,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             <ItemList
               noun="card"
               items={listed}
-              count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
+              total={listedWhole}
               tools={moduleEmpty ? null : (
                 <Button variant="primary" icon="cards" onClick={() => setManaging(true)}>
                   {`Manage this ${kindW}'s cards`}
                 </Button>
               )}
-              menus={cardMenus}
+              sort={cardSort}
+              filter={cardFilterProp}
               size="small"
               busy={busy}
               empty={filterNote}
@@ -10833,13 +10887,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               <ItemList
                 noun="card"
                 items={listedCards}
-                count={
-                  shownCards.length === onCards.length
-                    ? null
-                    : `${shownCards.length} of ${plural(onCards.length, "card")}`
-                }
+                total={onListed}
                 more={cards.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
-                menus={cardMenus}
+                sort={cardSort}
+                filter={cardFilterProp}
                 size="small"
                 busy={busy}
                 empty={
@@ -10885,14 +10936,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 selected={selCards}
                 onSelectedChange={setSelCards}
                 bulkActions={[
-                  { label: "Add to a module", onClick: () => setCardAction("add") },
-                  { label: "Remove from a module", onClick: () => setCardAction("remove") },
-                  { label: "Add tags", onClick: () => setTagAction("add") },
-                  { label: "Remove tags", onClick: () => setTagAction("remove") },
-                  { label: "Change status", onClick: () => setStatusAction({ to: null }) },
+                  { label: "Add to a module", icon: "folderAdd", onClick: () => setCardAction("add") },
+                  { label: "Remove from a module", icon: "folderRemove", onClick: () => setCardAction("remove") },
+                  { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
+                  { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
+                  { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
                   { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
                     label: "Delete",
+                    icon: "delete",
                     danger: true,
                     onClick: (ids) => setConfirm({ kind: "cards", ids: pickedIds(ids), action: () => {} }),
                   },
@@ -11121,11 +11173,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 selected={selModules}
                 onSelectedChange={setSelModules}
                 bulkActions={[
-                  { label: "Add to a course", onClick: () => setModuleAction("add") },
-                  { label: "Remove from a course", onClick: () => setModuleAction("remove") },
+                  { label: "Add to a course", icon: "school", onClick: () => setModuleAction("add") },
+                  { label: "Remove from a course", icon: "remove", onClick: () => setModuleAction("remove") },
                   { label: "Export", icon: "download", onClick: (ids: string[]) => exportModules(ids) },
                   {
                     label: "Delete",
+                    icon: "delete",
                     danger: true,
                     onClick: (ids) => {
                       const picked = modules.filter((d) => ids.includes(d.id));
@@ -11164,7 +11217,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     <Tile
                       title={d.title}
                       /* Every module says what kind it is, right after its
-                         name (0.728, the owner's 1a, 3a, 4a). */
+                         name (0.729, the owner's 1a, 3a, 4a). */
                       badge={<span className="at-kindbadge" data-el="module-kind">{moduleKindCap(d)}</span>}
                       /* One line under the name (0.715, the owner's 1c):
                          what in it needs looking at, who can see it, and
@@ -11194,7 +11247,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         ) : (
                           "Not in a course yet — nobody can see it"
                         );
-                        /* A module's kind is its badge, by the name (0.728):
+                        /* A module's kind is its badge, by the name (0.729):
                            "Unit" and "Personal set" are off this line. */
                         const parts = [
                           waiting ? <span key="w">{waiting}</span> : null,
@@ -12534,6 +12587,7 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
                 },
                 {
                   label: "Clear",
+                  icon: "delete",
                   danger: true,
                   onClick: (ids) => setClearingFeedback(ids),
                 },

@@ -723,6 +723,18 @@ button {
   .at-sheet { border-radius: var(--r-lg); padding-bottom:18px; }
 }
 .at-sheettop { display:flex; align-items:center; gap:8px; }
+/* A sheet with a button at its foot — a list's Sort and Filter (0.728):
+   what is in it scrolls, inside the sheet, and the button stays in view
+   under it however long the Kind and Modules lists grow. */
+.at-sheet.at-footsheet { display:flex; flex-direction:column; overflow:hidden; }
+.at-footsheet > .at-sheettop { flex:0 0 auto; }
+.at-footsheet > .at-sheetbody { flex:1 1 auto; min-height:0; overflow-y:auto;
+  overscroll-behavior:contain; margin:8px -4px 0; padding:0 4px 4px; }
+.at-footsheet > .at-sheetfoot { flex:0 0 auto; padding-top:12px; border-top:1px solid var(--line);
+  margin-top:8px; }
+.at-sheetfoot > .at-btn { width:100%; }
+/* In a sheet the pickers are the sheet's own, not a panel inside it. */
+.at-sheetbody > .at-filterbar { padding:0; border:0; background:none; }
 /* ---- pictures in practice ----
    The prompt: large enough to recognise the thing at a glance, its own
    shape inside a frame the height of a phrase prompt's worth of room. The
@@ -952,10 +964,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* The outline without the fill, matching .at-btn.ghost — for an icon button
    standing in a row beside ghost buttons. */
 .at-icon.ghost { background: transparent; }
-/* Select is a named button in the row under the search field, beside the
-   menus that order and narrow the list — it was an unlabelled icon up in
-   the search row, where it read as another way of finding something. */
-.at-toolbar-search .at-selectbtn.on { border-color: var(--accent); color: var(--accent); }
 /* An icon in the search row — how big to draw the tiles, the way in to a
    language's numbers — sized like the field beside it so the row keeps one
    height. Every icon there rather than that one by name: .at-icon is
@@ -964,17 +972,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    row on a list with nothing in it to search. */
 .at-toolbar .at-icon { flex:0 0 auto; width:44px; height:44px; min-height:44px;
   padding:0; box-sizing:border-box; }
-/* The view button stands at the far end of the top row, apart from New
-   and the dots at its start. */
-.at-toolbar-top .at-viewbtn { margin-inline-start:auto; }
-/* The bulk tray: what it is on the left, how many on the right. */
-.at-bulkhead2 { display:flex; align-items:baseline; justify-content:space-between;
-  gap:12px; width:100%; margin-bottom:8px; }
-.at-bulktitle { font-size:12px; font-weight:800; text-transform:uppercase;
-  letter-spacing:.05em; color: var(--ink); }
-.at-bulkrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%; }
-.at-bulkdel { margin-left:auto; width:44px; height:40px; flex:0 0 auto;
-  background: var(--rose); border-color: var(--rose); color:#fff; }
 
 .at-part:last-child, .at-part > :last-child, .at-part > .at-field:last-of-type { margin-bottom:0; }
 /* The name of the subsection, across the top of its panel and ruled off
@@ -1083,24 +1080,56 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
   padding:0; border:0; border-radius: var(--r-sm); background:transparent; color: var(--faint); cursor:pointer; }
 .at-searchclear:hover, .at-searchclear:focus-visible { color: var(--ink); background: var(--raised); }
-/* The second row: Select, then the menus. Three named buttons is more than a
-   narrow phone has room for on one line, so this row wraps where the row
-   above it must not — a search field that wrapped under its own New button
-   would be a field a thumb's width from nothing. */
-/* The search row (0.689): the box takes what the icons after it leave.
-   Without a box — nothing to search yet — a filler holds the icons at the
-   end of the row, where they are when there is one. */
-.at-toolbar-search .at-toolbarfill { flex:1 1 0; min-width:0; }
-/* A menu's count, on its icon's corner now the icon has no words beside
-   it, and the open one lit as its panel hangs under the row. */
-.at-toolbar .at-menubtn { position:relative; }
-.at-toolbar .at-menubtn > .at-filtercount { position:absolute; top:-6px; right:-6px; }
-.at-toolbar .at-menubtn.open { border-color: var(--accent); color: var(--accent); }
-/* Whichever menu is open, under the row and across it. In the flow rather
-   than floating: it is as tall as its groups need and pushing the list down
-   is honest — a panel hanging over the first row of cards hides the thing
-   being narrowed. */
-.at-listmenu { margin:0 0 12px; }
+/* A list's bar (0.728): New, the search box, Filter and the dots on one
+   row, the box taking what the others leave. Without a box — nothing to
+   search yet — a filler holds the icons at the end of the row, where they
+   are when there is one. */
+.at-toolbar .at-toolbarfill { flex:1 1 0; min-width:0; }
+/* + alone on a phone, a 44px square like the icons beside it, so the
+   search box keeps the width to read what was typed in it; "+ New card"
+   where there is room. The words are in the button either way, hidden
+   here rather than left out, so its name does not change with the width. */
+.at-btnword { display:none; }
+.at-toolbar .at-btn.at-newbtn { width:44px; padding:0; }
+@media (min-width: 640px) {
+  .at-btnword { display:inline; }
+  .at-toolbar .at-btn.at-newbtn { width:auto; padding:0 16px; }
+  .at-toolbar .at-icon.at-filterbtn { width:auto; padding:0 14px; gap:6px; }
+}
+/* Filter carries how many filters are on, on its corner, and is lit while
+   any is. */
+.at-toolbar .at-filterbtn { position:relative; font-family: var(--ui); font-size:14px; font-weight:700; }
+.at-toolbar .at-filterbtn > .at-filtercount { position:absolute; top:-6px; right:-6px; }
+.at-filterbtn.on { border-color: var(--brass); color: var(--brass); }
+.at-filterbtn.open, .at-donebtn { border-color: var(--accent); color: var(--accent); }
+/* The screen's own worded button, on a row of its own over the bar. */
+.at-toolsrow { flex-wrap:wrap; }
+/* The quiet line under the bar: the count, Clear, the order and the view
+   switch in small muted type rather than a second row of boxes. Its
+   buttons are words, with no border, and reach past the line above and
+   below so each is a 44px target without the line being 44px tall. */
+.at-listline { display:flex; align-items:center; gap:0 4px; min-height:28px; margin:-2px 0 8px;
+  font-family: var(--ui); font-size: var(--fs-sm); font-weight:600; color: var(--muted); }
+.at-listcount { white-space:nowrap; }
+.at-linebtn { display:inline-flex; align-items:center; gap:2px; min-height:44px; margin:-8px 0;
+  padding:0 8px; border:0; background:none; font:inherit; color: var(--muted); cursor:pointer;
+  white-space:nowrap; border-radius: var(--r-sm); }
+.at-linebtn:hover, .at-linebtn:focus-visible { color: var(--text); }
+.at-lineclear { color: var(--accent); margin-inline-start:4px; }
+.at-lineend { margin-inline-start:auto; }
+.at-linebtn.at-viewbtn { padding:0 6px; }
+.at-listline > .at-linebtn:last-child { margin-inline-end:-6px; }
+/* Each filter in force, as a chip that takes it off: one line that
+   scrolls sideways and never wraps, at every width. */
+.at-filterchips { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; margin:0 0 10px;
+  scrollbar-width:none; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+.at-filterchips::-webkit-scrollbar { display:none; }
+.at-filterchip { flex:0 0 auto; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;
+  min-height:32px; padding:0 12px; border:1px solid var(--line); border-radius:999px;
+  background: var(--well); color: var(--text); font-family: var(--ui); font-size: var(--fs-sm);
+  font-weight:700; }
+button.at-filterchip { padding-inline-end:8px; cursor:pointer; }
+button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: var(--accent); }
 /* Room between the line explaining a tab and the controls under it. */
 .at-listwrap > .at-toolbar:first-child { margin-top:16px; }
 /* A boxed section inside a full-screen view, so a course reads as three
@@ -1115,14 +1144,21 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* A course's People tab (0.707): the name, and the handle under it. */
 .at-personname .at-handle { display:block; font-size:12px; font-weight:400; color: var(--muted); }
 .at-panel .at-decklist2 .at-deckcard { background: var(--raised); }
-.at-listtools { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
 /* Dialog titles and screen titles are the same rank, so they are the same
    size — a modal is a small screen, not a different species. */
 .at-modaltitle { font-size:19px; font-weight:800; margin:0 0 10px; }
 /* The teaching tab strip and the learning nav share one type scale. */
 .at-nav2 .at-btn.sm .at-btn.sm { font-size:13px; letter-spacing:.03em; }
-/* A tile carries its own tick when the list is in selecting mode. */
+/* A tile carries its own tick when the list is in selecting mode. A finger
+   held on one starts selecting (0.728), so iOS is kept from putting its own
+   menu for a held link or picture over it; on a touch screen alone, the
+   hold does not start selecting the tile's text either. A mouse keeps
+   text selection as it was. */
+.at-tilewrap, .at-cardtable tr { -webkit-touch-callout:none; }
 .at-tilewrap { position:relative; }
+@media (hover: none) and (pointer: coarse) {
+  .at-tilewrap, .at-cardtable tr { -webkit-user-select:none; user-select:none; }
+}
 .at-tilewrap.picked > .at-deckcard, .at-tilewrap.picked > .at-minicard,
 .at-tilewrap.picked > .at-item { border-color: var(--accent); }
 /* A tap on a tile ticks it while selecting, so a tile's own edit and delete
@@ -1130,17 +1166,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-tilewrap.selecting .at-miniacts, .at-tilewrap.selecting .at-deckacts,
 .at-tilewrap.selecting .at-minicorner { display:none; }
 .at-tilewrap > .at-ckbox.pick { position:absolute; top:10px; right:10px; z-index:2; }
-/* The bar that rises once something is ticked: a plain tray across the
-   bottom, not a floating pill. */
+/* The bar that rises once something is ticked: a slim tray across the
+   bottom, not a floating pill — how many, and Actions (0.728). */
 .at-bulkfloat {
   position:fixed; left:0; right:0;
-  bottom:0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
-  z-index:120; display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  bottom:0; padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+  z-index:120; display:flex; gap:8px; align-items:center; flex-wrap:nowrap;
   background: var(--surface); border-top:2px solid var(--line);
   box-shadow: 0 -6px 20px rgba(0,0,0,.14);
 }
-.at-bulkcount { font-size:12px; font-weight:800; color: var(--muted);
+.at-bulkcount { font-size:13px; font-weight:800; color: var(--muted);
   margin-right:auto; text-transform:uppercase; letter-spacing:.04em; }
+.at-bulkfloat .at-bulkgo { min-height:44px; padding:0 20px; }
 
 .at-codeblock .at-hint { margin-top:6px; }
 /* On a screen laid out like the card editor, a code's name is a field's
@@ -1171,12 +1208,12 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-deckmain { flex:1 1 0; min-width:0; }
 .at-decktitle { font-size:18px; font-weight:800; overflow-wrap:anywhere; }
 .at-deckmeta { font-size:13px; color: var(--muted); margin-top:3px; }
-/* A tile's title with a badge after it (0.728): the badge follows the
+/* A tile's title with a badge after it (0.729): the badge follows the
    name, and goes to the next line when a long name needs the width. */
 .at-decktitlerow { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
 .at-decktitlerow > .at-decktitle { min-width:0; }
 /* What kind of module a tile is — Deck, Unit or Personal set — in the
-   outline of a tag (.at-tag), made small (0.728, the owner's 4a). */
+   outline of a tag (.at-tag), made small (0.729, the owner's 4a). */
 .at-kindbadge { display:inline-flex; align-items:center; font-family: var(--ui); font-size:11px;
   font-weight:800; line-height:1.2; white-space:nowrap; border-radius:999px; padding:3px 8px;
   background: var(--tag-bg); border:1.5px solid var(--tag-line); color: var(--brass); }
@@ -1867,9 +1904,9 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-ctxmeaning { font-family: var(--ui); font-size:17px; font-weight:700; color: var(--text-soft);
   margin:6px 0 0; text-align:center; }
 .at-answeralso .at-ctxmeaning { font-size:16px; font-weight:600; color: var(--muted); margin-top:2px; }
-/* What a Sort or Filter button opens onto: the groups, wrapping rather than
-   scrolling, each staying whole on a phone. The button that opens it lives
-   in the toolbar row above and is styled with it. */
+/* What a Sort or Filter panel holds: the groups, wrapping rather than
+   scrolling, each staying whole on a phone. The status menu on a card's
+   screen is the other .at-menubtn, lit the same way. */
 .at-menubtn.on { border-color: var(--brass); color: var(--brass); }
 .at-filtercount { display:inline-flex; align-items:center; justify-content:center;
   min-width:17px; height:17px; padding:0 4px; border-radius:999px;
@@ -2809,12 +2846,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-section > .at-sectiontop > .at-sectionhead { margin:0; }
 .at-pagetitle .at-brandmark { width:28px; height:28px; }
 
-/* Heading to first tile at the editor's 18px (0.572). The row is the
-   44px button's height with the heading centred in it, so 10px under the
-   row puts the heading's own foot about 18px above the first tile. The
-   list's top toolbar has nothing in it here — its search lives in the
-   heading's row — and an empty row still brought its margins along. */
-.at-coursesection .at-toolbar-top:empty { display:none; }
 /* The courses page's headings at the card editor's heading size (0.571). */
 .at-coursesection .at-sectionhead { font-size:25px; font-weight:800;
   letter-spacing:-.015em; line-height:1.15; }

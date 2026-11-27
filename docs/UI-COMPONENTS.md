@@ -182,17 +182,20 @@ chooses one of a few rather than acting (0.691): a card's status
 (`StatusMenu`) and `FilterMenu` open the same `PickSheet` of these rows.
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
-The panel a list's Sort or Filter button opens onto. `groups, note`
+The pickers a list's Sort or Filter panel holds. `groups, note, onClear`
 
 A group is `{ key, label, value, quiet, onChange, options }` and draws a
 `Segmented`; `quiet` names the value that counts as not narrowing, and
 `narrowing(groups)` counts the ones that are away from it — that count is
-what the button carries. A group with `custom` draws that instead, for a
-choice a row of buttons cannot say (which decks, of all of them), and `wide`
-gives it a line of its own.
+what the Filter button carries. A group with `custom` draws that instead, for
+a choice a row of buttons cannot say (which decks, of all of them), and `wide`
+gives it a line of its own. `chip` is what the group's chip under a list's bar
+says while it narrows ("Without recordings"; its `label` otherwise), and
+`onReset` puts that one group back — the chip's cross.
 
-It is only the panel: the button, and keeping one panel open at a time,
-belong to `ItemList`'s `menus`.
+It is only the pickers: the button, the panel they open in and the chips
+belong to `ItemList`'s `filter` (0.728). The Sort panel builds its own two
+groups from `ItemList`'s `sort`.
 
 ### `RadioGroup` — 2 uses
 One of a few, as a list of rows rather than a track of segments.
@@ -213,38 +216,62 @@ The languages, through `RadioGroup`. `languages, value, onChange, label, name`
 ## Lists and tiles
 
 ### `ItemList` — 9 uses
-The standard list frame: two rows of controls, bulk-action tray, empty state,
-and paging at 120 items.
+The standard list frame: one bar of controls, a quiet line under it, the
+list, a slim bar at the foot while selecting, empty state, and paging at 120
+items.
 
 `noun, plural, items, itemKey, match, groups, groupOf, size="large"|"small",
-views, onNew, renderItem, selected, onSelectedChange, bulkActions, tools,
-more, narrow, menus, filters, count, empty, busy`
+views, onNew, newOff, renderItem, selected, onSelectedChange, bulkActions,
+tools, more, narrow, sort, filter, total, filters, query, empty, emptyPanel,
+busy`
 
-The controls are **two rows** (0.689): New, the three dots holding `more`
-(Import, where a list has it), `tools` (the screen's own main button) and,
-at the far end, the view button on the first; the search box on a line of
-its own on the second, with Select, the `menus` and `narrow` after it as
-icons. Either row is left out when it would hold nothing. Whichever menu is
-open renders under them, then `filters`, then the tiles.
+**The bar is one row** (0.728): New (+ alone under 640px, "+ New card"
+from there), the search box taking what is left, Filter (with the count of
+filters on, and its word from 640px), `narrow`, and three dots. The dots hold
+Select first, where there is anything to select, then `more` (Import, where a
+list has it); where Select would be alone in them it is an icon of its own
+and there are no dots. `tools`, the screen's worded button ("Manage this
+deck's cards"), is on a row of its own above the bar. Each part is left out
+when it would hold nothing, and with `emptyPanel` showing the bar stands
+aside.
 
-`menus` is `[{ key, label, icon, busy, content }]` — one open at a time, so
-two panels can never give two answers to "why is this list short". `busy` is
-the count the button carries; `narrowing(groups)` works it out for a
-`FilterBar`'s groups.
+**The quiet line** under the bar, in small muted type: the count ("14 cards",
+or "5 of 14" while narrowed, against `total`), Clear while a filter is on,
+and at the end the order (opening the Sort panel) and the view switch. It is
+drawn only where it says more than a count — a list with `sort` or `views`,
+or narrowed, or selecting — so People has none. Under it, while filtered,
+each filter in force is a chip on one line that scrolls sideways.
 
-`views` adds the view button, which steps the list through four views —
-small grid, large grid, list and table — with an icon for each. It is
-`{ key, columns, row(item) }`: `row` gives a card's `word` and `meaning` for
-the list view, its `cells` by column key for the table, and the `open` and
-`actions` a tile would have. `key` names the list, and each list keeps the
-view it was left at on the device. `cardWords`, `cardKindLabel` and
-`cardSubtypeLabel` say a card's words, kind and subtype the same way in
-every list.
+`sort` is `{ value, down, options, onApply(value, down) }`, each option
+`{ value, label, down, up, saysDown, saysUp }`: `label` is its name in the
+panel, `down`/`up` its two directions there, `saysDown`/`saysUp` what the
+line reads. **The Sort panel keeps a draft and waits for Apply**; shut any
+other way it changes nothing. `filter` is `{ groups, onClear }` — `FilterBar`
+groups, which **take hold as they are ticked**; the panel's button reads
+"Show 5 cards" and only shuts it. One panel at a time, from the foot of the
+screen (`PickSheet`), its contents scrolling above a button that stays put.
+
+**Selecting** starts from Select, or from a finger held on a tile or table
+row (touch and pen, 500ms, cancelled by 10px of movement; the click after is
+swallowed). While it lasts the search box and Filter stay, New and the dots
+give way to a cross ("Done selecting"), and the line reads "3 selected" with
+Select all. The foot bar says how many and has one **Actions** button, which
+opens a panel of `bulkActions` as rows, each with its `icon`, `danger` ones
+last. It is still fixed to the foot and measured into `--bulk-h`, which the
+list reserves at its end.
+
+`views` adds the view switch — grid or table. It is
+`{ key, columns, row(item) }`: `row` gives a card's `cells` by column key for
+the table, and the `open` and `actions` a tile would have. `key` names the
+list, and each list keeps the view it was left at on the device.
+`cardWords`, `cardKindLabel` and `cardSubtypeLabel` say a card's words, kind
+and subtype the same way in every list.
 
 `match` is `(item, lowercasedQuery) => boolean`. `bulkActions` is
-`[{ label, danger, icon, onClick(ids) }]`, and **`ids` is an array, not the
-Set the list keeps internally** — the tray spreads it before calling, and
-every caller reaches for `.includes` or `.length`.
+`[{ label, icon, danger, onClick(ids) }]`, and **`ids` is an array, not the
+Set the list keeps internally** — every caller reaches for `.includes` or
+`.length`. Give every action an icon of its own; `folder` is drawn where one
+is missing.
 
 `itemKey` defaults to reading `.id`, so items need one unless you pass your
 own.
