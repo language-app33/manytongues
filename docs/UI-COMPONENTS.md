@@ -194,7 +194,7 @@ says while it narrows ("Without recordings"; its `label` otherwise), and
 `onReset` puts that one group back — the chip's cross.
 
 It is only the pickers: the button, the panel they open in and the chips
-belong to `ItemList`'s `filter` (0.727). The Sort panel builds its own two
+belong to `ItemList`'s `filter` (0.728). The Sort panel builds its own two
 groups from `ItemList`'s `sort`.
 
 ### `RadioGroup` — 2 uses
@@ -225,7 +225,7 @@ views, onNew, newOff, renderItem, selected, onSelectedChange, bulkActions,
 tools, more, narrow, sort, filter, total, filters, query, empty, emptyPanel,
 busy`
 
-**The bar is one row** (0.727): New (+ alone under 640px, "+ New card"
+**The bar is one row** (0.728): New (+ alone under 640px, "+ New card"
 from there), the search box taking what is left, Filter (with the count of
 filters on, and its word from 640px), `narrow`, and three dots. The dots hold
 Select first, where there is anything to select, then `more` (Import, where a

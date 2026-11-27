@@ -5997,7 +5997,7 @@ export const cardFormCount: (c: Card) => number = (c) => formsOf(c).length;
 export const cardAdded: (c: Card) => number = (c) => c.created || c.updated || 0;
 export const cardChanged: (c: Card) => number = (c) => c.updated || c.created || 0;
 
-/* Each order with the words the list says it in (0.727): `down` and `up`
+/* Each order with the words the list says it in (0.728): `down` and `up`
    are its two directions in the Sort panel, `saysDown` and `saysUp` what
    the line over the list reads while it is in force. "Most first" had
    been the word for every one of them, which was wrong about a date. */
@@ -7525,7 +7525,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * showing only cards with recordings opens showing the same, which is
    * what a filter above a list means everywhere else.
    *
-   * ItemList draws both (0.727): the order as a line of small text over the
+   * ItemList draws both (0.728): the order as a line of small text over the
    * list, opening the Sort panel, where a new order waits for Apply; the
    * filters behind the Filter button, taking hold as they are ticked, with
    * each one in force a chip that takes it off — which is what `chip` and
@@ -9798,7 +9798,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               listed.length ? (
                 <div className="at-mt3">
                   {/* Both labels, and the stylesheet shows the one that
-                      fits on one line (0.727): the long one says where the
+                      fits on one line (0.728): the long one says where the
                       cards go, which a phone has no room for. */}
                   <Button icon="add" className="at-blockbtn at-addexisting"
                     onClick={() => openAdding(d)}>

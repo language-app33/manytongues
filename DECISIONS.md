@@ -9587,7 +9587,7 @@ modules. Left as they were, by choice: the student's Cards and Progress
 tabs with no course (Home has Join a course), the "languages switched on"
 empties, and the sentence-card picker, where a button would leave a
 half-written card.
-## One bar over a list, and a quiet line under it (0.727)
+## One bar over a list, and a quiet line under it (0.728)
 
 Teaching › Material › Cards had two rows of controls over its list — New,
 three dots and the view button, then the search box with Select, Sort and

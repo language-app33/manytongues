@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.727 — 27 November 2026
+## 0.728 — 27 November 2026
 
 **A simpler bar above every list.** Teaching › Material › Cards had two
 rows of controls over its cards; now it has one, and every list in the app

@@ -1141,7 +1141,7 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
-/** A list's Select (0.727): the first row of its three dots, or an icon of
+/** A list's Select (0.728): the first row of its three dots, or an icon of
    its own where the dots would hold nothing else. Done selecting is the
    cross that takes New's place while it lasts.
    @param {Element} root */
@@ -1173,7 +1173,7 @@ const stopSelecting = async (root) => {
   await sleep(200);
 };
 /* What the Actions panel offers for what is ticked, row by row, and
-   pressing one of them: the foot bar's one button opens it (0.727). */
+   pressing one of them: the foot bar's one button opens it (0.728). */
 const actionRows = () => [...document.querySelectorAll(".at-actionsheet .at-sheetact")]
   .map((b) => ((b.querySelector("b") || {}).textContent || "").trim());
 const openActions = async () => {
@@ -3500,7 +3500,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
    screen is open. It used to come off only when a counter emptied, so an
    entry that outlived its component hid the chrome until the page was
    reloaded. */
-/* ---- a list with nothing for its three dots but Select (0.727) ----
+/* ---- a list with nothing for its three dots but Select (0.728) ----
    People: New and Select and no more. Dots opening onto one row would be a
    press for nothing, so Select is its own icon and there are no dots — and
    with no order or view to say, no line under the bar either. A list that
@@ -5545,7 +5545,7 @@ const openPronounTables = async () => {
   check("and ticking one raises the bulk actions", !!document.querySelector(".at-bulkfloat"),
     (document.body.textContent || "").slice(-80));
 
-  /* ---- selecting keeps the search and Filter (0.727) ----
+  /* ---- selecting keeps the search and Filter (0.728) ----
      Narrowing to what is to be ticked is half of selecting; New and the
      three dots give way to a cross that ends it. */
   {
@@ -5580,7 +5580,7 @@ const openPronounTables = async () => {
       cardsFrame.querySelectorAll(".at-tilewrap.picked").length === 1, `${cardsFrame.querySelectorAll(".at-tilewrap.picked").length} ticked`);
   }
 
-  /* ---- one Actions button, and the panel it opens (0.727) ----
+  /* ---- one Actions button, and the panel it opens (0.728) ----
      The tray held every action as a button, seven of them, over half a
      phone's screen. Now the foot bar says how many and opens a panel of
      them, each with a picture of its own, Delete last. */
@@ -5672,7 +5672,7 @@ const openPronounTables = async () => {
   takeSaves = false;
   if (cardsFrame.querySelector(".at-ckbox.pick")) await stopSelecting(cardsFrame);
 
-  /* ---- a finger held on a card starts selecting it (0.727) ----
+  /* ---- a finger held on a card starts selecting it (0.728) ----
      jsdom has no PointerEvent, so the press is a mouse event of the
      pointer's type carrying `pointerType`, which is all React reads of it. */
   {
@@ -9343,7 +9343,7 @@ const openPronounTables = async () => {
    Both now carry the same bar and the same settings, so a deck opened while
    the list is narrowed opens narrowed the same way.
 
-   The bar is one row since 0.727: New, the search box, Filter and the three
+   The bar is one row since 0.728: New, the search box, Filter and the three
    dots, which hold Select. Under it a quiet line says how many there are,
    the order, and the view; Sort and Filter open in the panel from the foot
    of the screen rather than pushing the list down. */
@@ -9417,7 +9417,7 @@ const openPronounTables = async () => {
   check("and at its end the view switch says which view it is in and what pressing it does",
     /^View: Grid — press for table$/.test(sizeName()), sizeName());
 
-  /* ---- Sort waits for Apply (0.727, the owner's word) ----
+  /* ---- Sort waits for Apply (0.728, the owner's word) ----
      Picking in the panel changes nothing behind it; Apply does; shutting
      it any other way leaves the order as it was. */
   const before = order();
@@ -9499,7 +9499,7 @@ const openPronounTables = async () => {
     !!tickRow(/^Noun$/) && !!tickRow(/^No subtype$/) && !tickRow(/^Conversation$/),
     [...document.querySelectorAll(".at-filtersheet .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
   check("and narrows the list to them", tiles() <= tilesBefore, `${tiles()} of ${tilesBefore}`);
-  /* Filters take hold as they are ticked (0.727): the list behind the
+  /* Filters take hold as they are ticked (0.728): the list behind the
      panel has already changed, and its button counts what is left. */
   check("and the panel's button counts the cards now listed",
     (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
@@ -9633,7 +9633,7 @@ const openPronounTables = async () => {
     tiles() === all && !clearAll() && !/\d/.test(filterBtn().textContent || ""),
     `${tiles()} of ${all}; ${filterBtn().textContent || ""}`);
 
-  /* ---- the filters in force, under the bar (0.727) ----
+  /* ---- the filters in force, under the bar (0.728) ----
      With the panel shut, the line says how many of how many, offers to
      clear, and each filter on is a chip whose cross takes it alone off. */
   const chips = () => [...frame.querySelectorAll(".at-filterchips .at-filterchip")].map((c) => (c.textContent || "").trim());
@@ -9812,7 +9812,7 @@ const openPronounTables = async () => {
     [...document.querySelectorAll(".at-screenhead h2")].some((h) => /^Manage cards$/.test((h.textContent || "").trim())),
     [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
   /* Its words are "Add existing cards to this deck" where there is room
-     and "Add existing cards" on a phone (0.727); both are in the button
+     and "Add existing cards" on a phone (0.728); both are in the button
      and the stylesheet shows one. */
   click(buttonNamed(/^Add existing cards/));
   await sleep(300);

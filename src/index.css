@@ -718,7 +718,7 @@ button {
   .at-sheet { border-radius: var(--r-lg); padding-bottom:18px; }
 }
 .at-sheettop { display:flex; align-items:center; gap:8px; }
-/* A sheet with a button at its foot — a list's Sort and Filter (0.727):
+/* A sheet with a button at its foot — a list's Sort and Filter (0.728):
    what is in it scrolls, inside the sheet, and the button stays in view
    under it however long the Kind and Modules lists grow. */
 .at-sheet.at-footsheet { display:flex; flex-direction:column; overflow:hidden; }
@@ -1075,7 +1075,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
   padding:0; border:0; border-radius: var(--r-sm); background:transparent; color: var(--faint); cursor:pointer; }
 .at-searchclear:hover, .at-searchclear:focus-visible { color: var(--ink); background: var(--raised); }
-/* A list's bar (0.727): New, the search box, Filter and the dots on one
+/* A list's bar (0.728): New, the search box, Filter and the dots on one
    row, the box taking what the others leave. Without a box — nothing to
    search yet — a filler holds the icons at the end of the row, where they
    are when there is one. */
@@ -1145,7 +1145,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 /* The teaching tab strip and the learning nav share one type scale. */
 .at-nav2 .at-btn.sm .at-btn.sm { font-size:13px; letter-spacing:.03em; }
 /* A tile carries its own tick when the list is in selecting mode. A finger
-   held on one starts selecting (0.727), so iOS is kept from putting its own
+   held on one starts selecting (0.728), so iOS is kept from putting its own
    menu for a held link or picture over it; on a touch screen alone, the
    hold does not start selecting the tile's text either. A mouse keeps
    text selection as it was. */
@@ -1162,7 +1162,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-tilewrap.selecting .at-minicorner { display:none; }
 .at-tilewrap > .at-ckbox.pick { position:absolute; top:10px; right:10px; z-index:2; }
 /* The bar that rises once something is ticked: a slim tray across the
-   bottom, not a floating pill — how many, and Actions (0.727). */
+   bottom, not a floating pill — how many, and Actions (0.728). */
 .at-bulkfloat {
   position:fixed; left:0; right:0;
   bottom:0; padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
