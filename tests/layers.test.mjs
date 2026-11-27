@@ -537,18 +537,21 @@ test("every token the stylesheet uses is a token the stylesheet defines", () => 
   assert.deepEqual(missing, [], `used but never defined: ${missing.join(", ")}`);
 });
 
-test("the selected tab has a stroke, in a colour that exists in both themes", () => {
-  /* The outline is what says which tab is current; a shade of fill alone
-     does not. It is its own token — a dark grey in both themes — rather
-     than the page's ink, which is near-white in the dark theme and would
-     read as a highlight rather than an outline. */
+test("the selected tab is marked in the accent colour, outlined and tinted", () => {
+  /* 0.698 (the owner's 1a): chosen is the accent colour everywhere — the
+     bar at the foot, a Segmented, a picked tile — so a selected tab is too.
+     The outline is what says which tab is current at a glance; the wash is
+     the bar's, faint, so a tab does not read as a Segmented's solid fill. */
   const on = rule(".at-tab2.on");
-  assert.match(on, /border-color:\s*var\(--tab-stroke\)/, "the selected tab does not stroke with --tab-stroke");
-  const definitions = [...css.matchAll(/--tab-stroke\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
-  assert.ok(definitions.length >= 2, `--tab-stroke is defined ${definitions.length} time(s); it needs the dark and the light theme`);
-  assert.ok(definitions.every((v) => /^#[0-9a-fA-F]{6}$/.test(v)), `--tab-stroke should be a plain colour: ${definitions.join(", ")}`);
+  assert.match(on, /border-color:\s*var\(--accent\)/, "the selected tab is not outlined in the accent colour");
+  assert.match(on, /color:\s*var\(--accent\)/, "the selected tab's name is not in the accent colour");
+  assert.match(on, /background:\s*color-mix\(in srgb, var\(--accent\) \d+%, transparent\)/, "the selected tab is not on a wash of the accent");
+  assert.doesNotMatch(css, /--tab-stroke/, "the grey outline is back");
   /* And the base tab still draws a border, or the colour has nothing to colour. */
-  assert.match(rule(".at-tab2"), /border:\s*2px solid/, "the tab has no border for the stroke to take");
+  assert.match(rule(".at-tab2"), /border:\s*2px solid/, "the tab has no border for the outline to take");
+  /* (2a) Ordinary lettering, as the bar's names are; (3a) the track's edge is everyone's 2px. */
+  assert.match(rule(".at-tab2"), /text-transform:\s*none/, "the tab names are capitals again");
+  assert.match(rule(".at-nav2"), /border:\s*2px solid/, "the track's edge is thinner than everything around it");
 });
 
 test("tabs inside a page are one full-width track, and views are switched by tabs", () => {

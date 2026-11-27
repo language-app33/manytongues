@@ -9382,3 +9382,15 @@ New card, Add existing cards and Import. A teacher in no course does not
 reach Teaching at all; the hidden case is an administrator, or courses
 all in languages switched off.
 
+## A selected tab is green, like everything chosen (0.698)
+
+0.685 made the selected tab in a page grey with a dark grey outline, partly
+so tabs would not read as a `Segmented`, whose chosen option is solid green.
+Side by side on a phone, that left tabs the one place where chosen was not
+the accent colour, and in the light theme the outline was the darkest line
+on the screen. The owner chose the bar's way of marking a section (1a): the
+accent on an 18% wash of it, with an accent outline. That keeps the
+distinction from a `Segmented` (a faint wash, not a solid fill) and drops
+`--tab-stroke`. Names are in ordinary lettering at the bar's 14px (2a), so
+four tabs on the narrowest phone step down to 11px rather than 9px; and the
+track's edge is the 2px everything else has (3a).

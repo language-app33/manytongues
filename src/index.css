@@ -149,9 +149,6 @@ button {
   /* The ink of the page: what a heading is written in. Fifteen rules named it
      and nothing defined it, so each fell back to whatever it inherited. */
   --ink: var(--text);
-  /* The outline of the selected tab: a dark grey in both themes, so it reads
-     as a stroke on a light fill and as a rim on a dark one. */
-  --tab-stroke: #4B556D;
   /* What marks a thing as chosen — the select button, a picked tile. Named in
      the stylesheet and never defined, like --ink; the app's chosen colour. */
   --accent: var(--jade);
@@ -174,9 +171,6 @@ button {
   /* The ink of the page: what a heading is written in. Fifteen rules named it
      and nothing defined it, so each fell back to whatever it inherited. */
   --ink: var(--text);
-  /* The outline of the selected tab: a dark grey in both themes, so it reads
-     as a stroke on a light fill and as a rim on a dark one. */
-  --tab-stroke: #4B556D;
   /* What marks a thing as chosen — the select button, a picked tile. Named in
      the stylesheet and never defined, like --ink; the app's chosen colour. */
   --accent: var(--jade);
@@ -200,9 +194,6 @@ button {
     /* The ink of the page: what a heading is written in. Fifteen rules named it
        and nothing defined it, so each fell back to whatever it inherited. */
     --ink: var(--text);
-    /* The outline of the selected tab: a dark grey in both themes, so it reads
-       as a stroke on a light fill and as a rim on a dark one. */
-    --tab-stroke: #4B556D;
     /* What marks a thing as chosen — the select button, a picked tile. Named in
        the stylesheet and never defined, like --ink; the app's chosen colour. */
     --accent: var(--jade);
@@ -461,16 +452,21 @@ button {
   text-align:center; letter-spacing:.01em; }
 .ob-box h2 { font-size:22px; font-weight:800; margin:0 0 10px; letter-spacing:-.01em; }
 /* Tabs inside a page (0.685): one track the parts share equally, each its
-   icon over its name, the current one raised out of the well with its
-   icon in the accent colour. What the card screen's tabs were, now every
-   set in a page; the bar at the foot draws its own (.at-docktabs). */
+   icon over its name. What the card screen's tabs were, now every set in a
+   page; the bar at the foot draws its own (.at-docktabs).
+   0.698 (the owner's 1a, 2a, 3a): the current tab is marked the way the
+   bar at the foot marks its section — the accent colour on a faint wash of
+   it — with an accent outline, so it reads as chosen in the app's one
+   colour for chosen while staying apart from a Segmented's solid fill. The
+   names are in ordinary lettering at the bar's size, and the track's edge
+   is the 2px every card, button and field has. */
 .at-nav2 { display:grid; grid-auto-flow:column; grid-auto-columns: minmax(0, 1fr); gap:4px;
   margin:0 0 16px; padding:4px; border-radius:16px;
-  background: var(--well-deep); border:1px solid var(--line); }
+  background: var(--well-deep); border:2px solid var(--line); }
 .at-tab2 { position:relative; min-width:0; min-height:44px;
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
-  padding:6px; font-family: var(--ui); font-size:11px; font-weight:800; line-height:1.2;
-  letter-spacing:.05em; text-transform:uppercase; text-align:center;
+  padding:6px; font-family: var(--ui); font-size:14px; font-weight:600; line-height:1.2;
+  letter-spacing:0; text-transform:none; text-align:center;
   background:none; border:2px solid transparent; border-radius:12px; color: var(--muted); cursor:pointer; }
 .at-tab2:has(> svg) { min-height:52px; }
 /* The names step down with the track rather than break in the middle of a
@@ -481,13 +477,14 @@ button {
 .at-nav2[data-n="2"] { --n: 2; }
 .at-nav2[data-n="4"] { --n: 4; }
 .at-nav2[data-n="5"] { --n: 5; }
-.at-nav2 > .at-tab2 { font-size: clamp(9px, calc(100cqi / var(--n) * 0.13), 11px);
+.at-nav2 > .at-tab2 { font-size: clamp(11px, calc(100cqi / var(--n) * 0.16), 14px);
   overflow-wrap: normal; padding-inline:2px; }
 .at-tab2 > svg { width:20px; height:20px; flex:none; }
 .at-tab2:not(.on):hover { background: var(--press); color: var(--text); }
-/* The selected tab carries a dark grey outline, so which one is active reads
-   at a glance rather than by shade alone. */
-.at-tab2.on { background: var(--raised); color: var(--text); border-color: var(--tab-stroke); }
+/* The selected tab is outlined as well as tinted, so which one is active
+   reads at a glance rather than by shade alone. */
+.at-tab2.on { background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent); border-color: var(--accent); }
 .at-tab2.on > svg { color: var(--accent); }
 /* How many are on a tab, under its name, where the number helps choose. */
 .at-tabcount { font-size:13px; letter-spacing:0; font-variant-numeric: tabular-nums; }
@@ -1142,10 +1139,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    The chrome is hidden as well, because a full-screen task should not show
    the account bubble — that is about focus, not layering. */
 .at-screen.over { z-index: var(--z-over); }
-/* A selected tab is outlined rather than merely tinted, so it reads at a
-   glance and in both themes. */
-/* A selected tab keeps the same border as the others, only darker, so the
-   two read as the same control in two states. */
 
 /* Playing a clip. The button shows what it will do next. */
 .at-clipplay.on { border-color: var(--accent); color: var(--accent); }

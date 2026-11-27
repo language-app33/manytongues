@@ -239,7 +239,7 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
     },
     {
       name: ".at-tab2",
-      size: "11px",
+      size: "14px",
       what: "One tab in the track at the top of a page or card.",
       example: "Modules",
       cls: "at-tab2",

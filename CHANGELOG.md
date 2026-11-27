@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.698 — 27 November 2026
+
+**Tabs inside a page now look like the rest of the app.** The tabs at the
+top of a page or a card — Modules / Cards / Word sets in Material, Basic /
+Exercises on a card, and every other set — mark the one you are on in green,
+as the bar at the foot of the window and the rest of the app mark what is
+chosen, rather than with a grey box and a dark grey outline.
+
+- The current tab has a green outline and a green name on a faint green
+  tint. It is still lighter than a Settings switch's solid green, so a tab
+  and a setting don't look like the same control.
+- Tab names are written in ordinary lettering at the size of the bar's
+  names, instead of small spaced capitals. On a narrow phone with four or
+  five tabs they still shrink to fit.
+- The track around the tabs has the same edge as every card, button and box
+  near it.
+
 ## 0.697 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
