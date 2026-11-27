@@ -297,7 +297,7 @@ const PLACED = {
     "admin-add-member",
     /* 0.578: removing from a space, and suspending across the app. */
     "admin-remove-member", "admin-suspend-app", "admin-lift-app",
-    /* 0.694: word sets shared with a space, tried in word-sets.test.mjs. */
+    /* 0.695: word sets shared with a space, tried in word-sets.test.mjs. */
     "space-word-sets", "share-word-set",
   ],
   own: [

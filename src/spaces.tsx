@@ -3868,7 +3868,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
    Becoming the administrator — once, from Account settings
    ------------------------------------------------------------------ */
 
-export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) {
+export function ClaimAdmin({ onDone }: { onDone?: (claimed?: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
@@ -3903,7 +3903,7 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
               await API.claimAdmin(key.trim());
               reach.ok();
               setOpen(false);
-              onDone();
+              onDone?.();
             } catch (e) {
               if (!reach.caught(e, claim)) setError(API.explain(e));
             } finally {
@@ -6715,12 +6715,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const [numbering, setNumbering] = useState<LangId | null>(null);
   /* Which language's pronouns are open. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
-  /* Whose set is open from Material's Word sets (0.694): another teacher's
+  /* Whose set is open from Material's Word sets (0.695): another teacher's
      shared set, or null for the teacher's own. Read by the pronouns and the
      numbers screens alike, and cleared as either closes. */
   const [setOwner, setSetOwner] = useState<string | null>(null);
   /* Every teacher's word sets shared with the space, for Material's Word
-     sets screen (0.694) — fetched as it opens, and again after a save. */
+     sets screen (0.695) — fetched as it opens, and again after a save. */
   const [spaceSets, setSpaceSets] = useState<{ pronouns: API.SharedPronouns[]; numbers: API.SharedNumbers[] } | null>(null);
   const loadSpaceSets = useCallback(async () => {
     const r = await API.spaceWordSets();
@@ -6732,7 +6732,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      language's under its name, which is where Numbers and Pronouns are
      opened from. It replaced an icon for each and a "Which language?" step
      before either. */
-  /* Material's Word sets lists every teacher's shared sets (0.694): fetched
+  /* Material's Word sets lists every teacher's shared sets (0.695): fetched
      each time the tab opens, so a set shared from another device is there. */
   useEffect(() => {
     if (tab !== "wordsets" || mineSide) return;
@@ -7862,7 +7862,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return run(async () => {
       const r = await API.saveSystem(kind, system, owner);
       const saved = kind === "times" ? readTimeSystem(r.system) : readNumberSystem(r.system);
-      /* Another teacher's shared set (0.694): theirs, so it is the space's
+      /* Another teacher's shared set (0.695): theirs, so it is the space's
          list that is read again, not this teacher's own systems. */
       if (owner) {
         await loadSpaceSets();
@@ -8694,7 +8694,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     ...((composerFor(langId) || { ranges: () => [] }).ranges()),
     ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
   ];
-  /* One teacher's pronouns (0.694): the named teacher's, or else the
+  /* One teacher's pronouns (0.695): the named teacher's, or else the
      viewer's own where they have any here, or else the earliest written —
      the set a course uses until someone chooses. Material can hold several
      teachers' sets, and "the pronouns" a deck takes is one of them. */
@@ -8768,7 +8768,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
   /* The pronouns into a deck or out of it, from their own screen (0.569):
      every pronoun card of the language, as Add existing cards does it. */
-  /* A module holds one teacher's pronouns (0.694): putting a set in takes
+  /* A module holds one teacher's pronouns (0.695): putting a set in takes
      any other teacher's out, and taking them out takes out every one. */
   const pronounsInModule = (langId: LangId, moduleId: string, on: boolean, set?: Card[]) =>
     run(async () => {
@@ -8783,7 +8783,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }
     }, on ? "Added to the module" : "Taken out of the module");
 
-  /* ---- the Word sets tab (0.569; a tab since 0.689; by teacher since 0.694) ----
+  /* ---- the Word sets tab (0.569; a tab since 0.689; by teacher since 0.695) ----
      My space: the teacher's own sets, each with the way to share it with
      the space. Material: the teacher's own sets, then every set another
      teacher has shared with the space, under that teacher's name, any of
@@ -8965,7 +8965,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       setPronouning(null);
       return null;
     }
-    /* Whose set (0.694): one opened from Material's Word sets is that
+    /* Whose set (0.695): one opened from Material's Word sets is that
        teacher's, as the server last listed it with anything saved here
        since laid over it; otherwise the one set this side shows. */
     const shared = setOwner && !mineSide && spaceSets
@@ -9011,7 +9011,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     if (!systems) {
       return <FetchingSystems name={numLang.name} load={loadSystems} onBack={() => setNumbering(null)} />;
     }
-    /* Another teacher's numbers, opened from Material's Word sets (0.694):
+    /* Another teacher's numbers, opened from Material's Word sets (0.695):
        as the server last listed them, saved back as theirs. */
     const theirs = setOwner && setOwner !== account.handle && !mineSide && spaceSets
       ? spaceSets.numbers.find((n) => n.owner === setOwner && n.lang === numbering) || null
@@ -10149,7 +10149,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               if (waiting) {
                 /* A My space module's numbers are the teacher's own; a
                    space module's are whichever teacher's its course chose
-                   (0.694), so it opens the shared sets to pick from. */
+                   (0.695), so it opens the shared sets to pick from. */
                 const ours = !!d.personal;
                 notes.push({
                   key: "numbers",
@@ -11291,7 +11291,7 @@ export function StudentCourses({
   /** Your spaces, when Learning shows more than one: the courses go under
       a heading per space (memberships). */
   spaces?: { id: string; name: string }[];
-  modules: (Module & { courseId: string, courseTitle?: string })[];
+  modules: (Module & { courseId?: string, courseTitle?: string })[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
@@ -11410,7 +11410,7 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
 }
 
 /*
- * Whose word sets a course uses (0.694; 3a, 5a, 6a, 7a).
+ * Whose word sets a course uses (0.695; 3a, 5a, 6a, 7a).
  *
  * One teacher's set of each kind, so two teachers' versions of a pronoun
  * or a number never reach the same students. Any teacher of the course

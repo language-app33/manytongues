@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.694 — 27 November 2026
+## 0.695 — 27 November 2026
 
 **One teacher's word set per course.** When two teachers had each written
 the pronouns (or the numbers) and both sets reached one course, its
@@ -44,6 +44,17 @@ To check by hand: on a phone, with two teachers whose pronouns are both on
 one course, open the course as a student and check each pronoun comes
 once; then choose the other teacher on the course page and check the
 student gets theirs after a refresh.
+
+## 0.694 — 27 November 2026
+
+**Courses opens again for students.** Learning › You › Courses showed
+"Something broke" (reading 'filter') for anyone in a course, since 0.687
+renamed decks to modules in the code: the Courses screen was still being
+handed its modules under the old name and got none. It now gets them, and
+each course counts its modules again. The type check now covers the props
+of every screen that loads on demand, so a rename missed on one side
+fails the build instead of the screen; it found one more such slip, in
+claiming super admin from Settings, which is mended too.
 
 ## 0.693 — 27 November 2026
 
