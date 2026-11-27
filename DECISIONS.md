@@ -9545,3 +9545,94 @@ personal deck, at each start (`retireOnStart`, which logs and serves on a
 failure). Creating personal records through the server still works, for
 the tests and for old phones; whatever is made is deleted at the next
 start. The app offers no way in.
+
+## To do leaves out a course's cards that don't reach students (0.721)
+
+**Problem.** To do on Home listed, per course, `notReaching`'s count: drafts,
+cards ready for review and number parts without words, with Open the course.
+Three remedies under one line, a button that led to the course's own copy of
+the same sentence, and drafts — often kept on purpose — kept To do from ever
+being empty.
+
+**Decided (owner, 1c).** Take it out of To do. The course screen's line (with
+Show the cards) and each module's line stay, so the fact is still said where
+the cards are. The import band in To do is unchanged.
+
+**Revisit if** teachers miss that a course's students see nothing: a line for
+a course whose cards *none* reach students is the narrow way back.
+
+## New module asks what kind again (0.722)
+
+The owner's word: bring back the sheet 0.710 removed. `newModule()` opens
+the `PickSheet` of `NEW_KINDS` again (outside My space), and To do's
+"Create a module" opens it too, keeping `namingFor`: a unit's course
+radio starts on that course (`NewModule`'s `initialCourse`), and a deck
+or a personal set is attached to it. The sheet is drawn at the frame's
+level, beside `MeaningSplits`, so it opens from Home as well as Material.
+"New personal set" left the Material list's `more` menu: one place to
+choose a kind. `PathSection`'s New unit stays.
+
+## Empty boxes get their button (0.724, 0.726)
+
+A course's empty Modules box gained Create a module (0.724), as To do has.
+A sweep of every empty box then found six that said what to do with no
+button to do it; the owner chose 1a, 2a, 3b, 4c, 5b, 6b. So a module's
+Courses now sits outside the `at-cardlock` fieldset and saves on tap
+(`saveModuleCourse`), as the course screen's `toggleModule` does; while
+editing it also patches the draft, as `saveBuiltins` does, so Save neither
+undoes nor repeats it. The cost: a module's courses are no longer part of
+the edit that Cancel throws away. People's empty Students box copies the
+student code, and the admin's empty Modules tab says teachers make
+modules. Left as they were, by choice: the student's Cards and Progress
+tabs with no course (Home has Join a course), the "languages switched on"
+empties, and the sentence-card picker, where a button would leave a
+half-written card.
+
+## An empty course's Modules box offers one button (0.727)
+
+0.724 put a solid Create a module beside the dotted Add a module to this
+course, two styles side by side. The owner chose (1a) one button by what
+the teacher has: Add a module where there are modules, Create a module
+where there are none; (2a) the solid button, as every empty box has, so
+`ModuleSwitch` gained `solid`, which draws its add button as a primary
+`Button` while nothing is chosen; (3a) Create a new module as the first row
+of the sheet, so `ModuleSwitch` gained `onCreate`, which closes the sheet
+and hands over to the course's kind sheet; (4a) the new module opens, as
+from To do. The row is in the filled course's Another module sheet too,
+since it is the same sheet. Only the course screen passes `onCreate`; a
+card's module list keeps its own way to make one (ModulePickScreen).
+## One bar over a list, and a quiet line under it (0.728)
+
+Teaching › Material › Cards had two rows of controls over its list — New,
+three dots and the view button, then the search box with Select, Sort and
+Filter — and Sort and Filter opened by pushing the list down. Selecting put
+a tray of seven buttons over half a phone. The owner designed the
+replacement, and `ItemList` draws it for every list that uses it:
+
+- **One row**: New, the search box, Filter and three dots. On a phone New
+  is + alone, so the box keeps 200px; the words come back from 640px.
+- **A quiet line** under it: the count, the order and the view switch, in
+  small text rather than boxes. They are about how the list is read, not
+  what is in it, and boxes for them were the second row.
+- **Sort waits for Apply; filters apply as they are ticked.** The owner
+  chose the word Apply and chose that it mean what it says: a list
+  reordering behind the panel while someone is still choosing is a list
+  they have lost their place in. A filter is different — watching the
+  count fall is how a teacher knows they have narrowed enough — so the
+  Filter panel's button counts along ("Show 5 cards") and only shuts it.
+- **Chips on one line that scrolls sideways**, never wrapping: three
+  filters on three lines would push the list down as far as the panel did.
+- **Select is in the three dots**, first, because a phone has no room for a
+  sixth icon — except where it would be alone there (People), where it is
+  its own icon rather than dots opening onto one row. A finger held on a
+  tile also starts selecting.
+- **The search box stays while selecting**: narrowing to what is to be
+  ticked is half of selecting, and what was ticked survives a search.
+- **One Actions button** at the foot opens a panel of every bulk action,
+  each with its own picture, Delete last.
+
+The cost: Select and Import are one press further away, New is an icon on
+a phone, a new order needs Apply, and every bulk action is one press
+further. Nothing was removed. `menus` and `count` went from `ItemList`'s
+inputs for `sort`, `filter` and `total`.
+

@@ -8,6 +8,155 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.728 — 27 November 2026
+
+**A simpler bar above every list.** Teaching › Material › Cards had two
+rows of controls over its cards; now it has one, and every list in the app
+that uses the same bar changes with it.
+
+- **One row:** a green **+** for a new card, the search box, **Filter** and
+  three dots. On a phone the + is the button on its own; on a wider screen
+  it still says New card.
+- **A quiet line under it** says how many cards there are and the order
+  they are in ("14 cards · Newest changes"), with the grid/table switch at
+  its end. Tap the order to change it.
+- **Sort and Filter open in the panel from the foot of the screen**, like
+  every other menu, instead of pushing the list down.
+- **Filters take effect as you tick them.** The panel's button counts along
+  ("Show 5 cards") and just closes it.
+- **Sorting waits for Apply.** Close the Sort panel any other way and the
+  order stays as it was. The order's words now fit what is being sorted:
+  "Newest first" for dates, "With first" for recordings, "Most first" for
+  forms.
+- **While the list is filtered**, the line reads "5 of 14" with **Clear**,
+  and each filter that is on is a chip in a row you can swipe sideways. Tap
+  a chip's cross to take just that filter off.
+- **Select is in the three dots.** On a list where it would be the only
+  thing there, such as People, it is its own button. On a phone or tablet,
+  **pressing and holding a card** also starts selecting, with that card
+  ticked.
+- **While selecting**, the search box and Filter stay, so you can narrow the
+  list and tick what is left; ticks survive a search. A cross ends it, and
+  the line says "3 selected" with Select all.
+- **One Actions button** at the foot replaces the tray of seven buttons. It
+  opens a panel listing every action, each with its own picture, Delete
+  last. Delete still asks first.
+- Inside a module, **Add existing cards** says "to this deck" (or unit, or
+  personal set) where there is room.
+
+Trade-offs: Select and Import are one press further away; New card is an
+icon on a phone; a new order needs Apply; each bulk action is one press
+further.
+
+To check by hand: on an iPhone and on Android, that holding a card starts
+selecting without the phone's own text-selection or link menu appearing;
+that the Filter panel scrolls smoothly with its button in view, including
+with the keyboard open after searching; that the row of chips swipes
+sideways without moving the page; and that the bar at the foot clears the
+phone's home indicator.
+## 0.727 — 27 November 2026
+
+**An empty course offers one button, not two.** In a course's Modules
+section, with no modules in it yet:
+
+- If you already have modules, the box offers only **Add a module**, a
+  green button like every other empty box's. Its list now starts with
+  **Create a new module**.
+- If you have none, it offers only **Create a module**.
+
+**Create a new module** asks what kind, as New module does. The new module
+is put in the course and opens, ready for cards. The same row is in the list
+behind **Another module** once the course has modules.
+
+## 0.726 — 27 November 2026
+
+**A module's courses change as you tap.** Opening a module in Teaching ›
+Material, the **Add this deck to a course** button under Courses is there
+straight away. Adding a course or taking one out saves at once, as it does
+from a course's screen; you no longer have to tap Edit first, or Save
+after. While editing, the same buttons save at once too, and Save keeps
+what they did.
+
+**Copy student code on People.** A course's People tab, with no students
+yet, has a **Copy student code** button instead of sending you to the
+Course tab to find the code.
+
+**Admin's empty Modules tab says where modules come from.** It now reads
+"No modules yet. Teachers make them in Teaching › Material, then add them
+to a course so students can see them."
+
+## 0.725 — 27 November 2026
+
+**Each tab in Material says what it holds, in one short line.** In
+Teaching › Material, the three tabs now open with matching sentences:
+
+- Modules: "A module is a group of cards. Add it to a course to teach it."
+- Cards: "A card is something students learn: a word, sentence,
+  conversation or text. Add it to a module to teach it." Cards had no line
+  before.
+- Word sets: "A word set is a ready-made group of cards taught together,
+  like numbers. Fill it in once per language, then add it to a module."
+
+That any teacher in the space can edit a word set is no longer said on the
+Word sets tab; it is said at the top of the set itself, once it is open.
+Leftover wording from My space, which nobody could reach any more, is gone
+from the code.
+
+## 0.724 — 27 November 2026
+
+**An empty course offers Create a module.** In Teaching › Home › My
+courses, a course with no modules yet now has a **Create a module** button
+in its Modules section, as To do does. It asks what kind of module, as New
+module does; a deck or personal set is put in the course, a unit starts on
+the course's path, and the new module opens. Where you already have modules
+elsewhere, **Add a module to this course** sits beside it as before.
+
+## 0.723 — 27 November 2026
+
+**Material no longer opens with an explanation.** The sentence at the top
+of Teaching's Material page, about whose modules are listed and when
+students see them, is gone; the page starts with its Modules and Cards
+tabs.
+
+## 0.722 — 27 November 2026
+
+**New module asks what kind again.** In Teaching › Material, New module
+opens a sheet with **Deck**, **Unit** and, where personal sets are switched
+on, **Personal set**, as it did before 0.710. The same sheet opens from
+**Create a module** in To do on Home; there a unit starts in that course,
+and a deck or personal set is put in it. The sheet says the kind can't be
+changed once the module is made, which is still true. "New personal set" is
+no longer in the three dots beside New module, since the sheet has it. A
+unit can still be made from a course's Path too.
+
+## 0.721 — 27 November 2026
+
+**To do no longer lists a course's cards that don't reach students yet.**
+The line "257 cards in Ahalan Arabi don't reach students yet: 1 draft, 255
+waiting for review, …" is gone from To do on Home. It mixed three jobs with
+three different fixes, and a single draft kept on purpose stopped To do from
+ever saying you're all caught up. The same line is still on the course's own
+screen, with Show the cards, and each module still says it of itself.
+
+**Trade-off:** Home no longer warns that a course's students are missing
+cards; you see it when you open the course.
+
+## 0.720 — 27 November 2026
+
+**A module's score is now a few words at the end of the line under its
+name, and the three dots lose their box.** In Teaching › Material ›
+Modules:
+
+- The score ring left of the name is gone. The score is the last thing on
+  the line under the name: "Available to students in the course Arabic 101
+  · score: 38". A module with nothing to score yet still shows no score.
+- The three dots on the right of a module's tile have no outline, just the
+  dots, as a card tile's are since 0.717. They are as easy to tap as
+  before.
+
+Trade-off: the score no longer stands in one column down the list, and it
+is plain grey text rather than coloured.
+
 ## 0.719 — 27 November 2026
 
 **My space is gone, and what was in it is deleted.** Teaching no longer

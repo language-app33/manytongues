@@ -19110,14 +19110,12 @@ function ItemsTab({
   onPriority: (id: string, on: boolean) => void;
 }) {
   const [sheet, setSheet] = useState<any | null>(null); // null | {view:item}
-  const [q, setQ] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
 
   /* Someone tapped "practice" on a deck elsewhere; show just that deck. */
   useEffect(() => {
     if (!moduleWanted) return;
     setFilterTags([moduleWanted]);
-    setQ("");
     if (onModuleWantedUsed) onModuleWantedUsed();
   }, [moduleWanted, onModuleWantedUsed]);
 
@@ -19135,15 +19133,6 @@ function ItemsTab({
         .sort((a, b) => b.created - a.created),
     [items, filterTags]
   );
-
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return items
-      .filter((i) => (filterTags.length ? i.tags.some((t) => filterTags.includes(t)) : true))
-      .filter((i) => cardMatches(i, s))
-      .slice()
-      .sort((a, b) => b.created - a.created);
-  }, [items, q, filterTags]);
 
   return (
     <>
@@ -19168,11 +19157,7 @@ function ItemsTab({
             busy={false}
             empty="No cards match."
             match={cardMatches}
-            count={
-              filtered.length === items.length
-                ? `${plural(items.length, "card")}`
-                : `${filtered.length} of ${items.length}`
-            }
+            total={items.length}
             /* Course cards are not a student's to change, so there is
                nothing to select them for. */
             /* The library's tile, not a copy of it. This screen had its own
