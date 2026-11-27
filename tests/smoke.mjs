@@ -9832,6 +9832,61 @@ const openPronounTables = async () => {
     check("and under it its courses and quality, with no name box",
       labels().join(" | ") === "Courses | Deck quality" && !must(thisModule(), "the block").querySelector("input"),
       labels().join(" | ") || "(no first block)");
+    /* Deck quality is one row since 0.734 (the owner's choice): the
+       score, its bar and how many ways to raise it, opening the advice on
+       a screen of its own, so the cards follow straight after. */
+    {
+      const rows = () => { const m = moduleSheet(); return m ? [...m.querySelectorAll(".at-qualityrow")] : []; };
+      check("its quality is one row: the score out of 100 and the ways to raise it, with its bar",
+        rows().length === 1 && /^\d+ of 100( · \d+ ways? to raise it)?/.test((rows()[0].textContent || "").trim()) &&
+          !!rows()[0].querySelector(".at-qualitybar") && rows()[0].tagName === "BUTTON",
+        rows().map((r) => (r.textContent || "").trim()).join(" | ") || "(no quality row)");
+      check("and no advice on the module's own screen",
+        !!moduleSheet() && !must(moduleSheet(), "the deck").querySelector(".at-qfix, .at-qfixtext, .at-qualityreach"),
+        "advice is still drawn on the deck's screen");
+      click(rows()[0]);
+      await sleep(300);
+      const qSheet = () => [...document.querySelectorAll(".at-screen")]
+        .find((el) => ((el.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Deck quality");
+      check("pressing the row opens a screen titled Deck quality, with the score and the advice",
+        !!qSheet() && !!must(qSheet(), "quality").querySelector(".at-qualityscore") &&
+          must(qSheet(), "quality").querySelectorAll(".at-qfix").length > 0,
+        qSheet() ? `${must(qSheet(), "quality").querySelectorAll(".at-qfix").length} suggestions` : "(no Deck quality screen)");
+      const heads = () => [...must(qSheet(), "quality").querySelectorAll("button.at-qfixhead")];
+      check("and each piece of advice is a row, closed until pressed",
+        heads().length > 0 && heads().every((h) => h.getAttribute("aria-expanded") === "false") &&
+          !must(qSheet(), "quality").querySelector(".at-qfixes .at-qfixtext, .at-qfixes .at-qfixword") &&
+          heads().every((h) => !!h.querySelector(".at-qfixico") && !!h.querySelector(".at-qfixtitle") && /^\+\d+points$/.test(((h.querySelector(".at-qfixgain") || {}).textContent || "").trim())),
+        heads().map((h) => `${h.getAttribute("aria-expanded")} ${(h.textContent || "").trim()}`).join(" | "));
+      const withWords = heads().find((h) => /sentence/i.test(h.textContent || "")) || heads()[0];
+      click(withWords);
+      await sleep(150);
+      const chips = () => [...must(qSheet(), "quality").querySelectorAll(".at-qfixes .at-qfixword")];
+      check("pressing one opens it: what to do, and its words, with no count on them",
+        withWords.getAttribute("aria-expanded") === "true" && !!must(qSheet(), "quality").querySelector(".at-qfixtext") &&
+          chips().every((c) => !/\+/.test(c.textContent || "") && !c.querySelector("i")) &&
+          ![...must(qSheet(), "quality").querySelectorAll(".at-qfixhint")].some((h) => /The number is/.test(h.textContent || "")),
+        `${withWords.getAttribute("aria-expanded")} · ${chips().map((c) => c.textContent).join(", ")}`);
+      if (chips().length) {
+        const topTitle = () => {
+          const t = [...document.querySelectorAll(".at-screen")].pop();
+          return ((t && t.querySelector(".at-screenhead h2")) || {}).textContent || "";
+        };
+        const word = (chips()[0].textContent || "").trim();
+        click(chips()[0]);
+        await sleep(300);
+        check("and pressing a word opens that card, over the advice",
+          topTitle().trim() !== "Deck quality" && /^Card/.test(topTitle().trim()),
+          `${word} · on top: ${topTitle() || "(none)"}`);
+        click([...document.querySelectorAll(".at-screen .at-back")].pop());
+        await sleep(300);
+        check("and Back from the card returns to the advice", topTitle().trim() === "Deck quality", topTitle() || "(none)");
+      }
+      click(must(qSheet(), "quality").querySelector(".at-back"));
+      await sleep(300);
+      check("and Back from the advice returns to the deck",
+        !qSheet() && !!moduleSheet(), qSheet() ? "still on the advice" : "(no deck screen)");
+    }
     check("and its language and size on one line",
       /^Palestinian Arabic · \d+ cards?$/.test(((thisModule() && must(thisModule(), "the block").querySelector(".at-formrole .at-formline")) || {}).textContent || ""),
       ((thisModule() && must(thisModule(), "the block").querySelector(".at-formrole")) || {}).textContent || "(no line)");
@@ -9995,11 +10050,39 @@ const openPronounTables = async () => {
     await sleep(150);
     await stopSelecting(sheet);
   }
-  /* Its words are "Add existing cards to this deck" where there is room
-     and "Add existing cards" on a phone (0.728); both are in the button
-     and the stylesheet shows one. */
-  click(buttonNamed(/^Add existing cards/));
-  await sleep(300);
+  /* One green + inside a module since 0.734 (the owner's choice): no
+     "Add existing cards" button under the list; the + asks which. */
+  check("inside a deck with cards there is no Add existing cards button in the list",
+    !buttonNamed(/^Add existing cards/) && !document.querySelector(".at-addexisting"),
+    "an Add existing cards button is still there");
+  {
+    const sheet = () => /** @type {HTMLElement} */ (document.querySelector(".at-sheet.at-addhow"));
+    click(document.querySelector(".at-listbar .at-newbtn") || buttonNamed(/^New card$/));
+    await sleep(250);
+    const title = ((sheet() && sheet().querySelector(".at-modaltitle")) || {}).textContent || "";
+    const rows = () => [...(sheet() ? sheet().querySelectorAll(".at-sheetact b") : [])].map((b) => (b.textContent || "").trim());
+    check("the green + opens a panel headed with the deck's name in quotes",
+      /^Add to the deck \u201c.+\u201d$/.test(title.trim()), title || "(no panel)");
+    check("and it lists exactly New card and Cards you already have, each with a line saying what it does",
+      rows().join(" | ") === "New card | Cards you already have" &&
+        [...sheet().querySelectorAll(".at-sheetact")].every((r) => !!r.querySelector("i") && !!r.querySelector(".at-sheetactico")),
+      rows().join(" | ") || "(no rows)");
+    click([...sheet().querySelectorAll(".at-sheetact")][0]);
+    await sleep(300);
+    const editor = [...document.querySelectorAll(".at-screen")].pop();
+    check("and New card there opens a new card",
+      !sheet() && !!editor && /New card|card/i.test(((editor.querySelector(".at-screenhead h2") || {}).textContent || "")),
+      ((editor && editor.querySelector(".at-screenhead h2")) || {}).textContent || "(no screen)");
+    click([...document.querySelectorAll(".at-screen .at-back")].pop());
+    await sleep(300);
+    const discard = buttonNamed(/^Discard/);
+    if (discard) { click(discard); await sleep(200); }
+    click(document.querySelector(".at-listbar .at-newbtn") || buttonNamed(/^New card$/));
+    await sleep(250);
+    click([...(sheet() ? sheet().querySelectorAll(".at-sheetact") : [])].find((r) => /Cards you already have/.test(r.textContent || "")));
+    await sleep(300);
+    check("and Cards you already have opens the picker", !sheet(), "the panel is still open");
+  }
   check("and adding heads the sets Word sets",
     [...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Word sets") &&
       ![...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Built-in"),
@@ -10007,10 +10090,10 @@ const openPronounTables = async () => {
   const partRow = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(".at-tickrow, label")].find((r) => re.test(r.textContent || ""));
   check("and adding lists the parts of the numbers, with counting inside them rather than parts of its own",
-    !!partRow(/Numbers 0 to 9/) && !!partRow(/Numbers 10 to 19/) && !partRow(/Counting things/) &&
+    !!partRow(/Numbers · 0 to 9/) && !!partRow(/Numbers · 10 to 19/) && !partRow(/Counting things/) &&
       !!partRow(/Telling the hour/),
     [...document.querySelectorAll(".at-tickrow, label")].map((r) => (r.textContent || "").slice(0, 24)).join(" | ") || "(no list)");
-  const box = partRow(/Numbers 0 to 9/);
+  const box = partRow(/Numbers · 0 to 9/);
   click(box && (box.querySelector("input") || box));
   await sleep(150);
   const partsBefore = savedParts.length;
@@ -10185,6 +10268,9 @@ const openPronounTables = async () => {
    else on that screen is a list of boxes. */
 {
   const { NumberSystemEditor } = await import(path.join(out, "number-system-editor.js"));
+  const { SnackbarProvider } = await import(path.join(out, "shared.js"));
+  /** Every message the screen put up, in order (0.734). */
+  const snacks = /** @type {string[]} */ ([]);
   const { LANGUAGES } = await import(path.resolve("src/languages.ts"));
   const { emptyNumberSystem, emptyTimeSystem, readNumberSystem } = await import(path.resolve("src/numbers/schema.ts"));
 
@@ -10224,7 +10310,7 @@ const openPronounTables = async () => {
      changed after any save of the numbers. */
   const draw = (/** @type {any} */ numbers) =>
     editorRoot.render(
-      React.createElement(NumberSystemEditor, {
+      React.createElement(SnackbarProvider, { show: (/** @type {string} */ m) => { snacks.push(m); } }, React.createElement(NumberSystemEditor, {
         lang: LANGUAGES["ar-PS"],
         numbers,
         times: emptyTimeSystem("", "lena", "ar-PS", numbers.id, Date.now(), 1),
@@ -10244,7 +10330,7 @@ const openPronounTables = async () => {
           return stored;
         },
         onClose() {},
-      }),
+      })),
     );
 
   /* A screen is drawn at the app's root rather than where it was written:
@@ -10291,30 +10377,52 @@ const openPronounTables = async () => {
   await sleep(200);
   const tiles = [...panel().querySelectorAll(".at-numparts .at-deckcard")];
   check("the number system's editor opens on its parts, one button each",
-    tiles.length >= 8 && !!tileNamed("Numbers 0 to 9") && !!tileNamed("Numbers 10 to 19") &&
-      !!tileNamed("Numbers 20 to 99") && !!tileNamed("Numbers 1,000 to 999,999,999") &&
-      !!tileNamed("Numbers 1,000,000,000 and over"),
+    tiles.length >= 8 && !!tileNamed("0 to 9") && !!tileNamed("10 to 19") &&
+      !!tileNamed("20 to 99") && !!tileNamed("Thousands and millions") &&
+      !!tileNamed("A billion and over"),
     tiles.map((t) => (t.textContent || "").trim()).join(" | "));
+  /* Since 0.734 (the owner's choice) the screen opens on what students can
+     do now, as a headline with no box, and the parts are named by their
+     range alone, under no heading of their own. */
+  const heroText = (/** @type {string} */ sel) => ((panel().querySelector(`.at-numhero ${sel}`) || {}).textContent || "").trim();
+  check("an empty set's headline says how many words to write to begin, with the instruction under it",
+    /^Write \d+ words to begin$/.test(heroText(".at-numherotitle")) &&
+      /builds every number from a few words/.test(heroText(".at-numherosub")) &&
+      !panel().querySelector(".at-numhero .at-numherotitle")?.closest("button"),
+    `${heroText(".at-numherotitle")} · ${heroText(".at-numherosub")}`);
+  check("and a step for each of the six parts",
+    panel().querySelectorAll(".at-numsteps > i").length === 6,
+    `${panel().querySelectorAll(".at-numsteps > i").length} steps`);
+  check("and no step is on", panel().querySelectorAll(".at-numsteps > i.on").length === 0);
+  check("there is no heading Parts, and no part's name starts with Numbers",
+    ![...panel().querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Parts") &&
+      !tiles.some((t) => /^Numbers/.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim())),
+    tiles.map((t) => ((t.querySelector(".at-decktitle") || {}).textContent || "").trim()).join(" | "));
+  check("the note that any teacher can edit it is not at the top",
+    !panel().querySelector(".at-screenbody > .at-hint:first-child, .at-screeninner > .at-hint:first-child"));
+  check("a part under way shows a thin bar of how much is written",
+    !!(/** @type {any} */ (tileNamed("0 to 9") || {}).querySelector?.(".at-numbar > i")),
+    (/** @type {any} */ (tileNamed("0 to 9") || {}).innerHTML || "").slice(0, 200));
   /* One plain line each since 0.732 (the owner's 7a): how many words are
      still to write, or which part is needed first. */
   check("the screen is named for the numbers and the language",
     /^Numbers · .*Arabic/.test((panel().getAttribute && panel().getAttribute("aria-label")) || ""),
     (panel().getAttribute && panel().getAttribute("aria-label")) || "(no screen)");
   check("and each part says in a line how many of its words are still to write",
-    /^\d+ words? still to write$/.test((/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-numstate") || {}).textContent || ""),
-    (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).textContent || "").trim());
+    /^\d+ words? still to write$/.test((/** @type {any} */ (tileNamed("0 to 9") || {}).querySelector?.(".at-numstate") || {}).textContent || ""),
+    (/** @type {any} */ (tileNamed("0 to 9") || {}).textContent || "").trim());
   check("or which part it needs first, drawn fainter",
-    /^Needs Numbers 0 to 9 first$/.test((/** @type {any} */ (tileNamed("Numbers 20 to 99") || {}).querySelector?.(".at-numstate") || {}).textContent || "") &&
-      !!/** @type {any} */ (tileNamed("Numbers 20 to 99") || {}).closest?.(".at-numwait") && !/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).closest?.(".at-numwait"),
-    (/** @type {any} */ (tileNamed("Numbers 20 to 99") || {}).textContent || "").trim());
+    /^Needs 0 to 9 first$/.test((/** @type {any} */ (tileNamed("20 to 99") || {}).querySelector?.(".at-numstate") || {}).textContent || "") &&
+      !!/** @type {any} */ (tileNamed("20 to 99") || {}).closest?.(".at-numwait") && !/** @type {any} */ (tileNamed("0 to 9") || {}).closest?.(".at-numwait"),
+    (/** @type {any} */ (tileNamed("20 to 99") || {}).textContent || "").trim());
   check("and the first part to write is marked Start here, and no other",
-    (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-statusbadge") || {}).textContent === "Start here" &&
+    (/** @type {any} */ (tileNamed("0 to 9") || {}).querySelector?.(".at-statusbadge") || {}).textContent === "Start here" &&
       panel().querySelectorAll(".at-numparts .at-statusbadge").length === 1,
     [...panel().querySelectorAll(".at-numparts .at-statusbadge")].map((b) => ((b.closest(".at-deckcard") || {}).textContent || "").slice(0, 30)).join(" | ") || "(no badge)");
   check("there are no counting parts, and no counting line on a part not yet ready",
     !tiles.some((t) => /Counting things/.test(t.textContent || "")) &&
-      !/Counting:/.test(/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).textContent || ""),
-    (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).textContent || "").trim());
+      !/Counting:/.test(/** @type {any} */ (tileNamed("0 to 9") || {}).textContent || ""),
+    (/** @type {any} */ (tileNamed("0 to 9") || {}).textContent || "").trim());
   check("the foot is headed Fix a number",
     [...panel().querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Fix a number"),
     [...panel().querySelectorAll(".at-eyebrow")].map((e) => e.textContent).join(" | "));
@@ -10328,11 +10436,26 @@ const openPronounTables = async () => {
     await sleep(50);
     draw({ ...system, lexemes: { ...system.lexemes, ...digits } });
     await sleep(250);
-    check("with zero to nine written, that part is Ready and Start here moves on",
-      (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-numstate") || {}).textContent === "Ready" &&
-        !/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-statusbadge") &&
+    const zero = /** @type {any} */ (tileNamed("0 to 9") || {});
+    const oneSaid = String((digits["unit.1"] || { forms: {} }).forms.standalone || (digits["unit.1"] || { forms: {} }).forms.m || "");
+    check("with zero to nine written, that part has a tick and its first numbers as the app says them, and Start here moves on",
+      !!zero.querySelector?.(".at-numtick") && !!oneSaid &&
+        ((zero.querySelector?.(".at-numsample1") || {}).textContent || "").includes(oneSaid) &&
+        /…$/.test((zero.querySelector?.(".at-numsample1") || {}).textContent || "") &&
+        !zero.querySelector?.(".at-statusbadge") &&
+        (/** @type {any} */ (tileNamed("10 to 19") || {}).querySelector?.(".at-statusbadge") || {}).textContent === "Start here" &&
         panel().querySelectorAll(".at-numparts .at-statusbadge").length === 1,
       [...panel().querySelectorAll(".at-numparts .at-deckcard")].slice(0, 3).map((t) => (t.textContent || "").trim()).join(" | "));
+    check("and it keeps the ordinary tile, not the chosen look",
+      !!zero.closest?.(".at-numdone") && !zero.classList?.contains("on") && !zero.querySelector?.(".at-numbar"),
+      zero.className || "(no tile)");
+    check("and the headline says how far students can count, with how many parts are ready and what is next",
+      heroText(".at-numherotitle") === "Students can count to 9" &&
+        heroText(".at-numherosub") === "1 of 6 parts ready. Next: 10 to 19." &&
+        panel().querySelectorAll(".at-numsteps > i.on").length === 1,
+      `${heroText(".at-numherotitle")} · ${heroText(".at-numherosub")}`);
+    check("and nothing there is marked Just finished, since it was not saved here",
+      !panel().querySelector(".at-numjust") && ![...panel().querySelectorAll(".at-statusbadge")].some((b) => /Just finished/.test(b.textContent || "")));
     editorRoot.render(React.createElement("div"));
     await sleep(50);
     draw(system);
@@ -10351,23 +10474,39 @@ const openPronounTables = async () => {
 
   /* One part opens on a screen of its own, with the words it is the first
      to need. */
-  click(tileNamed("Numbers 0 to 9"));
+  click(tileNamed("0 to 9"));
   await sleep(250);
   check("a part opens on a screen of its own",
-    !!screenNamed("Numbers 0 to 9"),
+    !!screenNamed("Numbers · 0 to 9"),
     ((up().getAttribute && up().getAttribute("aria-label")) || "(no screen)"));
   check("which holds the boxes for zero to nine and none of the teens or tens",
-    up().querySelectorAll(".at-numtile").length === 10 && !boxNamed("10, counting") && !boxNamed("40, counting"),
-    `${up().querySelectorAll(".at-numtile").length} panels`);
-  /* Each number a panel of its own, headed by the number, as a card's
-     editor puts each form in a panel under its name. */
+    up().querySelectorAll(".at-numtile").length + up().querySelectorAll(".at-numrow.at-numpair").length === 10 &&
+      !boxNamed("10, counting") && !boxNamed("40, counting"),
+    `${up().querySelectorAll(".at-numtile").length} panels, ${up().querySelectorAll(".at-numrow.at-numpair").length} rows`);
+  /* Since 0.734 (the owner's choice) a number with two boxes is a row:
+     its figure, then its two boxes side by side under column headings. A
+     number with one box (0) or three (1 and 2) keeps a panel of its own. */
   const tileOf = (/** @type {string} */ n) =>
-    [...up().querySelectorAll(".at-numtile")].find((t) => ((t.querySelector(".at-numhead > span") || {}).textContent || "") === n);
-  check("each number is a panel headed by the number, holding its own boxes",
-    !!tileOf("7") && !!(/** @type {any} */ (tileOf("7"))).querySelector('input[aria-label="7, counting"]') &&
-      /** @type {any} */ (tileOf("7")).classList.contains("at-part") &&
-      !!(/** @type {any} */ (tileOf("7"))).querySelector(".at-groupline"),
+    [...up().querySelectorAll(".at-numtile")].find((t) => ((t.querySelector(".at-numhead > span") || {}).textContent || "") === n) ||
+    [...up().querySelectorAll(".at-numrow.at-numpair")].find((t) => ((t.querySelector(".at-numrowfig > span") || {}).textContent || "") === n);
+  check("0, 1 and 2 are panels headed by the number, holding their own boxes, each box labelled",
+    ["0", "1", "2"].every((n) => { const t = tileOf(n); return !!t && t.classList.contains("at-numtile") && t.classList.contains("at-part") && !!t.querySelector(".at-groupline"); }) &&
+      (/** @type {any} */ (tileOf("0"))).querySelectorAll(".at-numcell > .at-label").length === 1 &&
+      (/** @type {any} */ (tileOf("1"))).querySelectorAll('.at-numcell input').length >= 3,
     [...up().querySelectorAll(".at-numtile .at-numhead")].map((h) => (h.textContent || "").trim()).join(" | "));
+  check("3 is one row with its two boxes side by side under two column headings",
+    !!tileOf("3") && (/** @type {any} */ (tileOf("3"))).classList.contains("at-numrow") &&
+      !!(/** @type {any} */ (tileOf("3"))).querySelector('input[aria-label="3, counting"]') &&
+      !!(/** @type {any} */ (tileOf("3"))).querySelector('input[aria-label="3, before a noun"]') &&
+      [...up().querySelectorAll(".at-numrowhead .at-label")].map((l) => (l.textContent || "").trim()).join(" | ") === "counting | before a noun",
+    [...up().querySelectorAll(".at-numrowhead .at-label")].map((l) => (l.textContent || "").trim()).join(" | ") || "(no headings)");
+  {
+    const shared = "The counting form, and the form that goes before a noun";
+    const hints = [...up().querySelectorAll(".at-numhint")].filter((h) => (h.textContent || "").includes(shared));
+    check("the explanation shared by 3 to 9 is said once, above them",
+      hints.length === 1 && !hints[0].closest(".at-numrow, .at-numtile"),
+      `${hints.length} times`);
+  }
 
   const sevenBox = boxNamed("7, counting");
   check("and every box is named by the number it is and the face of it",
@@ -10407,6 +10546,11 @@ const openPronounTables = async () => {
       .filter((l) => l && /Transliteration/.test(l)).slice(0, 3).join(" | ") || "(none asked)");
   check("and an empty box is not asked, because there is nothing to sound like",
     !boxNamed("Transliteration for 8, counting"));
+  check("in a row, how it sounds and Record sit under the box typed into, in its column",
+    !!sevenLat && !!sevenLat.closest(".at-numrow.at-numpair .at-numcell") &&
+      !!(/** @type {any} */ (sevenLat.closest(".at-numcell"))).querySelector('input[aria-label="7, counting"]') &&
+      [...(/** @type {any} */ (sevenLat.closest(".at-numcell"))).querySelectorAll("button")].some((b) => /^Record/.test((b.textContent || "").trim())),
+    sevenLat ? "(not in the box's column)" : "(no transliteration box)");
   if (sevenLat) {
     typeIn(sevenLat, "sabʕa");
     await sleep(200);
@@ -10417,7 +10561,14 @@ const openPronounTables = async () => {
      word before a noun, so nothing shows until that box is filled — and
      nothing under a number with no word yet, since there is nothing to
      count with. */
-  const counts = (/** @type {string} */ n) => ((tileOf(n) || { querySelector: () => null }).querySelector(".at-numcount") || {}).textContent || "";
+  /* A panel holds its examples; a row has them under it, full width. */
+  const counts = (/** @type {string} */ n) => {
+    const t = tileOf(n);
+    if (!t) return "";
+    if (t.classList.contains("at-numtile")) return (t.querySelector(".at-numcount") || {}).textContent || "";
+    const after = t.nextElementSibling;
+    return after && after.classList.contains("at-numcount") ? after.textContent || "" : "";
+  };
   check("no example under a number until its word before a noun is typed",
     !counts("7"), counts("7"));
   const sevenBefore = boxNamed("7, before a noun");
@@ -10427,7 +10578,8 @@ const openPronounTables = async () => {
   }
   check("then under its boxes are examples of counting things, read only",
     !!sevenBefore && /Examples of counting things/.test(counts("7")) && /sab3at/.test(counts("7")) && /7 books/.test(counts("7")) &&
-      !(/** @type {any} */ (tileOf("7"))).querySelector(".at-numcount input"),
+      !(/** @type {any} */ (tileOf("7"))).querySelector(".at-numcount input") &&
+      !((/** @type {any} */ (tileOf("7"))).nextElementSibling || { querySelector: () => null }).querySelector("input"),
     counts("7") || "(nothing under seven)");
   check("and nothing under a number with no word to count with",
     !counts("8"), counts("8"));
@@ -10495,7 +10647,7 @@ const openPronounTables = async () => {
     click(keep);
     await sleep(250);
     check("which goes back to the part, with it filed among the numbers you wrote out",
-      !!screenNamed("Numbers 0 to 9") && /Numbers you wrote out/.test(up().textContent || ""),
+      !!screenNamed("Numbers · 0 to 9") && /Numbers you wrote out/.test(up().textContent || ""),
       (up().textContent || "").slice(0, 200).replace(/\s+/g, " "));
   }
 
@@ -10508,7 +10660,7 @@ const openPronounTables = async () => {
   const cancel = [...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Cancel");
   click(cancel);
   await sleep(200);
-  check("and cancelling stays on the part", !!screenNamed("Numbers 0 to 9"));
+  check("and cancelling stays on the part", !!screenNamed("Numbers · 0 to 9"));
 
   const save = buttonIn(/^Save$/);
   check("the part's Save is in the top bar", !!save && !!save.closest(".at-screenhead"));
@@ -10541,7 +10693,7 @@ const openPronounTables = async () => {
     (panel().textContent || "").slice(0, 200).replace(/\s+/g, " "));
   /* Counting is a section of each part: the noun cards it counts, and
      what the rest are missing — here a pair form, which two needs. */
-  click(tileNamed("Numbers 0 to 9"));
+  click(tileNamed("0 to 9"));
   await sleep(250);
   const countingBlock = [...up().querySelectorAll(".at-formblock")]
     .find((b) => ((b.querySelector(".at-formnum") || {}).textContent || "") === "Counting things");
@@ -10555,10 +10707,10 @@ const openPronounTables = async () => {
 
   /* The word between a number's pieces is not a number, and is on a
      screen of its own beside the parts rather than among the tens. */
-  click(tileNamed("Numbers 20 to 99"));
+  click(tileNamed("20 to 99"));
   await sleep(250);
   check("the part that first needs the connecting word does not hold its box",
-    !!screenNamed("Numbers 20 to 99") && !!boxNamed("40, counting") && !boxNamed("and, counting"),
+    !!screenNamed("Numbers · 20 to 99") && !!boxNamed("40, counting") && !boxNamed("and, counting"),
     [...up().querySelectorAll("input")].map((i) => i.getAttribute("aria-label")).slice(0, 12).join(" | "));
   await goBack();
   check("the main screen offers the connecting words as a screen of their own",
@@ -10637,7 +10789,7 @@ const openPronounTables = async () => {
 
   /* A save that does not go through keeps the teacher beside its Save,
      and says so, rather than taking the change to the main screen. */
-  click(tileNamed("Numbers 0 to 9"));
+  click(tileNamed("0 to 9"));
   await sleep(250);
   const eightWord = boxNamed("8, counting");
   if (eightWord) {
@@ -10649,7 +10801,7 @@ const openPronounTables = async () => {
   click([...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Save" && !b.closest(".at-screenhead")));
   await sleep(250);
   check("a save on the way out that does not go through stays on the part, and says so",
-    !!screenNamed("Numbers 0 to 9") && /not saved/.test(up().textContent || "") &&
+    !!screenNamed("Numbers · 0 to 9") && /not saved/.test(up().textContent || "") &&
       !!buttonIn(/^Save$/) && !isOff(buttonIn(/^Save$/)),
     (up().textContent || "").slice(0, 160).replace(/\s+/g, " "));
   refuseSave = false;
@@ -10667,6 +10819,60 @@ const openPronounTables = async () => {
       up().querySelectorAll(".at-numsamplerow").length > 20,
     (up().textContent || "").slice(0, 200).replace(/\s+/g, " "));
   await goBack();
+
+  /* The moment a part becomes ready (0.734, the owner's choice): saving
+     that finishes 0 to 9 says so in a message, and its tile glows and is
+     marked Just finished until the teacher leaves Numbers. Drawn afresh
+     on an empty set, typed in box by box, as a teacher would. */
+  {
+    const { readFileSync: readGoldenAll } = await import("node:fs");
+    const gold = JSON.parse(readGoldenAll(path.resolve("tests/golden/ar-PS.numbers.json"), "utf8")).system;
+    const FACE = /** @type {Record<string, string>} */ ({
+      counting: "standalone", "with a masculine word": "m", "with a feminine word": "f",
+      "before a noun": "construct.m", "before a masculine noun": "construct.m", "before a feminine noun": "construct.f",
+    });
+    editorRoot.render(React.createElement("div"));
+    await sleep(50);
+    draw(emptyNumberSystem("n2", "lena", "ar-PS", Date.now(), 1));
+    await sleep(250);
+    snacks.length = 0;
+    click(tileNamed("0 to 9"));
+    await sleep(250);
+    let typed = 0;
+    for (const box of [...up().querySelectorAll("input")]) {
+      const m = /^(\d), (.+)$/.exec(box.getAttribute("aria-label") || "");
+      if (!m) continue;
+      const word = ((gold.lexemes[`unit.${m[1]}`] || { forms: {} }).forms || {})[FACE[m[2]] || ""];
+      if (!word) continue;
+      typeIn(box, word);
+      typed += 1;
+      await sleep(20);
+    }
+    await sleep(150);
+    click(buttonIn(/^Save$/));
+    await sleep(300);
+    check("saving the words that finish 0 to 9 says it is ready, what students can do, and what is next",
+      snacks.some((m) => m === "0 to 9 is ready. Students can now be asked these numbers. Next: 10 to 19."),
+      `${typed} boxes typed · ${snacks.join(" | ") || "(no message)"}`);
+    await goBack();
+    const zero = /** @type {any} */ (tileNamed("0 to 9") || {});
+    check("and back on the list, its tile glows and is marked Just finished, with its tick",
+      !!zero.closest?.(".at-numjust") && !!zero.querySelector?.(".at-numtick") &&
+        ((zero.querySelector?.(".at-statusbadge") || {}).textContent || "") === "Just finished",
+      (zero.textContent || "(no tile)").trim());
+    check("and Start here has moved on to 10 to 19, and the headline counts to 9",
+      (/** @type {any} */ (tileNamed("10 to 19") || {}).querySelector?.(".at-statusbadge") || {}).textContent === "Start here" &&
+        ((panel().querySelector(".at-numherotitle") || {}).textContent || "") === "Students can count to 9",
+      ((panel().querySelector(".at-numherotitle") || {}).textContent || "(no headline)"));
+    /* Leaving Numbers and coming back: no longer just finished. */
+    editorRoot.render(React.createElement("div"));
+    await sleep(50);
+    draw(saves[saves.length - 1].sys);
+    await sleep(250);
+    check("and once the teacher leaves Numbers and comes back, it is no longer marked",
+      !panel().querySelector(".at-numjust") && !!(/** @type {any} */ (tileNamed("0 to 9") || {}).querySelector?.(".at-numtick")) &&
+        ![...panel().querySelectorAll(".at-statusbadge")].some((b) => /Just finished/.test(b.textContent || "")));
+  }
 
   editorRoot.unmount();
   host.remove();

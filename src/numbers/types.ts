@@ -507,16 +507,22 @@ export const NUMBER_CEILING = 99999999999;
  * teacher wrote *billion*. Up to 999,999,999 is said with the words for
  * a million and below, so the thousands stay as open as they were.
  */
+/*
+ * Named by their range alone since 0.734 (the owner's choice): on the
+ * Numbers screen, under the language's name, "Numbers" before each was
+ * said six times over. Where a part's name stands on its own — a screen's
+ * title, an entry in a module, a skill card — partName puts it back.
+ */
 export const NUMBER_RANGES: Range[] = [
-  { id: "numbers:0-9", kind: "numbers", label: "Numbers 0 to 9", from: 0, to: 9, was: "numbers:0-10" },
-  { id: "numbers:10-19", kind: "numbers", label: "Numbers 10 to 19", from: 10, to: 19, was: "numbers:11-99" },
-  { id: "numbers:20-99", kind: "numbers", label: "Numbers 20 to 99", from: 20, to: 99, was: "numbers:11-99" },
-  { id: "numbers:100-999", kind: "numbers", label: "Numbers 100 to 999", from: 100, to: 999 },
-  { id: "numbers:1000+", kind: "numbers", label: "Numbers 1,000 to 999,999,999", from: 1000, to: 999999999 },
+  { id: "numbers:0-9", kind: "numbers", label: "0 to 9", from: 0, to: 9, was: "numbers:0-10" },
+  { id: "numbers:10-19", kind: "numbers", label: "10 to 19", from: 10, to: 19, was: "numbers:11-99" },
+  { id: "numbers:20-99", kind: "numbers", label: "20 to 99", from: 20, to: 99, was: "numbers:11-99" },
+  { id: "numbers:100-999", kind: "numbers", label: "100 to 999", from: 100, to: 999 },
+  { id: "numbers:1000+", kind: "numbers", label: "Thousands and millions", from: 1000, to: 999999999 },
   {
     id: "numbers:1000000000+",
     kind: "numbers",
-    label: "Numbers 1,000,000,000 and over",
+    label: "A billion and over",
     from: 1000000000,
     to: NUMBER_CEILING,
   },
@@ -594,4 +600,19 @@ export function partsNow(parts: string[]): string[] {
     for (const now of into.length ? into : [id]) if (!out.includes(now)) out.push(now);
   }
   return out;
+}
+
+/** A part's name where it stands on its own, away from the Numbers screen
+    that says what it is a part of: "Numbers · 0 to 9" (0.734). A part of
+    the clock is named in full already. */
+export function partName(range: { kind?: string; label: string }): string {
+  return range.kind === "numbers" ? `Numbers · ${range.label}` : range.label;
+}
+
+/** A part's numbers in figures, for a sentence: "0 to 9", "1,000 to
+    999,999,999", "1,000,000,000 and over" (0.734). */
+export function spanWords(range: { from: number; to: number }): string {
+  return range.to >= NUMBER_CEILING
+    ? `${range.from.toLocaleString("en")} and over`
+    : `${range.from.toLocaleString("en")} to ${range.to.toLocaleString("en")}`;
 }

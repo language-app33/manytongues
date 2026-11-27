@@ -809,8 +809,9 @@ export const CARD_FACTS: FieldRule[] = [
       "It holds a schedule and no words: what it is asked is made up when the question is dealt and thrown away with the sitting.",
     reader: "both",
     shown: (value) => {
-      const range = value as { label?: string } | null;
-      return range && range.label ? [range.label] : [];
+      const range = value as { kind?: string; label?: string } | null;
+      /* A part of the numbers by its range, as partName says it (0.734). */
+      return range && range.label ? [range.kind === "numbers" ? `Numbers · ${range.label}` : range.label] : [];
     },
   },
   {

@@ -219,7 +219,7 @@ test("a skill holds a schedule and no words at all", () => {
   assert.equal(form.en, "");
   assert.equal(form.range, true, "the marker every gate reads");
   assert.deepEqual(form.s, {});
-  assert.equal(skill.name, "Numbers 0 to 9", "and it is listed by what it is");
+  assert.equal(skill.name, "Numbers · 0 to 9", "and it is listed by what it is");
 });
 
 test("a skill is offered a listening question only where something has been recorded", () => {

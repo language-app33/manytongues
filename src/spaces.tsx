@@ -91,7 +91,7 @@ import { offersFor } from "./offers.ts";
 import { NumberSystemEditor } from "./number-system-editor.tsx";
 import { PronounsEditor, hasPronouns } from "./pronouns-editor.tsx";
 import type { NumberSystem, TimeSystem } from "./numbers/types.ts";
-import { partsNow } from "./numbers/types.ts";
+import { partName, partsNow } from "./numbers/types.ts";
 import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
 import type { PartSentences } from "./review.ts";
 import { moduleQuality, FIXES_SHOWN, qualityTone, qualityShown } from "./module-quality.ts";
@@ -5940,11 +5940,68 @@ const FIX_ICON: Record<string, string> = {
   repeats: "copy", long: "sort", scene: "group",
 };
 
+/* What the top suggestions would take the score to, and the score's
+   colour: worked out once for the quality row on the module's screen and
+   for the advice screen it opens (0.734), so the two draw the same bar. */
+function qualityPlan(quality: Quality) {
+  const score = quality.score || 0;
+  const fixes = quality.fixes.slice(0, FIXES_SHOWN);
+  const gainOf = (g: number) => Math.max(1, Math.round(g));
+  const reach = Math.min(100, score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
+  return { score, fixes, gainOf, reach, tone: qualityTone(score) };
+}
+
+/* The score's bar, with where the suggestions would take it drawn on after
+   it, faint. A span, so it can sit inside the row's button. */
+function QualityBar({ quality }: { quality: Quality }) {
+  const { score, fixes, reach, tone } = qualityPlan(quality);
+  return (
+    <span className="at-qualitybar" aria-hidden="true">
+      <span className={`now ${tone}`} style={{ width: `${score}%` }} />
+      {fixes.length ? <span className="then" style={{ left: `${score}%`, width: `${reach - score}%` }} /> : null}
+    </span>
+  );
+}
+
+/*
+ * A module's quality as one row on its screen (0.734, the owner's choice):
+ * the score, how many ways there are to raise it, and its bar. The advice
+ * itself is a press away on a screen of its own, so the cards follow
+ * straight after on the first screen rather than under three cards of
+ * advice. Drawn as the app's tiles are, white and outlined: it opens
+ * something, it is not chosen.
+ */
+function QualityRow({ quality, kindW, onOpen }: { quality: Quality; kindW: string; onOpen: () => void }) {
+  if (quality.score === null) return null;
+  const { score, fixes, tone } = qualityPlan(quality);
+  const n = fixes.length;
+  const u = quality.untaught.length;
+  const KindW = kindW.charAt(0).toUpperCase() + kindW.slice(1);
+  return (
+    <button type="button" className="at-qualityrow" onClick={onOpen}
+      aria-label={`${KindW} quality: ${score} out of 100. Open the advice.`}>
+      <span className="at-qualityrowtop">
+        <span className={`at-qualityrowtext ${tone}`}>
+          <b>{score}</b>
+          {" of 100"}
+          {n ? ` · ${plural(n, "way")} to raise it` : ""}
+          {u ? ` · ${plural(u, "sentence")} to look at` : ""}
+        </span>
+        <span className="at-qualityrowgo" aria-hidden="true"><Icon name="chevronDown" size={20} /></span>
+      </span>
+      <QualityBar quality={quality} />
+    </button>
+  );
+}
+
 /*
  * A deck's quality (0.561): the score with a bar and where the top
- * suggestions would take it; the suggestions as cards, each with what to do,
+ * suggestions would take it; the suggestions, each with what to do,
  * why, what it is worth and, where it is about particular cards, those
- * cards to tap (0.563).
+ * cards to tap (0.563). On a screen of its own since 0.734, each
+ * suggestion a row that opens: closed, the rows are compared by their
+ * points at a glance; open, one says why and which words. How many more
+ * sentences a word needs is in its chip's title, no longer a "+2" on it.
  */
 function ModuleQuality({ quality, cards, lang, onOpenCard }: {
   quality: Quality;
@@ -5952,23 +6009,25 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
   lang: Partial<Lang>;
   onOpenCard: (id: string) => void;
 }) {
+  /* Which suggestions are open: all closed to begin with. */
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   if (quality.score === null) return null;
-  const fixes = quality.fixes.slice(0, FIXES_SHOWN);
-  const gainOf = (g: number) => Math.max(1, Math.round(g));
-  const reach = Math.min(100, quality.score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
-  const tone = qualityTone(quality.score);
+  const { fixes, gainOf, reach, tone } = qualityPlan(quality);
   const byId = new Map(cards.map((c) => [String(c.id), c]));
   const rowOf = new Map(quality.words.map((w) => [w.id, w]));
   const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
+  const toggle = (key: string) => setOpen((was) => {
+    const next = new Set(was);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
   return (
     <>
       <p className={`at-qualityscore ${tone}`}>
         <b>{quality.score}</b> <span>out of 100</span>
       </p>
-      <div className="at-qualitybar" aria-hidden="true">
-        <span className={`now ${tone}`} style={{ width: `${quality.score}%` }} />
-        {fixes.length ? <span className="then" style={{ left: `${quality.score}%`, width: `${reach - quality.score}%` }} /> : null}
-      </div>
+      <QualityBar quality={quality} />
       {/* Always shown (0.562): there are at most three, and they are the
           most useful thing here. */}
       {fixes.length > 0 && (
@@ -5979,11 +6038,17 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
               <ul className="at-qfixes">
                 {fixes.map((f) => {
                   const ids = (f.cards || []).filter((id) => byId.has(id));
+                  const isOpen = open.has(f.key);
                   return (
-                    <li className="at-qfix" key={f.key}>
-                      <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                    <li className={`at-qfix${isOpen ? " open" : ""}`} key={f.key}>
+                      <button type="button" className="at-qfixhead" aria-expanded={isOpen} onClick={() => toggle(f.key)}>
+                        <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                        <span className="at-qfixtitle">{f.title}</span>
+                        <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                        <span className="at-qfixgo" aria-hidden="true"><Icon name={isOpen ? "chevronUp" : "chevronDown"} size={20} /></span>
+                      </button>
+                      {isOpen ? (
                       <div className="at-qfixbody">
-                        <p className="at-qfixtitle">{f.title}</p>
                         <p className="at-qfixtext">{f.text}</p>
                         {ids.length ? (
                           <div className="at-qfixwords">
@@ -5996,19 +6061,14 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
                                   <b lang={lang.id} dir={lang.direction} style={script}>
                                     {cardWords(byId.get(id) as Card, lang as Lang).word}
                                   </b>
-                                  {owed ? <i aria-label={`needs ${plural(owed, "more sentence")}`}>{`+${owed}`}</i> : null}
                                 </button>
                               );
                             })}
                           </div>
                         ) : null}
-                        {ids.length ? (
-                          <p className="at-qfixhint">
-                            {f.key === "words" ? "Tap a word to open it. The number is how many more sentences it needs." : "Tap one to open it."}
-                          </p>
-                        ) : null}
+                        {ids.length ? <p className="at-qfixhint">Tap one to open it.</p> : null}
                       </div>
-                      <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -6857,6 +6917,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The open deck, being edited: null while it is only read. */
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
   const [discardingModule, setDiscardingModule] = useState(false);
+  /* The open module's quality advice, on a screen of its own (0.734). */
+  const [qualityOpen, setQualityOpen] = useState(false);
+  /* The panel the green + opens inside a module (0.734): a new card or
+     cards the teacher already has. */
+  const [addingHow, setAddingHow] = useState(false);
+  /* Both belong to the module that was open: another module, or none,
+     starts without them, however it was left. */
+  useEffect(() => { setQualityOpen(false); setAddingHow(false); }, [openModule]);
   /* The picker a deck's screen opens to add
      cards the teacher already has: what is ticked, held until Done. */
   const [adding, setAdding] = useState<{ ids: string[]; parts: string[]; pronouns: boolean } | null>(null);
@@ -9716,7 +9784,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             lede="Lists every language has, written once for the language. Each range of numbers brings the number words it needs. A set still being written can go in: students get what is written so far.">
             <CheckList
               options={parts.map((r): { id: string; title: string; note?: string; disabled?: boolean } =>
-                ({ id: r.id, title: r.label, note: ready.has(r.id) ? undefined : "Words still to write" }))
+                ({ id: r.id, title: partName(r), note: ready.has(r.id) ? undefined : "Words still to write" }))
                 .concat(pronSet ? [{
                   id: "builtin:pronouns",
                   title: "Pronouns",
@@ -9840,7 +9908,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        — the pronouns are already one entry among them. */
     const numberEntries: NumberPart[] = numberPartsOf(langId)
       .filter((r) => partsNow(d.parts || []).includes(r.id))
-      .map((r) => ({ id: `numbers:${r.id}`, part: r.id, label: r.label, builtin: "numbers" }));
+      .map((r) => ({ id: `numbers:${r.id}`, part: r.id, label: partName(r), builtin: "numbers" }));
     const listed: any[] = (numberEntries as any[]).concat(moduleView ? moduleView.listed : []);
     const listedWhole = numberEntries.length + (moduleView ? moduleView.whole : 0);
     const moduleEmpty = !held.length && !numberEntries.length;
@@ -10033,7 +10101,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* Back asks first only while a rename is half typed (0.732). */
         onBack={() => {
           if (editing && changed) { setDiscardingModule(true); return; }
-          setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setServerProblems(null);
+          setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setServerProblems(null); setQualityOpen(false); setAddingHow(false);
         }}
         backIcon="back"
         backLabel="Back"
@@ -10165,10 +10233,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {/* Only once there is a sentence or a recording to score
                   (0.709); nothing in its place before then. */}
               {openQuality && qualityShown(openQuality) && (
-                <Field label={`${KindW} quality`} lede={QUALITY_LEDE}>
-                  <ModuleQuality quality={openQuality} cards={held}
-                    lang={langOfModule(d) || LANGUAGES[DEFAULT_LANGUAGE]}
-                    onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+                <Field label={`${KindW} quality`}>
+                  <QualityRow quality={openQuality} kindW={kindW} onOpen={() => setQualityOpen(true)} />
                 </Field>
               )}
             </div>
@@ -10299,20 +10365,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           filter={cardFilterProp}
           size="small"
           busy={busy}
-          filters={
-            listed.length ? (
-              <div className="at-mt3">
-                {/* Both labels, and the stylesheet shows the one that
-                    fits on one line (0.728): the long one says where the
-                    cards go, which a phone has no room for. */}
-                <Button icon="add" className="at-blockbtn at-addexisting"
-                  onClick={() => openAdding(d)}>
-                  <span className="at-longlabel">{`Add existing cards to this ${kindW}`}</span>
-                  <span className="at-shortlabel">Add existing cards</span>
-                </Button>
-              </div>
-            ) : null
-          }
           empty={filterNote}
           emptyPanel={moduleEmpty ? (
             <Nudge
@@ -10334,7 +10386,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             </Nudge>
           ) : undefined}
           match={matchEntry}
-          onNew={newCard}
+          /* One green + for both ways of filling a module (0.734, the
+             owner's choice): it asks which, in place of a second button
+             under the list. */
+          onNew={() => setAddingHow(true)}
           selected={selCards}
           onSelectedChange={setSelCards}
           bulkActions={[
@@ -10363,6 +10418,33 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 <Help>{madeLine(d, account.handle, shortDate)}</Help>
               </div>
             ) : null}
+
+        {/* The advice behind the quality row (0.734), on its own screen.
+            Drawn before the card's, so a card opened from it comes up
+            over it and Back returns to the advice. */}
+        {qualityOpen && openQuality && qualityShown(openQuality) && (
+          <Screen title={`${KindW} quality`} onBack={() => setQualityOpen(false)} className="cardform">
+            <div className="at-formblock">
+              <Help>{QUALITY_LEDE}</Help>
+              <ModuleQuality quality={openQuality} cards={held}
+                lang={langOfModule(d) || LANGUAGES[DEFAULT_LANGUAGE]}
+                onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+            </div>
+          </Screen>
+        )}
+
+        {/* What the green + adds (0.734): the module's kind and its name
+            in quotes, since italics do not exist in every script. */}
+        {addingHow && (
+          <PickSheet title={`Add to the ${kindW} \u201c${d.title}\u201d`} className="at-addhow" onClose={() => setAddingHow(false)}>
+            <div className="at-sheetacts">
+              <SheetAction icon="add" label="New card" note={`Write a new card in this ${kindW}`}
+                onClick={() => { setAddingHow(false); newCard(); }} />
+              <SheetAction icon="cards" label="Cards you already have" note="Choose from your other cards"
+                onClick={() => { setAddingHow(false); openAdding(d); }} />
+            </div>
+          </PickSheet>
+        )}
 
         {cardScreen}
         {cardAction === "add" && cardActionScreen(d.id)}

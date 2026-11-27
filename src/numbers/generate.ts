@@ -43,7 +43,7 @@ import type {
   Token,
 } from "./types.ts";
 import { askFor, blocking, countable, rangeChecks, renderAsk, probeOf, sayAlong, seeded } from "./range.ts";
-import { COUNTING_WAS, NUMBER_CEILING, countingOf, partsNow, stretchTag } from "./types.ts";
+import { COUNTING_WAS, NUMBER_CEILING, countingOf, partName, partsNow, stretchTag } from "./types.ts";
 
 /** A key may name a face with a bar in it; an id may not wear one. */
 const safe = (s: string) => String(s).replace(/\|/g, "~");
@@ -662,7 +662,7 @@ function rangeItem(
     lang,
     kind: "word",
     tags: [],
-    name: range.label,
+    name: partName(range),
     forms: [form],
     range,
     source: { systemId: sys.id, slot: `range:${range.id}` },
@@ -1236,6 +1236,31 @@ export function fileIntoModules(
  * language builds its numbers, not about what any teacher has written.
  */
 const HOMES: WeakMap<Composer, Map<string, string>> = new WeakMap();
+
+/**
+ * How much of a part's own words is written: the boxes of the words it is
+ * the first to need, and how many of them hold a word (0.734). Drawn as a
+ * thin bar on a part under way. A box the composer can do without is not
+ * counted: leaving it empty is not leaving the part unfinished.
+ */
+export function partProgress(
+  rangeId: string,
+  slots: SlotSpec[],
+  homes: Map<string, string>,
+  draft: Pick<NumberSystem, "lexemes">,
+): { written: number; total: number } {
+  let written = 0;
+  let total = 0;
+  for (const slot of slots) {
+    if (slot.optional || homes.get(slot.slot) !== rangeId) continue;
+    const forms = (draft.lexemes[slot.slot] || { forms: {} as Record<string, string> }).forms as Record<string, string | undefined>;
+    for (const key of slot.formKeys) {
+      total += 1;
+      if ((forms[key] || "").trim()) written += 1;
+    }
+  }
+  return { written, total };
+}
 
 /**
  * The part of the numbers each box is first needed by — one to ten under

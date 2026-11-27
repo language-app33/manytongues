@@ -358,7 +358,7 @@
 .at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }
 /* Deck quality (0.561): a bar for the score, with where the suggestions
    would take it drawn on after it, faint. */
-.at-qualitybar { position:relative; height:10px; border-radius:999px; background: var(--well);
+.at-qualitybar { display:block; position:relative; height:10px; border-radius:999px; background: var(--well);
   overflow:hidden; margin:4px 0 0; }
 .at-qualitybar > span { position:absolute; top:0; bottom:0; left:0; border-radius:999px; }
 .at-qualitybar > .now.good { background: var(--jade); }
@@ -366,14 +366,33 @@
 .at-qualitybar > .now.poor { background: var(--muted); }
 .at-qualitybar > .then { background: var(--jade-soft); border-radius:0 999px 999px 0; opacity:.7; }
 .at-qualityreach { margin:12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
+/* The quality row on a module's screen (0.734): a tile like the app's
+   others, white and outlined, which opens the advice. Never the green
+   outline and fill that mean "chosen". */
+.at-qualityrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; cursor:pointer;
+  padding:12px 14px; border:2px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+@media (hover: hover) { .at-qualityrow:hover { border-color: var(--faint); } }
+.at-qualityrowtop { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.at-qualityrowtext { flex:1 1 auto; min-width:0; font-size: var(--fs-sm); color: var(--text-soft); line-height:1.35; }
+.at-qualityrowtext b { font-size: var(--fs-md); font-weight:800; color: var(--ink); }
+.at-qualityrowtext.good b { color: var(--jade); }
+.at-qualityrowtext.fair b { color: var(--brass); }
+.at-qualityrowgo { flex:none; display:grid; place-items:center; color: var(--muted); }
+.at-qualityrowgo svg { transform: rotate(-90deg); }
 /* Each suggestion a card of its own: what to add, what it is worth, and
    the words it is about, each one tap from its card. */
 .at-qfixes { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
-.at-qfix { display:flex; align-items:flex-start; gap:12px; padding:14px; border:2px solid var(--line);
-  border-radius: var(--r-lg); background: var(--surface); }
+/* Each a row that opens (0.734): picture, what to do, points, chevron;
+   open, why and which words under it. */
+.at-qfix { border:2px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.at-qfixhead { display:flex; align-items:center; gap:12px; width:100%; padding:12px 14px; cursor:pointer;
+  background:none; border:0; text-align:left; font:inherit; color:inherit; border-radius: var(--r-lg); }
+.at-qfixhead .at-qfixtitle { flex:1 1 auto; min-width:0; }
+.at-qfixgo { flex:none; display:grid; place-items:center; color: var(--muted); }
 .at-qfixico { flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
   background: var(--jade-bg); color: var(--jade); }
-.at-qfixbody { flex:1 1 auto; min-width:0; }
+.at-qfixbody { padding:0 14px 14px 64px; min-width:0; }
+@media (max-width: 420px) { .at-qfixbody { padding-left:14px; } }
 .at-qfixgain { flex:none; display:flex; flex-direction:column; align-items:center; line-height:1.1;
   padding:6px 10px; border-radius:12px; background: var(--jade-bg); color: var(--jade); }
 .at-qfixgain b { font-size:18px; font-weight:800; }
@@ -383,13 +402,11 @@
   width:auto; flex:none; min-height:0; max-width:100%; line-height:1;
   border:1px solid var(--line); border-radius:999px; background: var(--well); color: var(--text); font:inherit; }
 .at-qfixword:hover { border-color: var(--jade); }
-/* Centred on the pill's middle rather than on the text's baseline (0.563):
-   the script and the Latin "+2" sit on that line differently, which left
-   some pills lopsided. Each part is its own box of the same line height. */
+/* The word in its own box of the script's line height (0.563), so the
+   pill is centred on its middle rather than on a baseline. */
 .at-qfixword b { font-weight:700; display:block; line-height:1.5;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-.at-qfixword i { font-style:normal; font-size:12px; color: var(--muted); display:block; line-height:1; flex:none; }
-.at-qfixtitle { margin:0; font-size: var(--fs-md); font-weight:800; line-height:1.3; color: var(--ink); }
+.at-qfixtitle { display:block; margin:0; font-size: var(--fs-md); font-weight:800; line-height:1.3; color: var(--ink); }
 .at-qfixtext { margin:4px 0 0; font-size: var(--fs-sm); line-height:1.4; color: var(--text-soft); }
 .at-qfixhint { margin:6px 0 0; font-size:12px; color: var(--muted); }
 /* Sentences with words no card teaches, listed in full under the
@@ -849,6 +866,24 @@
   font-weight:400; letter-spacing:0; text-transform:none; color: var(--muted);
   unicode-bidi:isolate; }
 .at-numhint { margin:0 0 10px; font-size:13px; line-height:1.5; }
+/* Inside a part (0.734): an explanation shared by a run of numbers, said
+   once above them across the whole width; and a run of numbers with two
+   boxes each, as rows — the number, then its two boxes under the run's
+   column headings, each box with how it sounds and its recording under it
+   once it is typed. The boxes shrink to their half; a long word scrolls
+   inside its box rather than widening the row. */
+.at-numtiles > .at-numrunhint { grid-column: 1 / -1; margin:4px 0 -4px; }
+.at-numrun { grid-column: 1 / -1; display:flex; flex-direction:column; gap:8px; }
+.at-numrowhead, .at-numrow.at-numpair { display:grid; grid-template-columns: 44px minmax(0,1fr) minmax(0,1fr);
+  gap:8px; align-items:start; flex-wrap:nowrap; }
+.at-numrowhead > span { margin:0; font-size:12px; letter-spacing:.08em; }
+.at-numrow.at-numpair > .at-numcell { min-width:0; }
+.at-numrow.at-numpair input, .at-numrow.at-numpair textarea { min-width:0; max-width:100%; }
+.at-numrowfig { margin:0; padding-top:10px; display:flex; flex-direction:column; align-items:flex-start; gap:0; font-weight:800;
+  color: var(--ink); line-height:1.2; }
+.at-numrowfig .at-numheadfig { font-size:calc(15px * var(--sscale, 1)); }
+.at-numrun > .at-numcount { margin:0 0 4px 52px; }
+.at-numrow.at-numpair .at-numsound { flex-wrap:wrap; }
 .at-numtile .at-numcell + .at-numcell { margin-top:12px; }
 /* How it sounds and its recording, on one line under the word. */
 .at-numsound { display:flex; gap:6px; align-items:center; margin-top:6px; }
@@ -994,14 +1029,6 @@ fieldset.at-cardlock:disabled input[type="checkbox"]:disabled { opacity:.55; }
    dashed and unfilled, as the other buttons that add one more are. */
 .at-joinmore { margin-top: var(--s3); border:2px dashed var(--faint); background:none; color: var(--muted); box-shadow:none; }
 .at-joinmore:hover { border-color: var(--muted); color: var(--text); }
-/* "Add existing cards" on a module's card list (0.728): where the cards
-   go, said where there is room for it on one line, and the short form
-   on a phone. Both are in the button; this picks one. */
-.at-addexisting .at-longlabel { display:none; }
-@media (min-width: 640px) {
-  .at-addexisting .at-longlabel { display:inline; }
-  .at-addexisting .at-shortlabel { display:none; }
-}
 .at-answerpair.headed { gap:0 6px; }
 .at-answerpair.headed > .at-answerhead { grid-column:1 / -1; }
 /* A heading with what acts on its list at the right of its line. */
@@ -1112,3 +1139,37 @@ fieldset.at-cardlock:disabled .at-reqstar { display:none; }
    words where it comes up, no tick-boxes (0.732, the owner's 5a). */
 .at-practice.said .at-practicerow { grid-template-columns: minmax(0, 1fr); }
 .at-practicesaid { flex: 0 0 100%; font-size: 13px; color: var(--muted); }
+/* "Add to the deck “…”" (0.734): a long name wraps inside the heading
+   rather than pushing the close button off the panel. */
+.at-addhow h3 { overflow-wrap:anywhere; }
+/* Word sets › Numbers (0.734): what students can do now, large, with no
+   box, fill or border — it is a statement, not something to press — and
+   a thin step for each part, green once it is ready. */
+.at-numhero { margin:4px 0 0; }
+.at-numherotitle { margin:0; font-size:26px; font-weight:800; line-height:1.15; letter-spacing:-.01em; color: var(--ink); }
+.at-numherosub { margin:6px 0 0; font-size: var(--fs-sm); line-height:1.4; color: var(--muted); }
+.at-numsteps { display:flex; gap:4px; margin-top:12px; }
+.at-numsteps > i { flex:1 1 0; height:6px; border-radius:999px; background: var(--line); }
+.at-numsteps > i.on { background: var(--jade); }
+/* A finished part: an ordinary tile with a solid green tick before its
+   name, and its first numbers as the app says them on one line. */
+.at-numtick { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%;
+  background: var(--jade); color:#fff; margin-right:8px; vertical-align:middle; flex:none; }
+.at-numtick svg { width:16px; height:16px; }
+.at-numsample1 { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  color: var(--text-soft); font-family: var(--sfont); unicode-bidi:plaintext; }
+/* A part under way: how much of its own words is written. */
+.at-numbar { display:block; height:4px; max-width:220px; margin:6px 0 2px; border-radius:999px;
+  background: var(--line); overflow:hidden; }
+.at-numbar > i { display:block; height:100%; border-radius:999px; background: var(--jade); }
+/* The moment a part becomes ready: one soft green glow, which fades; none
+   where the phone is set to reduce motion. */
+.at-numjust > * { animation: at-numglow 1.6s ease-out 1; }
+@keyframes at-numglow {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--jade) 0%, transparent); }
+  25% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--jade) 40%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--jade) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .at-numjust > * { animation:none; }
+}
