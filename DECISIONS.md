@@ -9572,7 +9572,7 @@ level, beside `MeaningSplits`, so it opens from Home as well as Material.
 "New personal set" left the Material list's `more` menu: one place to
 choose a kind. `PathSection`'s New unit stays.
 
-## Empty boxes get their button (0.724–0.725)
+## Empty boxes get their button (0.724, 0.726)
 
 A course's empty Modules box gained Create a module (0.724), as To do has.
 A sweep of every empty box then found six that said what to do with no

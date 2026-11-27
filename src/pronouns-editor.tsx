@@ -102,7 +102,7 @@ export const pronounCardFor = (cards: Card[], langId: string, person: string): C
 export const hasPronouns = (lang: Lang | null | undefined): boolean =>
   personsOf(verbOf(lang)).length > 1;
 
-export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, onModule }: {
+export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, onModule, sharedNote }: {
   lang: Lang;
   /** The teacher's cards, which is where the pronouns already written are. */
   cards: Card[];
@@ -114,6 +114,9 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, on
   /** Save one card; resolves when the server has it (or it is kept for later). */
   onSave: (card: Partial<Card>, modules: string[]) => Promise<unknown>;
   onClose: () => void;
+  /** A line at the top of the set's screen: that the space's teachers share
+      it (0.725). */
+  sharedNote?: string;
 }) {
   const persons = useMemo(() => personsOf(verbOf(lang)), [lang]);
   const held = useMemo(
@@ -229,6 +232,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, on
         </Button>
       }
     >
+      {sharedNote ? <Help>{sharedNote}</Help> : null}
       <Help>
         The words for I, you, he and the rest, written once for {lang.name}. Each becomes a card
         that can be practised and put in modules, and a sentence with a {"{{pronoun}}"} blank puts
