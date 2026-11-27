@@ -8,12 +8,32 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.715 — 27 November 2026
+## 0.716 — 27 November 2026
 
 **The card status panel no longer opens with a "Now: …" line.** Under
 "Card status" it repeated the status the card already has, which the panel
 shows anyway with a tick beside it. The line is gone; the choices are the
 same as before.
+
+## 0.715 — 27 November 2026
+
+**A module's tile is tidier: its score on the left, who can see it right
+under its name.** In Teaching › Material › Modules (and in My space, while
+you still have one):
+
+- The quality score's ring sits left of the module's name instead of out
+  on the right beside the three dots, so the scores of a list stand in one
+  column you can run your eye down. A module with no score yet keeps the
+  ring's room empty, so every name in the list starts in the same place.
+- The thin rule across the foot of the tile is gone, and the line saying
+  who can see it ("Available to students in the course …", "Not in a course
+  yet") sits straight under the name.
+- When a module is a unit, has cards to review or is a personal set, that
+  is said on the same line, first: "Unit · Available to students in the
+  course Arabic 101".
+
+The rule is gone from every tile that had one, too: courses, the modules
+list in Admin, and the rest.
 
 ## 0.714 — 27 November 2026
 
