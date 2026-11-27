@@ -8,6 +8,14 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.699 — 27 November 2026
+
+**A module's tile no longer counts the cards that don't reach students.**
+In Teaching › Material › Modules, the red "1 not reaching students" line is
+off the tile. Open the module and it is still there, with the reasons: how
+many are drafts, waiting for review, or need their number words written.
+To do on Home still says it for each course too.
+
 ## 0.697 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
