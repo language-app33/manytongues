@@ -6176,9 +6176,10 @@ function StatusMenu({ card, disabled, onStatus }: {
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
         {/* The statuses open in the app's one panel (0.690, the owner's
-            1a), its status now ticked. */}
+            1a), its status now ticked. No "Now: …" line over them (0.703):
+            the tick already says it. */}
         {open && (
-          <PickSheet title="Card status" lede={`Now: ${shown}`} className="at-statussheet" onClose={() => setOpen(false)}>
+          <PickSheet title="Card status" className="at-statussheet" onClose={() => setOpen(false)}>
             <div className="at-sheetacts">
               {choices.map((c) => (
                 <SheetAction

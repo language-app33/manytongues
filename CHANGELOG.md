@@ -8,6 +8,13 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.703 — 27 November 2026
+
+**The card status panel no longer opens with a "Now: …" line.** Under
+"Card status" it repeated the status the card already has, which the panel
+shows anyway with a tick beside it. The line is gone; the choices are the
+same as before.
+
 ## 0.702 — 27 November 2026
 
 **A card's words no longer look like headings when you are only reading
