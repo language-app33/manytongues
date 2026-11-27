@@ -31,6 +31,21 @@ and moves once per batch of work you would notice, not once per commit.
 
 Trade-off: editing or deleting from the list is one more tap.
 
+## 0.702 — 27 November 2026
+
+**A card's words no longer look like headings when you are only reading
+it.** Opened without Edit, a card showed its name, its word and its English
+in the same dark, bold, large type as the headings above them, so "This
+card" over "house" read as two headings in a row. The words are now a
+little smaller and at an ordinary weight; the headings are as they were.
+
+- Editing a card is unchanged: there the words were already in boxes and
+  smaller than the headings.
+- A module's own screen was checked and did not have the problem.
+
+To check by hand: on a phone, that the words still read comfortably at the
+new size, the Arabic above all.
+
 ## 0.701 — 27 November 2026
 
 **A module's tile no longer counts the cards that don't reach students.**

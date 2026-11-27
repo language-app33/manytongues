@@ -6227,7 +6227,7 @@ function StatusMenu({ card, disabled, onStatus }: {
 }
 
 /* The table view of a teacher's card lists, column by column. */
-/* Five columns, so the table fits a desktop and reads on a phone (0.702,
+/* Five columns, so the table fits a desktop and reads on a phone (0.703,
    the owner's 5a). Status is last: it is empty on most cards, and first it
    was an empty column across every phone. What went — transliteration,
    subtype, recording, review and the two dates — the filter and sort
