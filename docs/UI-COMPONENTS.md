@@ -162,11 +162,7 @@ second argument saves the caller working out which way the tick just went.
 Three dots that open the app's one context menu (0.689; a sheet since
 0.690): the less used things done with a tile or a list — a module's Export
 and Delete, a list's Import — out of the way of the one it is for.
-`label, title, lede, items, ghost=true, onTile=false`
-
-**On a tile, pass `onTile`** (0.692): with one action it is drawn as that
-action's own button, and only two or more go behind the dots; either way
-the button is a ghost with no stroke (`.at-tileact`).
+`label, title, lede, items, ghost=true`
 
 The panel is a `PickSheet` of `SheetAction` rows, the same one a saved
 session's dots open on Focused training: up from the foot of a phone, in the

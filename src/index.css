@@ -1888,14 +1888,7 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-morewrap { display:flex; flex:0 0 auto; }
 .at-morebtn.on { border-color: var(--accent); color: var(--accent); }
 .at-toolbar .at-morebtn { flex:0 0 auto; width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
-.at-deckacts .at-morewrap .at-icon { width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
-/* A tile's own buttons (0.692): ghosts without their stroke, a ground
-   only under a finger or a pointer, so they stand back from the tile's
-   words. The danger one keeps its colour. */
-.at-icon.at-tileact { border-color: transparent; background: transparent; }
-@media (hover: hover) { .at-icon.at-tileact:hover:not(:disabled) { border-color: transparent; background: var(--press); } }
-.at-icon.at-tileact:active:not(:disabled), .at-icon.at-tileact.on { border-color: transparent; background: var(--press); }
-.at-icon.at-tileact.danger { color: var(--rose); }
+.at-deckacts .at-morewrap .at-morebtn { width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
 .at-eyebrow { font-family: var(--ui); font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); margin:0 0 12px; }
 .at-hint { font-size:14px; font-weight:500; color: var(--muted); line-height:1.6; margin:10px 0 0; }
 /* The same voice as a hint, said before the answer rather than after it —
