@@ -8,6 +8,15 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.724 — 27 November 2026
+
+**An empty course offers Create a module.** In Teaching › Home › My
+courses, a course with no modules yet now has a **Create a module** button
+in its Modules section, as To do does. It asks what kind of module, as New
+module does; a deck or personal set is put in the course, a unit starts on
+the course's path, and the new module opens. Where you already have modules
+elsewhere, **Add a module to this course** sits beside it as before.
+
 ## 0.723 — 27 November 2026
 
 **Material no longer opens with an explanation.** The sentence at the top

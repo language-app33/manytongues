@@ -10226,6 +10226,25 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
   }
 
+  /* What kind of module a new one is: asked from New, from To do's Create a
+     module, and from an empty course's Modules (0.724), so the course screen
+     draws it too. */
+  const kindSheet = choosingKind ? (
+    <PickSheet title="New module" lede="What kind of module? This can't be changed once it is made." onClose={() => { setChoosingKind(false); setNamingFor(null); }}>
+      {/* Spaced as every list of tiles is (0.683); a personal set
+          only where the App admin switched them on (0.722). */}
+      <div className="at-decklist2">
+        {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
+          <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+            setChoosingKind(false);
+            setNewKind(k.kind);
+            setNaming("new");
+          }} />
+        ))}
+      </div>
+    </PickSheet>
+  ) : null;
+
   if (courseView) {
     const c = courses.find((x) => x.id === courseView);
     if (!c) {
@@ -10441,8 +10460,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 <Nudge
                   icon="folder"
                   tone="attention"
-                  action={
-                    <ModuleSwitch
+                  action={<div className="at-nudgeboth">
+                    {/* Made here, as from To do: the kind asked, then the new
+                        module is put in this course and opened (0.724). */}
+                    <Button size="sm" variant="primary" icon="add" onClick={() => {
+                      setNewKind("deck");
+                      setNamingFor(c);
+                      setChoosingKind(true);
+                    }}>Create a module</Button>
+                    {plainModules.length > 0 && <ModuleSwitch
                       modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                       chosen={mine.map((d) => d.id)}
                       onOpen={(id) => setOpenModule(id)}
@@ -10460,12 +10486,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         note: "",
                         none: "You have no modules yet. Make one under Modules, then add it to this course.",
                       }}
-                    />
-                  }
+                    />}
+                  </div>}
                 >
                   Nothing here yet. Add a module to give your students something to practise.
                 </Nudge>
               )}
+              {kindSheet}
             </div>
             {/* Only the student code lives here. The teacher code hands over
                 control of the material, so who holds it is the
@@ -10573,21 +10600,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               bands across the top of every tab here. Both are in To do on
               Home since 0.693 (the owner's 5a), with its count on Home's
               button in the bar. */}
-          {choosingKind && (
-            <PickSheet title="New module" lede="What kind of module? This can't be changed once it is made." onClose={() => { setChoosingKind(false); setNamingFor(null); }}>
-              {/* Spaced as every list of tiles is (0.683); a personal set
-                  only where the App admin switched them on (0.722). */}
-              <div className="at-decklist2">
-                {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
-                  <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
-                    setChoosingKind(false);
-                    setNewKind(k.kind);
-                    setNaming("new");
-                  }} />
-                ))}
-              </div>
-            </PickSheet>
-          )}
+          {kindSheet}
           {splitting && (
             <MeaningSplits
               cards={twoMeanings}
