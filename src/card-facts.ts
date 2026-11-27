@@ -78,8 +78,30 @@ export type Where = "card" | "form" | "line" | "answer";
  * everything that is about the word itself, which is what a student is
  * looking at when they open a card between sessions. Nothing is a
  * student's alone — there is no fact about a card its teacher may not see.
+ * `student` (0.704) is `both` without the parts written for teachers: what
+ * kind of card it is, the line saying what a student is asked, and the
+ * reference rows never asked in an exercise. It is the student's card page.
  */
-export type Reader = "teacher" | "both";
+export type Reader = "teacher" | "both" | "student";
+
+/** "Made by Tala Teacher · last changed by Rana Khoury, Nov 26" (0.711).
+    A person is "you" when they are `me`, else their name, else their
+    handle. No owner, no first part; no date, no second. */
+export function madeLine(
+  r: { owner?: string; ownerName?: string; editedBy?: string; editedByName?: string; updated?: number },
+  me: string,
+  day: (t: number) => string,
+): string {
+  const who = (handle: string, name?: string) => (handle === me ? "you" : name || handle);
+  const parts: string[] = [];
+  if (r.owner) parts.push(`Made by ${who(r.owner, r.ownerName)}`);
+  if (r.updated) {
+    parts.push(r.editedBy
+      ? `last changed by ${who(r.editedBy, r.editedByName)}, ${day(r.updated)}`
+      : `last changed ${day(r.updated)}`);
+  }
+  return parts.join(" · ");
+}
 
 export interface FactCtx {
   lang: Lang;
@@ -1227,6 +1249,9 @@ export const NOT_SHOWN: [string, string][] = [
   ["card.rev", "Which revision of the card this is. A fact about syncing, not about the word."],
   ["card.created", "When the card was made. Shown beside it in the card list, where a date belongs."],
   ["card.updated", "And when it was last saved — the same."],
+  ["card.editedBy", "Who last changed it (0.711): said in the line under the editor's first heading, not in the readout."],
+  ["card.ownerName", "The owner's name, sent with a teacher's list for that same line (0.711); never stored."],
+  ["card.editedByName", "The name of whoever last changed it, for that same line (0.711); never stored."],
   ["card.inDecks", "Which decks the server says carry it, which is what `decks` says in words."],
   ["card.org", "Which space it belongs to (0.542): where it lives, not something about the card a reader needs."],
   ["card.personal", "Made in its owner's My space (0.545): who may see it, which the screen it is on already says."],

@@ -31,6 +31,121 @@ and moves once per batch of work you would notice, not once per commit.
 
 Trade-off: editing or deleting from the list is one more tap.
 
+## 0.713 — 27 November 2026
+
+**Numbers and pronouns belong to the school, one set per language.**
+Teaching › Material › Word sets now shows one Numbers and one Pronouns for
+each language. Any teacher of the school can open and correct them, and
+every course uses them. There is no longer a list of sets by teacher, no
+Share step for numbers written in Material, and no "Numbers from / Pronouns
+from" choice on a course's page. Where two teachers had each written a set,
+the one written first is now the school's.
+
+**Trade-off:** in a course that had chosen the other teacher's pronouns,
+students now get the school's pronoun cards, so their progress on the old
+pronoun cards does not carry over. The other teacher's set is not deleted.
+
+To check by hand: in a school where two teachers wrote pronouns, open a
+course as a student and check each pronoun comes once.
+
+## 0.712 — 27 November 2026
+
+**My space is being retired from Teaching.** Teachers now make everything in
+Material. If you have nothing in My space, its tab is gone and the bar is
+Home, Material and You. If you still have modules or cards there, the tab
+stays so you can move, copy, export or delete them, but nothing new can be
+made in it; the tab disappears once it is empty. Nothing is deleted or moved
+for you. Material's first line now says what it actually lists: your
+modules and those of the courses you teach. Trade-off: there is no longer a
+private place to draft. A card that is a Draft is still hidden from
+students, and a module in no course is still seen and changed only by the
+person who made it and administrators.
+
+## 0.711 — 27 November 2026
+
+**Cards and modules say who made them and who last changed them.** A card's
+page and a module's page now carry one line, for example "Made by Tala ·
+last changed by Rana, Nov 26". Who may change what has not moved: the person
+who made it, an administrator, and any teacher of a course it is in. When
+someone else tries, the message now says exactly that. Cards and modules
+changed before this release show the date of the last change but not who
+made the change.
+
+## 0.710 — 27 November 2026
+
+**New module is one step.** In Teaching › Material, New module now goes
+straight to naming a deck. It no longer asks "Deck or Unit?" with a warning
+that the choice can't be changed. Units are made where they are used: open a
+course, then Path, then New unit. Where personal sets are switched on, "New
+personal set" is in the three-dot menu beside New module.
+
+## 0.709 — 27 November 2026
+
+**A module's quality score waits until there is something to score.** A
+new module of plain words no longer shows a score. The score appears, on the
+module's tile and on its page, once the module has at least one sentence or
+one recording. A low score is now shown in a neutral colour, never red. The
+line above the score now says why it favours sentences: "Words stick better
+when students meet them in sentences." The scoring rules themselves have not
+changed. Trade-off: a teacher with a words-only module sees no tips until
+they add a first recording or sentence.
+
+## 0.708 — 27 November 2026
+
+**A course's Exercises tab fits on one screen.** It now shows the four
+choices (With translation, Little translation, No translation, Custom) and
+one line saying what the chosen one does. The long list of individual
+switches appears only when Custom is chosen. Nothing about what students
+are asked has changed. Trade-off: to switch a single exercise off, a teacher
+now chooses Custom first; switches set earlier still apply, and the tab says
+how many are off.
+
+## 0.707 — 27 November 2026
+
+**A course lists its people by name.** The People tab now shows each
+teacher's and student's name, with their handle beneath it. It used to show
+handles only.
+
+**A course's modules come first.** On the Course tab, Modules now sits
+directly under the course's name, above the join code and the path.
+
+## 0.706 — 27 November 2026
+
+**A teacher's first screen is Teaching.** Signing in on a new device as
+someone who teaches a course now opens Teaching straight away. It used to
+open Learning the first time, with "Ask your teacher for a course code".
+Learning is still one tap away on the switch at the top.
+
+To check by hand: a teacher's very first sign-in from a real invitation, on
+a phone.
+
+## 0.705 — 27 November 2026
+
+**Progress shows three groups.** The seven tiles of "The ladder" are now
+three: Learning, Almost there and Learnt, under one bar that shows the share
+of each. Tap a group to see its cards. The four levels are still shown on
+each card's own page. Trade-off: a student no longer sees at a glance how
+many cards sit on each level.
+
+To check by hand: the three groups and the bar on a small phone screen.
+
+## 0.704 — 27 November 2026
+
+**A student's card page is shorter.** Tapping a card now shows the word, how
+it sounds, what it means, and one line of progress with a four-step bar. The
+sections written for teachers ("What it is", "Reference") are no longer
+shown to students. The explanation of levels now matches how the app works:
+answer right twice in a row to move up a level. "High priority" is now
+called "Practise this first" on this page and is explained in one sentence.
+Teachers' screens are unchanged.
+
+## 0.703 — 27 November 2026
+
+**The line at the end of a session is in plain words.** A session with no
+mistakes now says "All correct. These words will come back less often now."
+in place of "Clean run. Every gap just got longer." The other end-of-session
+lines are reworded the same way.
+
 ## 0.702 — 27 November 2026
 
 **A card's words no longer look like headings when you are only reading

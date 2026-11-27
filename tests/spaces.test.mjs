@@ -189,6 +189,18 @@ test("a space admin is just a member elsewhere, and an App admin only acts where
   assert.ok((await api("deck-cards", { key: main.teacher.key, org: B, params: { deck: b.deck.id } })).status >= 400);
 });
 
+test("a course's teachers get its people by name; its students do not (0.707)", async () => {
+  const asTeacher = (await api("my-courses", { key: main.teacher.key })).json.courses
+    .find((/** @type {any} */ c) => c.id === main.course.id);
+  assert.ok(asTeacher && asTeacher.people, "a teacher's course carries no names");
+  assert.equal(asTeacher.people[main.student.handle], "Student main");
+  assert.equal(asTeacher.people[main.teacher.handle], "Teacher main");
+  const asStudent = (await api("my-courses", { key: main.student.key })).json.courses
+    .find((/** @type {any} */ c) => c.id === main.course.id);
+  assert.ok(asStudent, "the student does not see their course");
+  assert.equal(asStudent.people, undefined, "a student is sent the course's names");
+});
+
 test("every list leaves the other space out", async () => {
   const ids = (/** @type {any[]} */ rows) => (rows || []).map((r) => r.id || r.handle);
   const mine = await api("my-courses", { key: main.teacher.key });

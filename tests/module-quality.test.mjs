@@ -10,7 +10,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { moduleQuality, formIn, formsToMeet, qualityTone, unknownFinder, wantsSentences } from "../src/module-quality.ts";
+import { moduleQuality, formIn, formsToMeet, qualityShown, qualityTone, unknownFinder, wantsSentences } from "../src/module-quality.ts";
 import { LANGUAGES } from "../src/languages.ts";
 import { ALT_SEP } from "../src/answers.ts";
 import { must } from "./helpers.mjs";
@@ -601,4 +601,28 @@ test("a form with two answers is recorded and spelt only when each answer is", (
   const old = { id: "old", lang: "ar-PS", category: "adjective", forms: [{
     id: "old", en: "fine", ar: ["تمام", "منيح"].join(ALT_SEP), lat: ["tamaam", "mniih"].join(ALT_SEP), clips: ["c1"] }] };
   assert.equal(checkOf(moduleQuality([old], { lang: ar, pool: [old] }), "recordings").share, 1);
+});
+
+/* ---- when the score is shown (0.709) ---- */
+
+test("a module of plain words with nothing recorded and no sentence has no score shown", () => {
+  const door = { id: "q1", lang: "ar-PS", category: "noun", forms: [{ id: "q1", ar: "باب", en: "door", lat: "baab" }] };
+  const dog = { id: "q2", lang: "ar-PS", category: "noun", forms: [{ id: "q2", ar: "كلب", en: "dog", lat: "kalb" }] };
+  const q = moduleQuality([door, dog], { lang: ar, pool: [door, dog], known: [door, dog] });
+  assert.notEqual(q.score, null, "the module is scored, only not shown");
+  assert.equal(qualityShown(q), false);
+});
+
+test("one recorded word is enough for the score to be shown", () => {
+  const door = { id: "q1", lang: "ar-PS", category: "noun", forms: [{ id: "q1", ar: "باب", en: "door", lat: "baab", clips: ["h1"] }] };
+  const dog = { id: "q2", lang: "ar-PS", category: "noun", forms: [{ id: "q2", ar: "كلب", en: "dog", lat: "kalb" }] };
+  const q = moduleQuality([door, dog], { lang: ar, pool: [door, dog], known: [door, dog] });
+  assert.equal(qualityShown(q), true);
+});
+
+test("one sentence is enough for the score to be shown", () => {
+  const door = { id: "q1", lang: "ar-PS", category: "noun", forms: [{ id: "q1", ar: "باب", en: "door", lat: "baab" }] };
+  const open = { id: "q3", lang: "ar-PS", uses: ["q1"], forms: [{ id: "q3", ar: "سكّر الباب", en: "close the door", lat: "sakker il-baab" }] };
+  const q = moduleQuality([door, open], { lang: ar, pool: [door, open], known: [door, open] });
+  assert.equal(qualityShown(q), true);
 });

@@ -351,7 +351,8 @@
 .at-quality { font-weight:700; white-space:nowrap; }
 .at-quality.good, .at-qualityscore.good b { color: var(--jade); }
 .at-quality.fair, .at-qualityscore.fair b { color: var(--brass); }
-.at-quality.poor, .at-qualityscore.poor b { color: var(--rose); }
+/* A low score is never red (0.709): neutral, as the ring's track is. */
+.at-quality.poor, .at-qualityscore.poor b { color: var(--text); }
 /* QualityRing (0.689): a module's score on its tile, the number in a ring
    filled from the top, clockwise, as far as the score goes. */
 .at-qring { position:relative; display:inline-flex; align-items:center; justify-content:center;
@@ -362,13 +363,12 @@
 .at-qringfill { stroke-linecap:round; }
 .at-qring.good .at-qringfill { stroke: var(--jade); }
 .at-qring.fair .at-qringfill { stroke: var(--brass); }
-.at-qring.poor .at-qringfill { stroke: var(--rose); }
+.at-qring.poor .at-qringfill { stroke: var(--muted); }
 .at-qringnum { position:relative; font-family: var(--ui); font-size:14px; font-weight:800;
   letter-spacing:-.02em; line-height:1; color: var(--ink); }
 .at-qring.good .at-qringnum { color: var(--jade); }
 .at-qring.fair .at-qringnum { color: var(--brass); }
-.at-qring.poor .at-qringnum { color: var(--rose); }
-.at-qring.none .at-qringnum { color: var(--muted); }
+.at-qring.poor .at-qringnum { color: var(--muted); }
 .at-qualityscore { margin:0 0 6px; display:flex; align-items:baseline; gap:6px; }
 .at-qualityscore b { font-size: var(--fs-stat); font-weight:800; line-height:1.1; letter-spacing:-.02em; }
 .at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }
@@ -379,7 +379,7 @@
 .at-qualitybar > span { position:absolute; top:0; bottom:0; left:0; border-radius:999px; }
 .at-qualitybar > .now.good { background: var(--jade); }
 .at-qualitybar > .now.fair { background: var(--brass); }
-.at-qualitybar > .now.poor { background: var(--rose); }
+.at-qualitybar > .now.poor { background: var(--muted); }
 .at-qualitybar > .then { background: var(--jade-soft); border-radius:0 999px 999px 0; opacity:.7; }
 .at-qualityreach { margin:12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
 /* Each suggestion a card of its own: what to add, what it is worth, and
