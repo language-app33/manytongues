@@ -8,6 +8,14 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.710 — 27 November 2026
+
+**New module is one step.** In Teaching › Material, New module now goes
+straight to naming a deck. It no longer asks "Deck or Unit?" with a warning
+that the choice can't be changed. Units are made where they are used: open a
+course, then Path, then New unit. Where personal sets are switched on, "New
+personal set" is in the three-dot menu beside New module.
+
 ## 0.709 — 27 November 2026
 
 **A module's quality score waits until there is something to score.** A

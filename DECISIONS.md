@@ -9478,3 +9478,12 @@ applies exactly when there is one) or a recording (`recordings` has a share
 above 0). `QualityRing`, `QualityMark` and the module page's quality `Field`
 draw nothing below that; the ring's dash state is gone. `poor` is drawn in
 the neutral muted colour, never rose; `qualityTone` is unchanged.
+
+## New module no longer asks what kind (0.710)
+
+The first choice a teacher made was irreversible and needed two terms
+explained. `newModule()` sets the kind to "deck" and opens naming on both
+sides; the `PickSheet` of kinds and `NEW_KINDS` are gone. A unit is made
+from `PathSection`'s New unit, as it already could be. Personal sets, where
+`setsOn`, are a "New personal set" item in the Material list's `more` menu.
+A module's own screen still names its kind.

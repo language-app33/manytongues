@@ -5024,14 +5024,10 @@ function lockedDeleteNote(titles: string[]): string {
  * deck (its courses, its lock, what it holds) is on the deck's screen once
  * it is saved, as a card's exercises wait for the card to be saved.
  */
-/* The three kinds a new deck can be (0.633): chosen first, on a sheet,
-   and fixed once it is made. */
+/* The three kinds a new deck can be (0.633), fixed once it is made. Since
+   0.710 New module makes a deck straight away; a unit is made from a
+   course's path, and a personal set from the three dots beside New module. */
 type NewKind = "deck" | "unit" | "set";
-const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
-  { kind: "deck", title: "Deck", meta: "A set of cards, for any course." },
-  { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
-  { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
-];
 
 function NewModule({
   choices,
@@ -6678,14 +6674,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The course a new module is being made for, from To do on Home
      (0.695): it is made in that course's language and put in it. */
   const [namingFor, setNamingFor] = useState<Course | null>(null);
-  /* What kind of deck "New deck" makes: chosen on a sheet first, outside
-     My space, where only a regular deck can be made (0.633). */
-  const [choosingKind, setChoosingKind] = useState(false);
+  /* What kind of module naming makes. New module is a deck, in one step
+     (0.710): no sheet asking which kind first. */
   const [newKind, setNewKind] = useState<NewKind>("deck");
   const newModule = () => {
     setNewKind("deck");
-    if (mineSide) setNaming("new");
-    else setChoosingKind(true);
+    setNaming("new");
   };
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
   /* Open a card to read it: the editor, locked. */
@@ -11088,24 +11082,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               <Help>
                 {mineSide
                   ? "A module is something a course learns from. Here in My space, each one is a deck: a set of cards, grouped by theme, class or objective."
-                  : "A module is something a course learns from: a deck of cards, a unit on a course's path, or a personal set. Students see a module once it's added to a course they belong to."}
+                  : "A module is a set of cards a course learns from. Students see a module once it's added to a course they belong to."}
               </Help>
-
-              {choosingKind && (
-                <PickSheet title="New module" lede="What kind of module? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
-                  {/* Spaced as every list of tiles is (0.683); a personal
-                      set only where the App admin switched them on. */}
-                  <div className="at-decklist2">
-                    {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
-                      <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
-                        setChoosingKind(false);
-                        setNewKind(k.kind);
-                        setNaming("new");
-                      }} />
-                    ))}
-                  </div>
-                </PickSheet>
-              )}
 
               <ItemList
                 noun="module"
@@ -11137,7 +11115,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                more={modules.length ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
+                more={[
+                  ...(modules.length ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []),
+                  /* A personal set, where the space has them (0.710). */
+                  ...(setsOn && !mineSide ? [{ label: "New personal set", icon: "add", onClick: () => {
+                    setNewKind("set");
+                    setNaming("new");
+                  } }] : []),
+                ]}
                 onNew={newModule}
                 selected={selModules}
                 onSelectedChange={setSelModules}
