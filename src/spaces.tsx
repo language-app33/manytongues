@@ -10040,7 +10040,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* No Edit and no Save (0.732, the owner's 1a): the name is renamed
            by its pencil, and Export and Delete wait behind three dots. */
         action={
+          /* The dots alone, no outline (0.734, the owner's wish), as on
+             a module's tile. */
           <MoreMenu
+            bare
             label={`More for this ${kindW}`}
             title={d.title}
             items={[
