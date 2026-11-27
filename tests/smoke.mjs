@@ -291,6 +291,9 @@ let withPath = false;
 let pathOrder = ["u1", "u2"];
 /** @type {any[]} */
 const movedUnits = [];
+/** Lesson 1's name as the stub server holds it, and the renames it was sent (0.732). */
+let lessonOneTitle = "Lesson 1";
+const renamedDecks = /** @type {any[]} */ ([]);
 /* And a learner's course with a path: two published units. */
 let studentPath = false;
 /* And a learner's course with a personal set (0.630): a deck of three
@@ -334,6 +337,10 @@ const savedSets = [];
 /** @type {any[]} */
 const madeUnits = [];
 let teacherSets = false;
+/* 0.733's walks: one card a draft, for its badge on a tile and a row; and
+   a teacher with nothing waiting, for To do's slim caught-up band. */
+let draftOne = false;
+let teacherQuiet = false;
 /* A module of the teacher's own in My space (0.712), where a walk asks. */
 let teacherPersonal = false;
 /* What the deck screen's Lock asked the server to do. */
@@ -563,7 +570,7 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         decks: [
-          { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
+          { id: "d1", title: lessonOneTitle, owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
           { id: "d2", title: "Introductions", owner: account.handle, lang: "ar-PS", cardIds: [frameCard.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
           ...(teacherSets ? [
             { id: "d4", title: "Family words", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] },
@@ -577,6 +584,9 @@ const fakeFetch = async (input, opts = {}) => {
         ],
       });
     }
+    if (action === "my-cards" && teacherQuiet) {
+      return json({ ok: true, cards: [{ ...phrase, decks: ["d1"] }] });
+    }
     if (action === "my-cards") {
       return json({
         ok: true,
@@ -585,7 +595,7 @@ const fakeFetch = async (input, opts = {}) => {
           /* A person in the personal set, a picture and a name (0.634). */
           ...(teacherSets ? [{ id: "k777777777777", owner: account.handle, lang: "ar-PS", rev: 1, updated: 1, decks: ["d5"],
             forms: [{ ar: "لان", en: "", lat: "lan", images: ["7".repeat(64)] }] }] : []),
-          { ...phrase, decks: ["d1"] },
+          { ...phrase, decks: ["d1"], ...(draftOne ? { status: "draft" } : {}) },
           { ...talk, decks: [] },
           { ...frameCard, decks: ["d2"] },
           { ...rafa, decks: [] },
@@ -700,6 +710,13 @@ const fakeFetch = async (input, opts = {}) => {
       return json({ ok: true, space: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" } });
     }
     if (action === "practiced" || action === "leave-space") return json({ ok: true });
+    /* A deck renamed from its own screen (0.732): the pencil's Save. */
+    if (action === "rename-deck") {
+      const body = JSON.parse(opts.body || "{}");
+      renamedDecks.push(body);
+      if (body.deckId === "d1") lessonOneTitle = body.title;
+      return json({ ok: true });
+    }
     return json({ error: "unknown-action" }, 400);
   }
   if (url.pathname === "/api/sync") {
@@ -1141,6 +1158,55 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+/** A list's Select (0.728): the first row of its three dots, or an icon of
+   its own where the dots would hold nothing else. Done selecting is the
+   cross that takes New's place while it lasts.
+   @param {Element} root */
+const startSelecting = async (root) => {
+  const lone = root.querySelector(".at-listbar .at-selectbtn");
+  if (lone) {
+    click(lone);
+    await sleep(200);
+    return true;
+  }
+  const dots = root.querySelector(".at-listbar .at-morebtn");
+  if (!dots) return false;
+  click(dots);
+  await sleep(150);
+  const row = [...document.querySelectorAll(".at-moresheet .at-sheetact")]
+    .find((b) => /^Select$/.test(((b.querySelector("b") || {}).textContent || "").trim()));
+  if (!row) {
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+    await sleep(150);
+    return false;
+  }
+  click(row);
+  await sleep(200);
+  return true;
+};
+/** @param {Element} root */
+const stopSelecting = async (root) => {
+  click(root.querySelector('.at-listbar [aria-label="Done selecting"]'));
+  await sleep(200);
+};
+/* What the Actions panel offers for what is ticked, row by row, and
+   pressing one of them: the foot bar's one button opens it (0.728). */
+const actionRows = () => [...document.querySelectorAll(".at-actionsheet .at-sheetact")]
+  .map((b) => ((b.querySelector("b") || {}).textContent || "").trim());
+const openActions = async () => {
+  click(document.querySelector(".at-bulkfloat .at-bulkgo"));
+  await sleep(150);
+  return !!document.querySelector(".at-actionsheet");
+};
+/** @param {RegExp} re */
+const bulkAction = async (re) => {
+  if (!document.querySelector(".at-actionsheet")) await openActions();
+  const row = [...document.querySelectorAll(".at-actionsheet .at-sheetact")]
+    .find((b) => re.test(((b.querySelector("b") || {}).textContent || "").trim()));
+  click(row);
+  await sleep(150);
+  return !!row;
+};
 /* Every card has a name, asked first in "This card" and needed before it
    saves. A test about something else gives the card on screen one, where
    it has none yet, so that Save is refused only for what the test is
@@ -2419,6 +2485,15 @@ if (/Build a session/.test(document.body.textContent)) {
   const said = tile ? (tile.textContent || "").replace(/\s+/g, " ") : document.body.textContent.slice(0, 160).replace(/\s+/g, " ");
   check("the student's Courses opens from the menu and counts each course's modules",
     !!tile && /[1-9]\d* modules?/.test(said) && !/Something broke/.test(document.body.textContent || ""), said);
+  /* Teaching's join became a button and a panel in 0.733; the learner's
+     stays the box it was, under its own heading. */
+  {
+    const joinBox = document.querySelector(".at-joinbox");
+    const heads = [...document.querySelectorAll(".at-sectionhead")].map((h) => (h.textContent || "").trim());
+    check("the learner's Courses page still has its join box, under Join a course",
+      !!joinBox && heads.includes("Join a course") && !!joinBox.querySelector('input[placeholder="Course code"]') && !document.querySelector(".at-joinmore"),
+      heads.join(" | ") || "(no headings)");
+  }
   check("and nothing threw opening it", errors.length === before, errors.slice(before, before + 3).join(" | "));
   click(document.querySelector(".at-screen .at-back, [aria-label='Back']"));
   await sleep(200);
@@ -2436,6 +2511,9 @@ if (/Build a session/.test(document.body.textContent)) {
   check("the student's cards are tiles from the library, not a copy of one",
     tiles.length > 0,
     tiles.length ? tiles[0].className : `no tile — ${document.body.textContent.slice(0, 80).replace(/\s+/g, " ")}`);
+  /* The teacher's grids changed in 0.733; the learner's did not. */
+  check("and none of the learner's tiles is drawn as the teacher's",
+    tiles.length > 0 && !tiles.some((t) => t.classList.contains("teach")), tiles.map((t) => t.className).join(" | "));
   /* The tile for a known card, found by the word itself rather than by
      being first in a list nothing here decides the order of — and matched
      whole, because "كتاب" sits inside "الكتاب كبير" and a substring match
@@ -3451,6 +3529,45 @@ check("no console errors during the session", errors.length === 0, errors.slice(
    screen is open. It used to come off only when a counter emptied, so an
    entry that outlived its component hid the chrome until the page was
    reloaded. */
+/* ---- a list with nothing for its three dots but Select (0.728) ----
+   People: New and Select and no more. Dots opening onto one row would be a
+   press for nothing, so Select is its own icon and there are no dots — and
+   with no order or view to say, no line under the bar either. A list that
+   has more in its dots holds Select there, first. */
+{
+  const { ItemList } = await import(path.join(out, "shared.js"));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const listRoot = createRoot(host);
+  const people = [{ id: "a", name: "Amal" }, { id: "b", name: "Basim" }];
+  /** @param {any} extra */
+  const draw = async (extra) => {
+    listRoot.render(React.createElement(ItemList, {
+      noun: "person", plural: "people", items: people,
+      match: (/** @type {any} */ p, /** @type {string} */ q) => p.name.toLowerCase().includes(q),
+      onNew() {}, selected: new Set(), onSelectedChange() {},
+      bulkActions: [{ label: "Suspend", icon: "block", onClick() {} }],
+      renderItem: (/** @type {any} */ p) => React.createElement("div", { className: "at-item" }, p.name),
+      ...extra,
+    }));
+    await sleep(80);
+  };
+  await draw({});
+  const labels = () => [...host.querySelectorAll(".at-listbar button")].map((b) => b.getAttribute("aria-label") || "");
+  check("a list with nothing else for its dots has a Select icon and no three dots",
+    labels().join(" | ") === "New person | Select" && !host.querySelector(".at-morebtn") && !!host.querySelector(".at-listbar .at-selectbtn"),
+    labels().join(" | "));
+  check("and no line under the bar", !host.querySelector(".at-listline"), (host.querySelector(".at-listline") || {}).textContent || "");
+  check("and New is + alone, named in words for a screen reader",
+    !!host.querySelector('.at-newbtn[aria-label="New person"] .at-btnword'), labels().join(" | "));
+  await draw({ more: [{ label: "Import", icon: "upload", onClick() {} }] });
+  check("a list with more to offer holds Select in its three dots instead",
+    labels().join(" | ") === "New person | More for these people" && !host.querySelector(".at-listbar .at-selectbtn"),
+    labels().join(" | "));
+  listRoot.unmount();
+  host.remove();
+}
+
 {
   const { Screen } = await import(path.join(out, "shared.js"));
   const host = document.createElement("div");
@@ -4903,12 +5020,53 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
         (b.classList.contains("at-statusbtn") || !(b.textContent || "").trim())) &&
       !headButtons.some((b) => /Export/.test(b.getAttribute("aria-label") || "")),
     headButtons.map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim()).join(" | ") || "(no header)");
-  const exportBtn = /** @type {any} */ ((teachRead || document).querySelector('[aria-label="Export this card"]'));
-  check("and Export sits by the card's “This card” heading, working while it is only read",
-    !!exportBtn && !!exportBtn.closest(".at-formhead") &&
-      /This card/.test(((exportBtn.closest(".at-formhead").querySelector(".at-formnum") || {}).textContent) || "") &&
-      !exportBtn.disabled && !exportBtn.closest("button[disabled]"),
-    exportBtn ? "by the heading" : "(no export)");
+  /* Read, the card opens with the card itself (0.732, the owner's 4a):
+     its word large, how it is said and what it means, Export behind its
+     three dots; "This card", the advanced box and the stars wait for Edit. */
+  {
+    const hero = /** @type {any} */ ((teachRead || document).querySelector(".at-cardhero"));
+    check("a card being read opens with its word, how it is said and what it means, at the top",
+      !!hero && (hero.querySelector(".at-cardheroword") || {}).textContent === "الكتاب كبير" &&
+        (hero.querySelector(".at-cardherolat") || {}).textContent === "il-kitaab kbiir" &&
+        (hero.querySelector(".at-cardheroen") || {}).textContent === "the book is big" &&
+        !hero.closest("fieldset"),
+      hero ? (hero.textContent || "").trim() : "(no card at the top)");
+    const heads = teachRead ? [...teachRead.querySelectorAll('[role="tabpanel"]:not([hidden]) .at-formnum')].map((h) => (h.textContent || "").trim()) : [];
+    check("and no This card heading, no advanced box and no Export by a heading",
+      !heads.includes("This card") && !/Build an advanced card/.test((teachRead || {}).textContent || "") &&
+        !(teachRead || document).querySelector('[aria-label="Export this card"]'),
+      heads.join(" | "));
+    const { readFileSync: readCss } = await import("node:fs");
+    check("and the stylesheet hides a field's star while the card is read",
+      /fieldset\.at-cardlock:disabled \.at-reqstar \{ display:\s*none; \}/.test(readCss(path.resolve("src/teaching.css"), "utf8")));
+    const dots = hero && hero.querySelector('[aria-label="More for this card"]');
+    check("and its three dots work while it is only read", !!dots && !dots.disabled, dots ? "dimmed" : "(no dots)");
+    click(dots);
+    await sleep(150);
+    const lines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((x) => (x.textContent || "").trim());
+    check("and hold Export", lines.includes("Export"), lines.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+    await sleep(150);
+    /* A word with no vowel marks says so in a short list, with the way to fix it. */
+    const improve = (teachRead || document).querySelector('[data-el="card-to-improve"]');
+    check("a word written without vowel marks shows 1 thing to improve, with Add them",
+      !!improve && /^1 thing to improve$/.test(((improve.querySelector(".at-formnum") || {}).textContent || "").trim()) &&
+        /Add them/.test(improve.textContent || "") && !(teachRead || document).querySelector('[data-el="editor-no-marks"]'),
+      improve ? (improve.textContent || "").trim() : "(no list)");
+    click(improve && [...improve.querySelectorAll("button, [role=button]")].find((x) => /Add them/.test(x.textContent || "")));
+    await sleep(300);
+    const nowOn = [...document.querySelectorAll(".at-screen.cardform")].pop();
+    const editHeads = nowOn ? [...nowOn.querySelectorAll('[role="tabpanel"]:not([hidden]) .at-formnum')].map((h) => (h.textContent || "").trim()) : [];
+    check("and Add them turns the screen to editing, with This card and the advanced box back",
+      !!nowOn && !nowOn.querySelector("fieldset.at-cardlock[disabled]") && editHeads.includes("This card") &&
+        /Build an advanced card/.test(nowOn.textContent || "") && !nowOn.querySelector(".at-cardhero"),
+      editHeads.join(" | ") || "(no screen)");
+    click(nowOn && nowOn.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
+    await sleep(300);
+    check("and Cancel goes back to reading it",
+      !!document.querySelector(".at-screen.cardform fieldset.at-cardlock[disabled]") && !!document.querySelector(".at-cardhero"),
+      "(not read again)");
+  }
 
   const tries = () => /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".at-try")]);
   check("a card in the teaching space lists the exercises it could be asked",
@@ -5448,8 +5606,7 @@ const openPronounTables = async () => {
      leaving to make one, which threw the selection away: the way out of
      the screen was to lose the work that got you there. */
   const cardsFrame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  click(cardsFrame.querySelector(".at-selectbtn"));
-  await sleep(200);
+  await startSelecting(cardsFrame);
   const firstPick = cardsFrame.querySelector(".at-ckbox.pick");
   check("cards can be selected in the teaching space", !!firstPick,
     cardsFrame.querySelectorAll(".at-tilewrap").length + " tiles");
@@ -5457,8 +5614,64 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and ticking one raises the bulk actions", !!document.querySelector(".at-bulkfloat"),
     (document.body.textContent || "").slice(-80));
-  clickNamed(/^Add to a module$/);
-  await sleep(300);
+
+  /* ---- selecting keeps the search and Filter (0.728) ----
+     Narrowing to what is to be ticked is half of selecting; New and the
+     three dots give way to a cross that ends it. */
+  {
+    const bar = cardsFrame.querySelector(".at-listbar");
+    const lineSays = () => ((cardsFrame.querySelector(".at-listline .at-listcount") || {}).textContent || "").trim();
+    check("while selecting, the search box and Filter stay, and New and the dots give way to a cross",
+      !!bar && !!bar.querySelector("input.at-search") && !!bar.querySelector(".at-filterbtn") &&
+        !bar.querySelector(".at-newbtn") && !bar.querySelector(".at-morebtn") &&
+        !!bar.querySelector('[aria-label="Done selecting"]'),
+      bar ? [...bar.querySelectorAll("button, input")].map((b) => b.getAttribute("aria-label") || b.tagName).join(" | ") : "(no bar)");
+    check("and the line under it says how many are ticked, with Select all",
+      lineSays() === "1 selected" && !!cardsFrame.querySelector(".at-listline .at-linebtn") &&
+        /^Select all \d+$/.test((cardsFrame.querySelector(".at-listline .at-linebtn") || {}).textContent || ""),
+      `${lineSays()} · ${(cardsFrame.querySelector(".at-listline") || {}).textContent || "(no line)"}`);
+    const box = /** @type {HTMLInputElement | null} */ (bar && bar.querySelector("input.at-search"));
+    const setBox = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
+    if (box) {
+      setBox?.call(box, "zzz-nothing-is-called-this");
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(200);
+    }
+    check("and typing a search keeps what was ticked",
+      lineSays() === "1 selected" && !!document.querySelector(".at-bulkfloat") &&
+        cardsFrame.querySelectorAll(".at-tilewrap").length === 0,
+      `${lineSays()} · ${cardsFrame.querySelectorAll(".at-tilewrap").length} tiles shown`);
+    if (box) {
+      setBox?.call(box, "");
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(200);
+    }
+    check("and emptying it again shows the tick where it was",
+      cardsFrame.querySelectorAll(".at-tilewrap.picked").length === 1, `${cardsFrame.querySelectorAll(".at-tilewrap.picked").length} ticked`);
+  }
+
+  /* ---- one Actions button, and the panel it opens (0.728) ----
+     The tray held every action as a button, seven of them, over half a
+     phone's screen. Now the foot bar says how many and opens a panel of
+     them, each with a picture of its own, Delete last. */
+  {
+    const foot = document.querySelector(".at-bulkfloat");
+    check("the foot bar says how many are ticked and has one Actions button",
+      !!foot && /1 selected/.test(foot.textContent || "") &&
+        [...foot.querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") === "Actions",
+      foot ? (foot.textContent || "").trim() : "(no foot bar)");
+    await openActions();
+    check("and Actions opens a panel named for the selection, listing every bulk action with Delete last",
+      actionRows().join(" | ") === "Add to a module | Remove from a module | Add tags | Remove tags | Change status | Export | Delete" &&
+        ((document.querySelector(".at-actionsheet .at-modaltitle") || {}).textContent || "") === "1 selected" &&
+        !!document.querySelector(".at-actionsheet .at-sheetact:last-child.danger"),
+      actionRows().join(" | ") || "(no panel)");
+    const pictures = [...document.querySelectorAll(".at-actionsheet .at-sheetact path")].map((p) => p.getAttribute("d"));
+    check("each with a picture of its own",
+      pictures.length === 7 && new Set(pictures).size === 7, `${new Set(pictures).size} different of ${pictures.length}`);
+  }
+  await bulkAction(/^Add to a module$/);
+  await sleep(150);
   check("the deck screen offers to make one on the spot", !!buttonNamed(/^New deck$/),
     [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
   clickNamed(/^New deck$/);
@@ -5491,8 +5704,7 @@ const openPronounTables = async () => {
   }
   clickNamed(/^Cancel$/);
   await sleep(250);
-  click(cardsFrame.querySelector(".at-selectbtn"));
-  await sleep(200);
+  await stopSelecting(cardsFrame);
 
   /* ---- a group tag on several cards at once ----
 
@@ -5501,11 +5713,10 @@ const openPronounTables = async () => {
      carries a tag now, made on the spot if it does not exist yet. */
   takeSaves = true;
   const savedBefore = savedCards.length;
-  click(cardsFrame.querySelector(".at-selectbtn"));
-  await sleep(200);
+  await startSelecting(cardsFrame);
   click(cardsFrame.querySelector(".at-ckbox.pick"));
   await sleep(200);
-  check("the selection offers to add tags", clickNamed(/^Add tags$/),
+  check("the selection offers to add tags", await bulkAction(/^Add tags$/),
     [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-160));
   await sleep(300);
   const tagBox = /** @type {HTMLInputElement | null} */ (document.querySelector('input[aria-label="Name a new tag"]'));
@@ -5529,9 +5740,44 @@ const openPronounTables = async () => {
       JSON.stringify(sent.map((c) => c.fills)));
   }
   takeSaves = false;
-  if (cardsFrame.querySelector(".at-ckbox.pick")) {
-    click(cardsFrame.querySelector(".at-selectbtn"));
-    await sleep(200);
+  if (cardsFrame.querySelector(".at-ckbox.pick")) await stopSelecting(cardsFrame);
+
+  /* ---- a finger held on a card starts selecting it (0.728) ----
+     jsdom has no PointerEvent, so the press is a mouse event of the
+     pointer's type carrying `pointerType`, which is all React reads of it. */
+  {
+    const press = (/** @type {Element} */ el, /** @type {string} */ type, /** @type {string} */ kind, x = 20) => {
+      const e = new w.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: 20 });
+      Object.defineProperty(e, "pointerType", { value: kind });
+      el.dispatchEvent(e);
+    };
+    const firstTile = () => /** @type {Element} */ (cardsFrame.querySelector(".at-tilewrap"));
+    const selectingNow = () => !!cardsFrame.querySelector('.at-listbar [aria-label="Done selecting"]');
+    press(firstTile(), "pointerdown", "mouse");
+    await sleep(650);
+    press(firstTile(), "pointerup", "mouse");
+    check("a mouse held on a card does not start selecting", !selectingNow());
+    press(firstTile(), "pointerdown", "touch");
+    await sleep(100);
+    press(firstTile(), "pointermove", "touch", 45);
+    await sleep(600);
+    press(firstTile(), "pointerup", "touch", 45);
+    check("nor does a finger that moves, which is a scroll", !selectingNow());
+    const screensBefore = document.querySelectorAll(".at-screen.cardform").length;
+    press(firstTile(), "pointerdown", "touch");
+    await sleep(650);
+    check("a finger held on a card starts selecting, with that card ticked",
+      selectingNow() && firstTile().classList.contains("picked") &&
+        cardsFrame.querySelectorAll(".at-tilewrap.picked").length === 1,
+      `${selectingNow() ? "selecting" : "not selecting"} · ${cardsFrame.querySelectorAll(".at-tilewrap.picked").length} ticked`);
+    press(firstTile(), "pointerup", "touch");
+    click(firstTile().querySelector(".at-minicard"));
+    await sleep(250);
+    check("and letting go neither opens the card nor unticks it",
+      document.querySelectorAll(".at-screen.cardform").length === screensBefore &&
+        firstTile().classList.contains("picked"),
+      `${document.querySelectorAll(".at-screen.cardform").length - screensBefore} screens opened`);
+    await stopSelecting(cardsFrame);
   }
 
   /* ---- and the report sees it ----
@@ -8458,8 +8704,8 @@ const openPronounTables = async () => {
     !!setTile("Numbers") && !!setTile("Pronouns"),
     setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
   check("each saying how much of it is written and how many decks hold it",
-    /^0 of 9 pronouns written · in no module yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
-      / ranges? written · in /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    /^Not started · not in a module yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
+      /( parts? written|Not started) · (in|not in) /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
     `${((setTile("Pronouns") || {}).textContent || "")} | ${((setTile("Numbers") || {}).textContent || "")}`);
   click(setTile("Pronouns"));
   await sleep(400);
@@ -8497,14 +8743,46 @@ const openPronounTables = async () => {
   check("and the English is the person's name where none was typed",
     ((sent.forms || [])[0] || {}).en === "I (m)", JSON.stringify((sent.forms || [])[0]));
   const reading = (/** @type {string} */ what) => {
-    const box = iRow() && [...iRow().querySelectorAll("input")].find((i) => (i.getAttribute("aria-label") || "") === `${what}, for I (m)`);
+    const box = iRow() && [...iRow().querySelectorAll("input")].find((i) => (i.getAttribute("aria-label") || "") === (what === "English" ? "English for I (m)" : `${what}, for I (m)`));
     return box ? /** @type {any} */ (box).value : "(no box)";
   };
+  /* Its English is one line until Change is pressed (0.732, the owner's 3b). */
+  check("a pronoun shows no English box until Change is pressed, its English on one line",
+    !!iRow() && reading("With to be") === "(no box)" && reading("English") === "(no box)" &&
+      /English: “I \(m\)”, “I am \(m\)”, “am I \(m\)”/.test((iRow() || {}).textContent || "") &&
+      !!iRow().querySelector('[aria-label="Change the English for I (m)"]'),
+    ((iRow() || {}).textContent || "(no row)").slice(0, 200));
+  click(iRow() && iRow().querySelector('[aria-label="Change the English for I (m)"]'));
+  await sleep(150);
+  check("and Change shows the three boxes, and turns to Done",
+    reading("English") !== "(no box)" && reading("With to be") !== "(no box)" && reading("As a question") !== "(no box)" &&
+      !!iRow().querySelector('[aria-label="Done with the English for I (m)"]'),
+    `${reading("English")} | ${reading("With to be")}`);
   check("each row reads its pronoun with to be and as a question, filled in already",
     reading("With to be") === "I am (m)" && reading("As a question") === "am I (m)",
     `${reading("With to be")} | ${reading("As a question")}`);
   check("and a reading left as it came is not stored, so it goes on following the English",
     !sent.enIs && !sent.enAsk, JSON.stringify({ enIs: sent.enIs, enAsk: sent.enAsk }));
+  /* A value typed there is saved as before. */
+  setValue(iRow() && [...iRow().querySelectorAll("input")].find((i) => i.getAttribute("aria-label") === "With to be, for I (m)"), "I'm (m)");
+  await sleep(120);
+  click(saveBtn());
+  await sleep(400);
+  check("and a reading changed in its box is saved",
+    (savedCards[savedCards.length - 1] || {}).enIs === "I'm (m)",
+    JSON.stringify({ enIs: (savedCards[savedCards.length - 1] || {}).enIs }));
+  /* The long introduction is one sentence, the rest behind a button. */
+  click(screen() && [...screen().querySelectorAll("button")].find((b) => /^How sentences use them$/.test((b.textContent || "").trim())));
+  await sleep(150);
+  {
+    const how = [...document.querySelectorAll(".at-modal, .at-sheet, [role=dialog]")]
+      .find((el) => /In a sentence card/.test(el.textContent || ""));
+    check("How sentences use them opens a panel showing the blanks",
+      !!how && /\{\{pronoun-is\}\}/.test(how.textContent || "") && /\{\{is-pronoun\}\}/.test(how.textContent || ""),
+      how ? (how.textContent || "").slice(0, 200) : "(no panel)");
+    click(how && how.querySelector('[aria-label="Close"]'));
+    await sleep(150);
+  }
   check("once one is written, the set can be put in a deck from its own screen",
     !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a module$/.test((b.textContent || "").trim())),
     screen() ? [...screen().querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no screen)");
@@ -8627,8 +8905,19 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "كبير");
   click(tile);
   await sleep(450);
+  /* Read, What is practised is a row per form saying in words where it
+     comes up, with no tick-boxes (0.732, the owner's 5a). */
+  {
+    const said = practiceRows().map((r) => ((r.querySelector(".at-practicesaid") || {}).textContent || "").trim());
+    check("read, What is practised says in words where each form comes up, with no tick-boxes",
+      said.length > 0 && said.every(Boolean) && !(cardOnScreen() || document).querySelector(".at-practicetick") &&
+        said.includes("On its own and in sentences"),
+      said.join(" | ") || "(no rows)");
+  }
   click(cardEdit());
   await sleep(450);
+  check("and after Edit the tick-boxes are back",
+    !!(cardOnScreen() || document).querySelector(".at-practicetick") && !(cardOnScreen() || document).querySelector(".at-practicesaid"));
   await nameIt();
   const box = (/** @type {string} */ label) =>
     /** @type {any} */ ([...document.querySelectorAll("input")]
@@ -9164,107 +9453,170 @@ const openPronounTables = async () => {
    The Cards tab and an open deck show the same material and were two
    different screens about it: the tab could be sorted and narrowed, the deck
    could do neither, and Select was an unlabelled icon up in the search row.
-   Both now carry the same rows — New card and the size button, then
-   Select, Sort and Filter — and the same settings, so a deck opened while
-   the list is narrowed opens narrowed the same way. The Cards tab puts its
-   search box on a line of its own between the two, since its first row
-   also carries Reports, Numbers and Pronouns. */
+   Both now carry the same bar and the same settings, so a deck opened while
+   the list is narrowed opens narrowed the same way.
+
+   The bar is one row since 0.728: New, the search box, Filter and the three
+   dots, which hold Select. Under it a quiet line says how many there are,
+   the order, and the view; Sort and Filter open in the panel from the foot
+   of the screen rather than pushing the list down. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   /* The last one in the document: the learner's nav is still behind this. */
   const tabNamed = (/** @type {RegExp} */ re) =>
     frameButtons(frame).filter((b) => re.test((b.textContent || "").trim())).pop();
   const rows = () => [...frame.querySelectorAll(".at-toolbar")];
-  const subRow = () => frame.querySelector(".at-toolbar-search");
-  /* The name each icon carries (0.689: Select, Sort and Filter are icons
-     now, named for a screen reader and on hover), in order — the search
-     box's own clear cross aside. */
+  /* The name each control carries, in order — the search box's own clear
+     cross aside. */
   const named = (/** @type {Element | null} */ row) =>
     row
       ? [...row.querySelectorAll("button")]
           .filter((b) => !b.classList.contains("at-searchclear"))
           .map((b) => (b.getAttribute("aria-label") || "").trim())
       : [];
-  const menuBtn = (/** @type {RegExp} */ re) =>
-    /** @type {any} */ (
-      [...frame.querySelectorAll(".at-menubtn")].find((b) => re.test((b.getAttribute("aria-label") || "").trim())) || {}
-    );
+  const filterBtn = () => /** @type {any} */ (frame.querySelector(".at-listbar .at-filterbtn") || {});
   const tiles = () => frame.querySelectorAll(".at-cardgrid .at-minicard").length;
+  const listed = () => frame.querySelectorAll(".at-cardgrid .at-tilewrap").length;
   /* Whatever this finds, it is a DOM node or nothing — the walk asks it for
      attributes and styles, which is what the cast is for. */
   const one = (/** @type {string} */ sel, /** @type {any} */ root) =>
     /** @type {any} */ ((root || document).querySelector(sel) || null);
+  const lineCount = () => ((frame.querySelector(".at-listline .at-listcount") || {}).textContent || "").trim();
+  const orderSays = () => ((frame.querySelector(".at-listline .at-sortbtn") || {}).textContent || "").trim();
+  const order = () => [...frame.querySelectorAll(".at-cardgrid .at-tilewrap")].map((t) => (t.textContent || "").slice(0, 40)).join(" | ");
+  const sheetLabels = (/** @type {string} */ sheet) =>
+    [...document.querySelectorAll(`${sheet} .at-filterlabel`)].map((s) => (s.textContent || "").trim());
+  const seg = (/** @type {string} */ group, /** @type {RegExp} */ re) =>
+    [...document.querySelectorAll(`.at-sortsheet [role="group"][aria-label="${group}"] .at-seg`)]
+      .find((b) => re.test((b.textContent || "").trim()));
+  const sheetFoot = (/** @type {string} */ sheet) => /** @type {any} */ (document.querySelector(`${sheet} .at-sheetfoot button`));
+  const shutSheet = async (/** @type {string} */ sheet) => {
+    click(document.querySelector(`${sheet} [aria-label="Close"]`));
+    await sleep(200);
+  };
 
   click(tabNamed(/^Cards$/));
   await sleep(500);
 
-  check("the Cards tab's controls are two rows: buttons, then search with Select and the menus",
-    rows().length === 2, `${rows().length} rows`);
-  const top = /** @type {any} */ (rows()[0]);
-  check("the first row is New card, its three dots and the view button, with no search box in it",
-    !!top && /New card/.test(top.textContent || "") &&
-      !top.querySelector("input.at-search") && !!top.querySelector(".at-viewbtn") && !!top.querySelector(".at-morebtn"),
-    top ? (top.textContent || "").replace(/\s+/g, " ").trim() + ` · ${top.querySelectorAll("input, button").length} controls` : "no row");
-  click(one(".at-morebtn", top));
+  const bar = /** @type {any} */ (frame.querySelector(".at-listbar"));
+  check("the Cards tab's controls are one row: New, the search box, Filter and the three dots",
+    rows().length === 1 && !!bar &&
+      named(bar).join(" | ") === "New card | Filter | More for these cards" &&
+      bar.querySelectorAll("input").length === 1 && !!bar.querySelector("input.at-search[placeholder='Search cards']"),
+    `${rows().length} rows · ${named(bar).join(" | ")} · ${bar ? bar.querySelectorAll("input").length : 0} boxes`);
+  check("with no Sort and no view button in it",
+    !!bar && !bar.querySelector(".at-viewbtn, .at-sortbtn") && !named(bar).some((n) => /^(Sort|View)/.test(n)),
+    named(bar).join(" | "));
+  click(one(".at-morebtn", bar));
   await sleep(150);
   /* The app's one context menu (0.690): the sheet a saved session's dots
-     open, named for what it acts on, a row per action. */
+     open, named for what it acts on, a row per action — Select first. */
   const moreLines = () => [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
-  check("and the three dots open a sheet named Cards, holding Import",
-    moreLines().join(" | ") === "Import" &&
+  check("and the three dots open a sheet named Cards, holding Select and Import",
+    moreLines().join(" | ") === "Select | Import" &&
       ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Cards",
     moreLines().join(" | ") || "(no sheet)");
   click(document.querySelector('.at-moresheet [aria-label="Close"]'));
   await sleep(150);
   check("and its cross closes it", !document.querySelector(".at-moresheet"));
-  const searchRow = /** @type {any} */ (rows()[1]);
-  check("and the search box is on a line of its own under it",
-    !!searchRow && searchRow.classList.contains("at-toolbar-search") &&
-      searchRow.querySelectorAll("input").length === 1 &&
-      !!searchRow.querySelector("input.at-search[placeholder='Search cards']"),
-    searchRow ? searchRow.className : "no row");
+  check("the line under the bar says how many cards there are and the order they are in",
+    /^\d+ cards?$/.test(lineCount()) && orderSays() === "Newest changes" &&
+      /^Sort: Newest changes$/.test(one(".at-listline .at-sortbtn", frame)?.getAttribute("aria-label") || ""),
+    `${lineCount()} · ${orderSays() || "(no order)"}`);
   const sizeName = () => {
-    const btn = one(".at-viewbtn", null);
+    const btn = one(".at-listline .at-viewbtn", null);
     return btn ? btn.getAttribute("aria-label") || "" : "(no view button)";
   };
-  check("and the view button says which view it is in and what pressing it does",
+  check("and at its end the view switch says which view it is in and what pressing it does",
     /^View: Grid — press for table$/.test(sizeName()), sizeName());
-  check("after it, as icons, Select, Sort and Filter, in that order",
-    named(subRow()).join(" | ") === "Select | Sort | Filter",
-    named(subRow()).join(" | ") || "(no second row)");
 
-  /* Each menu opens onto its own panel, and only one is open: two panels at
-     once is two answers to "why is this list short". */
-  click(menuBtn(/^Sort/));
+  /* ---- Sort waits for Apply (0.728, the owner's word) ----
+     Picking in the panel changes nothing behind it; Apply does; shutting
+     it any other way leaves the order as it was. */
+  const before = order();
+  click(one(".at-listline .at-sortbtn", frame));
   await sleep(200);
-  const sortLabels = () =>
-    [...frame.querySelectorAll(".at-listmenu .at-filterlabel")].map((s) => (s.textContent || "").trim());
-  check("Sort opens onto how to order the list, and nothing else",
-    sortLabels().join(" | ") === "Sort | Order", sortLabels().join(" | ") || "(nothing open)");
-  click(menuBtn(/^Filter/));
+  check("the order opens the Sort panel: what to sort by, and which way",
+    sheetLabels(".at-sortsheet").join(" | ") === "Sort by | Order" &&
+      [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')].map((b) => (b.textContent || "").trim()).join(" | ") === "Newest first | Oldest first" &&
+      (sheetFoot(".at-sortsheet") || {}).textContent === "Apply",
+    sheetLabels(".at-sortsheet").join(" | ") || "(nothing open)");
+  click(seg("Sort by", /^Forms$/));
+  await sleep(150);
+  check("and the directions take the words of what is picked",
+    [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')].map((b) => (b.textContent || "").trim()).join(" | ") === "Most first | Fewest first",
+    [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')].map((b) => (b.textContent || "").trim()).join(" | "));
+  click(seg("Sort by", /^Added$/));
+  await sleep(100);
+  click(seg("Order", /^Oldest first$/));
   await sleep(200);
-  check("and Filter replaces it rather than standing beside it",
-    frame.querySelectorAll(".at-listmenu").length === 1 &&
+  check("picking a different order in the panel does not reorder the list behind it",
+    order() === before && orderSays() === "Newest changes", orderSays());
+  await shutSheet(".at-sortsheet");
+  check("and shutting the panel without Apply leaves the order and the line as they were",
+    !document.querySelector(".at-sortsheet") && order() === before && orderSays() === "Newest changes", orderSays());
+  click(one(".at-listline .at-sortbtn", frame));
+  await sleep(200);
+  check("and it opens again at the order in force, not the one let go",
+    seg("Sort by", /^Changed$/)?.getAttribute("aria-pressed") === "true" &&
+      seg("Order", /^Newest first$/)?.getAttribute("aria-pressed") === "true",
+    [...document.querySelectorAll(".at-sortsheet .at-seg")].map((b) => `${(b.textContent || "").trim()}=${b.getAttribute("aria-pressed")}`).join(" "));
+  click(seg("Sort by", /^Added$/));
+  await sleep(100);
+  click(seg("Order", /^Oldest first$/));
+  await sleep(100);
+  click(sheetFoot(".at-sortsheet"));
+  await sleep(250);
+  const applied = order();
+  check("and Apply reorders the list, says so in the line and shuts the panel",
+    !document.querySelector(".at-sortsheet") && orderSays() === "Oldest added" &&
+      (applied !== before || listed() < 2),
+    `${orderSays()} · ${applied === before ? "same order" : "reordered"}`);
+  /* Back to how it was, for what follows. */
+  click(one(".at-listline .at-sortbtn", frame));
+  await sleep(200);
+  click(seg("Sort by", /^Changed$/));
+  await sleep(100);
+  click(seg("Order", /^Newest first$/));
+  await sleep(100);
+  click(sheetFoot(".at-sortsheet"));
+  await sleep(250);
+  check("and back again", order() === before && orderSays() === "Newest changes", orderSays());
+
+  /* Filter opens onto its own panel; only one is open at a time. */
+  click(filterBtn());
+  await sleep(200);
+  const sortLabels = () => sheetLabels(".at-filtersheet");
+  check("Filter opens its own panel of what to leave out, and no other panel with it",
+    document.querySelectorAll(".at-sheet").length === 1 && !document.querySelector(".at-sortsheet") &&
       sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Modules | Blanks | Review",
-    `${frame.querySelectorAll(".at-listmenu").length} panels · ${sortLabels().join(" | ")}`);
+    `${document.querySelectorAll(".at-sheet").length} panels · ${sortLabels().join(" | ")}`);
+  check("with a button that says how many cards it is showing",
+    (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
+    (sheetFoot(".at-filtersheet") || {}).textContent || "(no button)");
 
   /* ---- and by kind, with each kind's subtypes under it ----
      Offered once the kind is ticked and only then: "verbs" says nothing
      about a sentence. */
   const tickRow = (/** @type {RegExp} */ re) => /** @type {any} */ (
-    [...frame.querySelectorAll(".at-listmenu .at-tickrow")]
+    [...document.querySelectorAll(".at-filtersheet .at-tickrow")]
       .find((r) => re.test((((r.querySelector("b") || {}).textContent) || "").trim())) || null);
   check("the filter offers the three kinds of card",
     !!tickRow(/^Word or phrase$/) && !!tickRow(/^Sentence$/) && !!tickRow(/^Scene$/),
-    [...frame.querySelectorAll(".at-listmenu .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
+    [...document.querySelectorAll(".at-filtersheet .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
   check("and no subtypes before a kind is ticked", !tickRow(/^No subtype$/) && !tickRow(/^Conversation$/), "");
   const tilesBefore = tiles();
   click(tickRow(/^Word or phrase$/) && tickRow(/^Word or phrase$/).querySelector("input"));
   await sleep(250);
   check("ticking words and phrases offers their subtypes, and no scene's",
     !!tickRow(/^Noun$/) && !!tickRow(/^No subtype$/) && !tickRow(/^Conversation$/),
-    [...frame.querySelectorAll(".at-listmenu .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
+    [...document.querySelectorAll(".at-filtersheet .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
   check("and narrows the list to them", tiles() <= tilesBefore, `${tiles()} of ${tilesBefore}`);
+  /* Filters take hold as they are ticked (0.728): the list behind the
+     panel has already changed, and its button counts what is left. */
+  check("and the panel's button counts the cards now listed",
+    (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
+    `${(sheetFoot(".at-filtersheet") || {}).textContent} · ${listed()} listed`);
   click(tickRow(/^Word or phrase$/) && tickRow(/^Word or phrase$/).querySelector("input"));
   await sleep(250);
   check("and letting go of the kind gives the list back", tiles() === tilesBefore && !tickRow(/^No subtype$/),
@@ -9279,10 +9631,10 @@ const openPronounTables = async () => {
   const all = tiles();
   check("every card is listed before either filter is used", all >= 3, `${all} tiles`);
   const sideLabel = '[role="group"][aria-label="Which side of a blank a card is on"] .at-seg';
-  const sides = () => [...frame.querySelectorAll(sideLabel)]
+  const sides = () => [...document.querySelectorAll(sideLabel)]
     .map((b) => (b.textContent || "").trim());
   const blankSide = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll(sideLabel)].find((b) => re.test((b.textContent || "").trim()));
+    [...document.querySelectorAll(sideLabel)].find((b) => re.test((b.textContent || "").trim()));
   check("the filter asks which side of a blank a card is on",
     sides().join(" | ") === "Any card | Leaves one | Fills one | Fills none",
     sides().join(" | ") || "(no blanks filter)");
@@ -9296,13 +9648,13 @@ const openPronounTables = async () => {
   /* The blanks themselves are listed, read off the cards that wrote them,
      each saying what it is worth on both sides. */
   const blankRow = () => /** @type {any} */ (
-    [...frame.querySelectorAll(".at-listmenu .at-tickrow")]
+    [...document.querySelectorAll(".at-filtersheet .at-tickrow")]
       .find((r) => /^friend\b/.test((((r.querySelector("b") || {}).textContent) || "").trim())) || null);
   check("and the blanks are there to pick from, named and counted from both sides",
     !!blankRow() && /left by .*card/.test(blankRow().textContent || "") &&
       /filled by .*card/.test(blankRow().textContent || ""),
     blankRow() ? (blankRow().textContent || "").replace(/\s+/g, " ").trim()
-      : [...frame.querySelectorAll(".at-listmenu .at-tickrow")]
+      : [...document.querySelectorAll(".at-filtersheet .at-tickrow")]
           .map((r) => (r.textContent || "").slice(0, 12)).join(" | ") || "no blanks listed");
   click(blankRow() && blankRow().querySelector("input"));
   await sleep(250);
@@ -9343,19 +9695,19 @@ const openPronounTables = async () => {
      ticked, and emptying the list in the meantime would read as a list that
      had lost its cards. */
   const moduleMode = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .find((b) => re.test((b.textContent || "").trim()));
   check("the filter offers in, not in, or any deck at all",
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .map((b) => (b.textContent || "").trim()).join(" | ") === "Any module | In these | Not in these | In no module",
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .map((b) => (b.textContent || "").trim()).join(" | ") || "(no deck filter)");
   click(moduleMode(/^Not in these$/));
   await sleep(200);
   check("picking a mode with no deck ticked leaves the list alone",
     tiles() === all, `${tiles()} of ${all} still listed`);
   const lesson1 = /** @type {any} */ (
-    [...frame.querySelectorAll(".at-listmenu .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))
+    [...document.querySelectorAll(".at-filtersheet .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))
   );
   check("and the decks are there to tick, with how many cards each holds",
     !!lesson1 && /card/.test(lesson1.textContent || ""),
@@ -9366,10 +9718,10 @@ const openPronounTables = async () => {
   check("ticking one shows the cards that are in no deck of that name",
     outside > 0 && outside < all, `${outside} of ${all}`);
   check("and the Filter button says the list is narrowed",
-    /1/.test(menuBtn(/^Filter/).textContent || "") &&
-      !!menuBtn(/^Filter/).classList &&
-      menuBtn(/^Filter/).classList.contains("on"),
-    menuBtn(/^Filter/).textContent || "(no filter button)");
+    /1/.test(filterBtn().textContent || "") &&
+      !!filterBtn().classList &&
+      filterBtn().classList.contains("on"),
+    filterBtn().textContent || "(no filter button)");
   /* The other way round shows exactly the rest of them: "in" and "not in"
      are two halves of the same cut. */
   click(moduleMode(/^In these$/));
@@ -9382,21 +9734,61 @@ const openPronounTables = async () => {
   await sleep(250);
   const loose = tiles();
   check("in no deck shows the cards no deck holds, with nothing ticked",
-    loose > 0 && loose < all && loose <= outside && !frame.querySelector(".at-listmenu .at-deckfilter .at-tickrow"),
+    loose > 0 && loose < all && loose <= outside && !document.querySelector(".at-filtersheet .at-deckfilter .at-tickrow"),
     `${loose} in no deck, ${outside} outside Lesson 1, ${all} in all`);
   /* And one press takes every filter off again. */
-  const clearAll = () => [...frame.querySelectorAll(".at-filterclear button")]
+  const clearAll = () => [...document.querySelectorAll(".at-filtersheet .at-filterclear button")]
     .find((b) => /Clear all filters/.test(b.textContent || ""));
   check("a narrowed list offers to clear every filter at once", !!clearAll(), "(no Clear all filters)");
   click(clearAll());
   await sleep(250);
   check("and clearing them shows every card, with nothing left to clear",
-    tiles() === all && !clearAll() && !/\d/.test(menuBtn(/^Filter/).textContent || ""),
-    `${tiles()} of ${all}; ${menuBtn(/^Filter/).textContent || ""}`);
+    tiles() === all && !clearAll() && !/\d/.test(filterBtn().textContent || ""),
+    `${tiles()} of ${all}; ${filterBtn().textContent || ""}`);
+
+  /* ---- the filters in force, under the bar (0.728) ----
+     With the panel shut, the line says how many of how many, offers to
+     clear, and each filter on is a chip whose cross takes it alone off. */
+  const chips = () => [...frame.querySelectorAll(".at-filterchips .at-filterchip")].map((c) => (c.textContent || "").trim());
+  const whole = lineCount();
+  click(moduleMode(/^Not in these$/));
+  await sleep(150);
+  click(/** @type {any} */ ([...document.querySelectorAll(".at-filtersheet .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))).querySelector("input"));
+  await sleep(150);
+  click([...document.querySelectorAll('.at-filtersheet [role="group"][aria-label="Forms"] .at-seg')].find((b) => /^One$/.test((b.textContent || "").trim())));
+  await sleep(200);
+  const narrowedTo = listed();
+  click(sheetFoot(".at-filtersheet"));
+  await sleep(200);
+  check("Show only shuts the panel, leaving the filters on",
+    !document.querySelector(".at-filtersheet") && listed() === narrowedTo && /2/.test(filterBtn().textContent || ""),
+    `${listed()} listed · ${filterBtn().textContent || ""}`);
+  check("and the line reads how many of how many, with Clear",
+    lineCount() === `${listed()} of ${whole.replace(/ cards?$/, "")}` && !!frame.querySelector(".at-listline .at-lineclear"),
+    `${lineCount()} (all: ${whole}) · ${frame.querySelector(".at-listline .at-lineclear") ? "Clear" : "no Clear"}`);
+  check("and each filter in force is a chip, on one line",
+    chips().join(" | ") === "One form | Not in 1 module" &&
+      !!frame.querySelector('.at-filterchips [aria-label="Remove filter: One form"]'),
+    chips().join(" | ") || "(no chips)");
+  click(frame.querySelector('.at-filterchips [aria-label="Remove filter: One form"]'));
+  await sleep(250);
+  check("and a chip's cross takes that filter off and no other",
+    chips().join(" | ") === "Not in 1 module" && tiles() === outside && /1/.test(filterBtn().textContent || ""),
+    `${chips().join(" | ")} · ${tiles()} listed, ${outside} expected`);
+  click(frame.querySelector(".at-listline .at-lineclear"));
+  await sleep(250);
+  check("and Clear takes every one off",
+    chips().length === 0 && tiles() === all && lineCount() === whole && !frame.querySelector(".at-listline .at-lineclear"),
+    `${chips().join(" | ")} · ${lineCount()}`);
+
+  click(filterBtn());
+  await sleep(200);
   click(moduleMode(/^In these$/));
   await sleep(250);
-  click(/** @type {any} */ ([...frame.querySelectorAll(".at-listmenu .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))).querySelector("input"));
+  click(/** @type {any} */ ([...document.querySelectorAll(".at-filtersheet .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))).querySelector("input"));
   await sleep(250);
+  click(sheetFoot(".at-filtersheet"));
+  await sleep(200);
   /* ---- and the same controls over one deck ----
      Including the filter still in force, which is the point of one setting
      for both. */
@@ -9409,45 +9801,116 @@ const openPronounTables = async () => {
       .map((t) => (t.textContent || "").slice(0, 14)).join(" | ") || "no decks");
   click(moduleTile);
   await sleep(500);
-  /* Read-only since 0.523: the deck's cards are sorted and filtered here,
-     and selected only on Manage cards. */
-  check("an open deck carries the same two rows",
-    [...document.querySelectorAll(".at-toolbar")].length >= 2 &&
-      named(document.querySelector(".at-toolbar-search")).join(" | ") === "Sort | Filter",
-    named(document.querySelector(".at-toolbar-search")).join(" | ") || "(no second row)");
+  /* Since 0.732 (the owner's 1a) Manage cards is folded into the deck's
+     own screen: its bar is the Cards tab's — New card, search, Filter and
+     three dots — over the same line, and nothing else above the list. */
+  check("an open deck carries the Cards tab's bar and line: New card, search, Filter, three dots, then the order",
+    !document.querySelector(".at-toolsrow") &&
+      /^New card \| Filter \| More/.test(named(document.querySelector(".at-listbar")).join(" | ")) &&
+      !!document.querySelector(".at-listbar input.at-search") &&
+      ((document.querySelector(".at-listline .at-sortbtn") || {}).textContent || "").trim() === "Newest changes",
+    `${named(document.querySelector(".at-listbar")).join(" | ") || "(no bar)"} · ${((document.querySelector(".at-listline") || {}).textContent || "(no line)").trim()}`);
+  check("and no Manage button anywhere on it",
+    ![...document.querySelectorAll("button")].some((b) => /^Manage/.test((b.textContent || "").trim())));
   check("and the same filter, still in force",
-    !!document.querySelector(".at-menubtn.on"),
-    [...document.querySelectorAll(".at-menubtn")].map((b) => (b.textContent || "").trim()).join(" | "));
-  /* Laid out like a card's screen: its sections headed at the editor's
-     size, Deck quality part of "This deck", Export by that heading, and
-     Edit alone on the title line, as on a card being read. */
+    !!document.querySelector(".at-listbar .at-filterbtn.on") && /^In 1 module$/.test(((document.querySelector(".at-filterchip") || {}).textContent || "").trim()),
+    [...document.querySelectorAll(".at-filterbtn, .at-filterchip")].map((b) => (b.textContent || "").trim()).join(" | "));
+  /* Laid out like a card's screen, headed by the deck's own name with a
+     pencil beside it, and Export and Delete behind three dots on the title
+     line; no Edit floating in the corner (0.732, the owner's 1a). */
   {
-    const moduleSheet = [...document.querySelectorAll(".at-screen.cardform")]
+    const moduleSheet = () => [...document.querySelectorAll(".at-screen.cardform")]
       .find((el) => ((el.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Deck");
-    const moduleHeads = moduleSheet
-      ? [...moduleSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
+    const moduleHeads = () => moduleSheet()
+      ? [...must(moduleSheet(), "the deck").querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
-    check("an open deck is headed like a card's screen, This deck to Cards",
-      moduleHeads.join(" | ") === "This deck | Cards",
-      moduleHeads.join(" | ") || "(not laid out like the card editor)");
-    const thisModule = moduleSheet && moduleSheet.querySelector(".at-formblock");
-    const labels = thisModule ? [...thisModule.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
-    check("and This deck holds its name, courses and quality",
-      labels.join(" | ") === "Deck name | Courses | Deck quality" &&
-        /** @type {any} */ ((thisModule && thisModule.querySelector("input")) || {}).value === "Lesson 1",
-      labels.join(" | ") || "(no This deck)");
-    check("and Export sits by its “This deck” heading, with Edit floating in the corner and nothing on the title line",
-      !!moduleSheet && !!moduleSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
-        named(moduleSheet.querySelector(".at-screenaction")).length === 0 &&
-        !!moduleSheet.querySelector('.at-fab[aria-label="Edit"]'),
-      moduleSheet ? [...moduleSheet.querySelectorAll(".at-screenaction button")].map((b) => b.getAttribute("aria-label")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
-    check("and read, its title cannot be typed into",
-      !!thisModule && !!thisModule.querySelector("fieldset:disabled input"),
-      thisModule ? "the title box is live" : "(no This deck)");
+    check("an open deck is headed by its own name, then Cards",
+      moduleHeads().join(" | ") === "Lesson 1 | Cards",
+      moduleHeads().join(" | ") || "(not laid out like the card editor)");
+    const thisModule = () => { const m = moduleSheet(); return m && m.querySelector(".at-formblock"); };
+    const labels = () => { const t = thisModule(); return t ? [...t.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : []; };
+    check("and under it its courses and quality, with no name box",
+      labels().join(" | ") === "Courses | Deck quality" && !must(thisModule(), "the block").querySelector("input"),
+      labels().join(" | ") || "(no first block)");
+    check("and its language and size on one line",
+      /^Palestinian Arabic · \d+ cards?$/.test(((thisModule() && must(thisModule(), "the block").querySelector(".at-formrole .at-formline")) || {}).textContent || ""),
+      ((thisModule() && must(thisModule(), "the block").querySelector(".at-formrole")) || {}).textContent || "(no line)");
+    check("and no Edit floating in the corner, nor Export by the heading",
+      !!moduleSheet() && !must(moduleSheet(), "the deck").querySelector(".at-fab") &&
+        !must(moduleSheet(), "the deck").querySelector('[aria-label="Export this deck"]'),
+      moduleSheet() ? "an Edit or Export is still there" : "(no deck screen)");
+    check("and who made it, where that is known, is at the foot after the cards, not under the name",
+      (() => {
+        const m = moduleSheet();
+        if (!m) return false;
+        const first = m.querySelector(".at-formblock");
+        const cards = [...m.querySelectorAll(".at-section")].pop();
+        const made = [...m.querySelectorAll(".at-help")].find((h) => /^Made by/.test((h.textContent || "").trim()));
+        return !/Made by/.test((first && first.textContent) || "") &&
+          (!made || (!!cards && !!(cards.compareDocumentPosition(made) & w.Node.DOCUMENT_POSITION_FOLLOWING) && !cards.contains(made)));
+      })(),
+      "(a made-by line above the cards)");
+    /* The three dots: Export and Delete, and nothing else. */
+    click(must(moduleSheet(), "the deck").querySelector('.at-screenhead [aria-label="More for this deck"]'));
+    await sleep(150);
+    const sheetLines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+    check("its three dots hold exactly Export and Delete this deck",
+      sheetLines.join(" | ") === "Export | Delete this deck", sheetLines.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+    await sleep(150);
+    /* The pencil turns the heading into a name box with Save. */
+    click(must(moduleSheet(), "the deck").querySelector('[aria-label="Rename this deck"]'));
+    await sleep(200);
+    const nameBox = /** @type {any} */ (thisModule() && must(thisModule(), "the block").querySelector("input"));
+    check("the pencil shows the name in a box, with Save and Cancel, and the heading goes",
+      !!nameBox && nameBox.value === "Lesson 1" && moduleHeads().join(" | ") === "Cards" &&
+        !!buttonNamed(/^Save$/) && !!buttonNamed(/^Cancel$/),
+      `${nameBox ? nameBox.value : "(no box)"} · ${moduleHeads().join(" | ")}`);
+    check("and Save is dimmed until the name changes",
+      !!buttonNamed(/^Save$/) && /** @type {any} */ (buttonNamed(/^Save$/)).disabled);
+    if (nameBox) {
+      const setter = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the setter").set;
+      must(setter, "the setter").call(nameBox, "Lesson 1 renamed");
+      nameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+    }
+    await sleep(100);
+    click(buttonNamed(/^Cancel$/));
+    await sleep(200);
+    check("and Cancel leaves the name as it was",
+      moduleHeads().join(" | ") === "Lesson 1 | Cards" && !(thisModule() && must(thisModule(), "the block").querySelector("input")),
+      moduleHeads().join(" | "));
+    click(must(moduleSheet(), "the deck").querySelector('[aria-label="Rename this deck"]'));
+    await sleep(200);
+    const box2 = /** @type {any} */ (thisModule() && must(thisModule(), "the block").querySelector("input"));
+    if (box2) {
+      const setter = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the setter").set;
+      must(setter, "the setter").call(box2, "Lesson 1 renamed");
+      box2.dispatchEvent(new w.Event("input", { bubbles: true }));
+    }
+    await sleep(100);
+    click(buttonNamed(/^Save$/));
+    await sleep(600);
+    check("and Save renames the deck, the heading showing the new name",
+      moduleHeads().join(" | ") === "Lesson 1 renamed | Cards" && !(thisModule() && must(thisModule(), "the block").querySelector("input")) &&
+        JSON.stringify(renamedDecks[renamedDecks.length - 1]) === JSON.stringify({ deckId: "d1", title: "Lesson 1 renamed" }),
+      moduleHeads().join(" | "));
+    /* Put back, since the walk below looks for Lesson 1 by name. */
+    click(must(moduleSheet(), "the deck").querySelector('[aria-label="Rename this deck"]'));
+    await sleep(200);
+    const box3 = /** @type {any} */ (thisModule() && must(thisModule(), "the block").querySelector("input"));
+    if (box3) {
+      const setter = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the setter").set;
+      must(setter, "the setter").call(box3, "Lesson 1");
+      box3.dispatchEvent(new w.Event("input", { bubbles: true }));
+    }
+    await sleep(100);
+    click(buttonNamed(/^Save$/));
+    await sleep(600);
+    check("and renamed back, it reads Lesson 1 again", moduleHeads().join(" | ") === "Lesson 1 | Cards", moduleHeads().join(" | "));
   }
 
   /* Two views, in turn (0.714): the grid, and a table of five columns. */
-  const sizeBtn = () => one(".at-viewbtn", null);
+  const sizeBtn = () => one(".at-listline .at-viewbtn", null);
   const viewIcon = () => {
     const p = one(".at-viewbtn path", null);
     return p ? p.getAttribute("d") || "" : "";
@@ -9511,24 +9974,31 @@ const openPronounTables = async () => {
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
      by name, from a screen of their own. */
-  check("read, an open deck offers no way to change its word sets",
-    !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
-  click(document.querySelector('.at-fab[aria-label="Edit"]'));
-  await sleep(250);
-  check("Edit swaps the back arrow for a cross that cancels",
-    !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
-    [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
   /* Since 0.523 the word sets (built-in cards before 0.569) are among the
-     deck's cards, added on Manage cards with the rest and saved there and
-     then. */
-  click(document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
-  await sleep(250);
-  click(buttonNamed(/^Manage this deck's cards$/));
-  await sleep(300);
-  check("Manage this deck's cards opens a page of its own",
-    [...document.querySelectorAll(".at-screenhead h2")].some((h) => /^Manage cards$/.test((h.textContent || "").trim())),
-    [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
-  click(buttonNamed(/^Add existing cards$/));
+     deck's cards, added with the rest and saved there and then; since
+     0.732 that is on the deck's own screen. */
+  check("an open deck has no Choose built-in cards button",
+    !buttonNamed(/^Choose built-in cards$/), "the button is there");
+  /* Selecting a card offers taking it out of this deck (0.732). */
+  {
+    const sheet = must([...document.querySelectorAll(".at-screen.cardform")]
+      .find((el) => ((el.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Deck"), "the deck's screen");
+    const started = await startSelecting(sheet);
+    const pick = sheet.querySelector(".at-ckbox.pick");
+    click(pick);
+    await sleep(200);
+    await openActions();
+    check("on the deck's own screen, a ticked card can be taken out of the deck",
+      actionRows()[0] === "Remove from this deck",
+      actionRows().join(" | ") || `(no panel: selecting ${started}, tick ${!!pick}, foot ${!!document.querySelector(".at-bulkfloat")})`);
+    click(document.querySelector('.at-actionsheet [aria-label="Close"]'));
+    await sleep(150);
+    await stopSelecting(sheet);
+  }
+  /* Its words are "Add existing cards to this deck" where there is room
+     and "Add existing cards" on a phone (0.728); both are in the button
+     and the stylesheet shows one. */
+  click(buttonNamed(/^Add existing cards/));
   await sleep(300);
   check("and adding heads the sets Word sets",
     [...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Word sets") &&
@@ -9789,7 +10259,7 @@ const openPronounTables = async () => {
      first and quietly pass while the wrong one was up. */
   const screenNamed = (/** @type {string} */ name) =>
     document.querySelector(`.at-screen[aria-label="${name}"]`);
-  const panel = () => screenNamed("Number system") || host;
+  const panel = () => [...document.querySelectorAll(".at-screen")].find((sc) => /^Numbers · /.test(sc.getAttribute("aria-label") || "")) || host;
   /* Whichever of them is up. The last one in the document, because a
      portal appends: earlier blocks of this walk left their own screens
      mounted, and asking for the first would find a teaching screen from
@@ -9825,13 +10295,49 @@ const openPronounTables = async () => {
       !!tileNamed("Numbers 20 to 99") && !!tileNamed("Numbers 1,000 to 999,999,999") &&
       !!tileNamed("Numbers 1,000,000,000 and over"),
     tiles.map((t) => (t.textContent || "").trim()).join(" | "));
-  check("and each says what it is waiting for",
-    /waiting on/.test((tileNamed("Numbers 0 to 9") || {}).textContent || ""),
-    ((tileNamed("Numbers 0 to 9") || {}).textContent || "").trim());
-  check("there are no counting parts: each part says where its counting stands",
+  /* One plain line each since 0.732 (the owner's 7a): how many words are
+     still to write, or which part is needed first. */
+  check("the screen is named for the numbers and the language",
+    /^Numbers · .*Arabic/.test((panel().getAttribute && panel().getAttribute("aria-label")) || ""),
+    (panel().getAttribute && panel().getAttribute("aria-label")) || "(no screen)");
+  check("and each part says in a line how many of its words are still to write",
+    /^\d+ words? still to write$/.test((/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-numstate") || {}).textContent || ""),
+    (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).textContent || "").trim());
+  check("or which part it needs first, drawn fainter",
+    /^Needs Numbers 0 to 9 first$/.test((/** @type {any} */ (tileNamed("Numbers 20 to 99") || {}).querySelector?.(".at-numstate") || {}).textContent || "") &&
+      !!/** @type {any} */ (tileNamed("Numbers 20 to 99") || {}).closest?.(".at-numwait") && !/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).closest?.(".at-numwait"),
+    (/** @type {any} */ (tileNamed("Numbers 20 to 99") || {}).textContent || "").trim());
+  check("and the first part to write is marked Start here, and no other",
+    (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-statusbadge") || {}).textContent === "Start here" &&
+      panel().querySelectorAll(".at-numparts .at-statusbadge").length === 1,
+    [...panel().querySelectorAll(".at-numparts .at-statusbadge")].map((b) => ((b.closest(".at-deckcard") || {}).textContent || "").slice(0, 30)).join(" | ") || "(no badge)");
+  check("there are no counting parts, and no counting line on a part not yet ready",
     !tiles.some((t) => /Counting things/.test(t.textContent || "")) &&
-      /Counting: once the numbers are ready/.test((tileNamed("Numbers 0 to 9") || {}).textContent || ""),
-    ((tileNamed("Numbers 0 to 9") || {}).textContent || "").trim());
+      !/Counting:/.test(/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).textContent || ""),
+    (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).textContent || "").trim());
+  check("the foot is headed Fix a number",
+    [...panel().querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Fix a number"),
+    [...panel().querySelectorAll(".at-eyebrow")].map((e) => e.textContent).join(" | "));
+  /* With zero to nine written, Start here moves on to the next part. */
+  {
+    const { readFileSync: readGoldenDigits } = await import("node:fs");
+    const gold = JSON.parse(readGoldenDigits(path.resolve("tests/golden/ar-PS.numbers.json"), "utf8")).system;
+    const digits = Object.fromEntries(Object.entries(gold.lexemes).filter(([k]) => /^unit\.\d$/.test(k)));
+    /* Drawn afresh: the screen keeps its own draft of what it was opened on. */
+    editorRoot.render(React.createElement("div"));
+    await sleep(50);
+    draw({ ...system, lexemes: { ...system.lexemes, ...digits } });
+    await sleep(250);
+    check("with zero to nine written, that part is Ready and Start here moves on",
+      (/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-numstate") || {}).textContent === "Ready" &&
+        !/** @type {any} */ (tileNamed("Numbers 0 to 9") || {}).querySelector?.(".at-statusbadge") &&
+        panel().querySelectorAll(".at-numparts .at-statusbadge").length === 1,
+      [...panel().querySelectorAll(".at-numparts .at-deckcard")].slice(0, 3).map((t) => (t.textContent || "").trim()).join(" | "));
+    editorRoot.render(React.createElement("div"));
+    await sleep(50);
+    draw(system);
+    await sleep(250);
+  }
   check("with no boxes on the main screen any more",
     panel().querySelectorAll(".at-numrow, .at-numtile").length === 0,
     `${panel().querySelectorAll(".at-numrow, .at-numtile").length} boxes`);
@@ -10029,7 +10535,7 @@ const openPronounTables = async () => {
   check("once saved, there is nothing left to save",
     !!buttonIn(/^Save$/) && isOff(buttonIn(/^Save$/)));
   await goBack();
-  check("once saved, going back asks nothing", !!screenNamed("Number system") && !/Save your changes/.test(document.body.textContent || ""));
+  check("once saved, going back asks nothing", panel() !== host && !/Save your changes/.test(document.body.textContent || ""));
   check("and the main screen does not say anything is unsaved",
     !/not saved/.test(panel().textContent || ""),
     (panel().textContent || "").slice(0, 200).replace(/\s+/g, " "));
@@ -10056,7 +10562,7 @@ const openPronounTables = async () => {
     [...up().querySelectorAll("input")].map((i) => i.getAttribute("aria-label")).slice(0, 12).join(" | "));
   await goBack();
   check("the main screen offers the connecting words as a screen of their own",
-    !!tileNamed("Connecting words") && /not written yet/.test((tileNamed("Connecting words") || {}).textContent || ""),
+    !!tileNamed("Connecting words") && /Not written yet/.test((tileNamed("Connecting words") || {}).textContent || ""),
     ((tileNamed("Connecting words") || {}).textContent || "(no tile)").trim());
   click(tileNamed("Connecting words"));
   await sleep(250);
@@ -10099,7 +10605,7 @@ const openPronounTables = async () => {
   }
   await goBack();
   check("and coming back leaves the parts as they were",
-    !!screenNamed("Number system") && panel().querySelectorAll(".at-numparts .at-deckcard").length >= 7);
+    panel() !== host && panel().querySelectorAll(".at-numparts .at-deckcard").length >= 7);
 
   /* A number written out from Check a number is kept somewhere with a
      Save, not carried back to the main screen, which has none. */
@@ -10127,7 +10633,7 @@ const openPronounTables = async () => {
   click([...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Don't save"));
   await sleep(250);
   check("and dropping it goes back to the main screen with nothing unsaved",
-    !!screenNamed("Number system") && !/not saved/.test(panel().textContent || ""));
+    panel() !== host && !/not saved/.test(panel().textContent || ""));
 
   /* A save that does not go through keeps the teacher beside its Save,
      and says so, rather than taking the change to the main screen. */
@@ -10151,7 +10657,7 @@ const openPronounTables = async () => {
   await sleep(250);
   check("and saving again clears it", !/not saved/.test(up().textContent || ""));
   await goBack();
-  check("after which going back asks nothing", !!screenNamed("Number system") && !/Save your changes/.test(document.body.textContent || ""));
+  check("after which going back asks nothing", panel() !== host && !/Save your changes/.test(document.body.textContent || ""));
 
   /* And the corrections: their own screen, with the one written out on top. */
   click(tileNamed("Correct how a number is said"));
@@ -13213,15 +13719,24 @@ const openPronounTables = async () => {
   const cardsNow = [...document.querySelectorAll(".at-deckcard")];
   const tiles = cardsNow.map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const tileOf = (/** @type {RegExp} */ re) => tiles.find((t) => re.test(t)) || "";
-  /* The label on its own since 0.689, the language and size it led having
-     come off the tile. */
-  const unitLabel = (/** @type {RegExp} */ re) => {
-    const el = cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "")));
-    return ((el && el.querySelector('[data-el="unit-label"]')) || {}).textContent || "";
+  /* Since 0.729 every module's kind is a badge right after its name, and
+     the line under the name no longer starts with "Unit". */
+  const tileNamed = (/** @type {RegExp} */ re) =>
+    cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
+  const kindOf = (/** @type {RegExp} */ re) => {
+    const el = tileNamed(re);
+    return ((el && el.querySelector('.at-decktitlerow > [data-el="module-kind"]')) || {}).textContent || "";
   };
-  check("in Material's Modules, a unit is labelled Unit and a deck is not",
-    unitLabel(/Greetings unit/) === "Unit" && unitLabel(/Family unit/) === "Unit" && !!tileOf(/Lesson 1/) && !unitLabel(/Lesson 1/),
-    tiles.join(" | ").slice(0, 300) || "no tiles");
+  const lineOf = (/** @type {RegExp} */ re) => {
+    const el = tileNamed(re);
+    return ((el && el.querySelector(".at-deckmain > .at-reach")) || {}).textContent || "";
+  };
+  check("in Material's Modules, each tile's badge says Deck or Unit after the name",
+    kindOf(/^Greetings unit$/) === "Unit" && kindOf(/^Family unit$/) === "Unit" && kindOf(/^Lesson 1$/) === "Deck",
+    cardsNow.map((t) => `${(t.querySelector(".at-decktitle") || {}).textContent} [${(t.querySelector('[data-el="module-kind"]') || {}).textContent || ""}]`).join(" | ") || "no tiles");
+  check("a unit's line under its name no longer starts with Unit",
+    !!tileOf(/Greetings unit/) && !/^\s*Unit\b/.test(lineOf(/^Greetings unit$/)) && !document.querySelector('[data-el="unit-label"]'),
+    lineOf(/^Greetings unit$/) || "(no line)");
   /* A module's tile (0.689): no language or size under its title, and
      Export and Delete behind three dots that do not open the module when
      pressed. Since 0.720 its quality is " · score: N" at the end of the
@@ -13334,6 +13849,9 @@ const openPronounTables = async () => {
   const rows = [...document.querySelectorAll(".at-sheet .at-openrow")];
   const titles = rows.map((b) => (b.querySelector(".at-decktitle") || b).textContent || "").join(" | ");
   check("with personal sets off in the space, New module offers a deck and a unit only", titles === "Deck | Unit", titles || "no sheet");
+  check("each with its picture, and the deck independent of the others (0.733)",
+    rows.length === 2 && rows.every((b) => !!b.querySelector(".at-kindicon")) && /independent of your other decks/.test(rows[0].textContent || ""),
+    rows.map((b) => (b.textContent || "").trim()).join(" | ") || "no sheet");
   check("and the kinds sit in the spaced list of tiles", rows.length > 0 && rows.every((b) => !!b.parentElement && b.parentElement.classList.contains("at-decklist2")),
     rows.map((b) => (b.parentElement && b.parentElement.className) || "").join(", ") || "no rows");
   click(document.querySelector('.at-sheet button[aria-label="Close"]'));
@@ -13394,6 +13912,20 @@ const openPronounTables = async () => {
   await openSheet();
   check("New module asks what kind: a deck, a unit or a personal set",
     sheetRows().join(" | ") === "Deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  /* A picture on each kind, and the owner's descriptions (0.733). */
+  {
+    const kindRows = [...document.querySelectorAll(".at-sheet .at-openrow")];
+    const metaOf = (/** @type {RegExp} */ re) => ((kindRows.find((b) => re.test((b.querySelector(".at-decktitle") || b).textContent || "")) || document.createElement("i"))
+      .querySelector(".at-deckmeta") || {}).textContent || "";
+    check("and each kind has its picture",
+      kindRows.length === 3 && kindRows.every((b) => !!b.querySelector(".at-kindicon svg")),
+      kindRows.map((b) => (b.querySelector(".at-kindicon") ? "icon" : "none")).join(" | ") || "no rows");
+    check("and says what it is, in the owner's words",
+      metaOf(/^Deck/) === "Cards on one topic, independent of your other decks." &&
+        metaOf(/^Unit/) === "One lesson on a course's path. Each unit builds on the ones before it, so students do them in order." &&
+        metaOf(/^Personal set/) === "For words that are different for each student, like My family. Students answer about your pictures once, then practise their own words.",
+      [metaOf(/^Deck/), metaOf(/^Unit/), metaOf(/^Personal set/)].join(" | "));
+  }
   await pickKind(/^Deck/);
   check("choosing Deck opens Create deck", screenTitle() === "Create deck", screenTitle() || "no screen");
   backOut();
@@ -13483,7 +14015,11 @@ const openPronounTables = async () => {
   backOut();
   await sleep(400);
   const setTile = [...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Our family/.test(t.textContent || ""));
-  check("a set's tile in the list says Personal set", !!setTile && /Personal set/.test(setTile.textContent || ""), setTile ? setTile.textContent || "" : "no tile");
+  /* Since 0.729 in its badge, by the name, and no longer in the line under it. */
+  check("a set's tile has a Personal set badge, and its line does not say it again",
+    !!setTile && ((setTile.querySelector('[data-el="module-kind"]') || {}).textContent || "") === "Personal set"
+      && !/Personal set/.test((setTile.querySelector(".at-deckmain > .at-reach") || {}).textContent || ""),
+    setTile ? setTile.textContent || "" : "no tile");
   await openTile(/Our family/);
   check("a set's deck has its section, with no switch to turn it off",
     !!section() && !/^(On|Off)$/m.test([...(section() || document).querySelectorAll(".at-segmented button")].map((b) => (b.textContent || "").trim()).join("\n")),
@@ -13523,6 +14059,11 @@ const openPronounTables = async () => {
   /* A picture of the set, edited: always a basic card, its English optional. */
   const personTile = [...document.querySelectorAll(".at-screen.cardform .at-cardtile, .at-screen.cardform .at-minicard, .at-screen.cardform .at-tile")]
     .find((t) => /لان/.test(t.textContent || ""));
+  /* No English: its transliteration in the meaning's place (0.733). */
+  check("a module's card with no English shows its transliteration in its place, on a teacher's tile",
+    !!personTile && personTile.classList.contains("teach") &&
+      ((personTile.querySelector(".at-minien.standin i") || {}).textContent || "") === "lan",
+    personTile ? `${personTile.className}: ${(personTile.textContent || "").trim()}` : "no tile");
   click(/** @type {any} */ (personTile));
   await sleep(600);
   click([...document.querySelectorAll('.at-fab[aria-label="Edit"]')].pop() || null);
@@ -13541,6 +14082,133 @@ const openPronounTables = async () => {
   r.unmount();
   host.remove();
   check("and nothing threw making decks of each kind, or on a set's section", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- Teaching's Home, simpler (0.733) ----
+   Join is a button at the foot of My courses, opening a panel with the
+   code box; a single course is not searched; and with nothing waiting,
+   To do is a slim band. */
+{
+  const before = errors.length;
+  teacherQuiet = true;
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /^Home/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const heads = [...frame().querySelectorAll(".at-sectionhead")].map((h) => (h.textContent || "").trim());
+  check("Teaching's Home has no Join a course as a teacher section",
+    heads.includes("My courses") && !heads.includes("Join a course as a teacher") && !frame().querySelector(".at-joinbox"),
+    heads.join(" | ") || "(no headings)");
+  const joinBtn = [...frame().querySelectorAll("button.at-joinmore")].find((b) => /Join another course/.test(b.textContent || ""));
+  check("a teacher with a course has Join another course at the foot of My courses",
+    !!joinBtn && !!joinBtn.closest('[data-el="courses-of-space"]'), joinBtn ? "outside My courses" : "(no button)");
+  check("with one course, there is no Search courses box",
+    !frame().querySelector('input[placeholder="Search courses"]') && !frame().querySelector('[data-el="courses-of-space"] .at-listbar'),
+    "a search box or an empty bar is drawn");
+  const quiet = frame().querySelector('[data-el="todo"] .at-empty2');
+  check("with nothing waiting, To do is the slim caught-up band",
+    !!quiet && quiet.classList.contains("slim") && /all caught up/.test(quiet.textContent || ""),
+    quiet ? quiet.className : ((frame().querySelector('[data-el="todo"]') || {}).textContent || "(no To do)").slice(0, 120));
+  click(joinBtn || null);
+  await sleep(300);
+  const sheet = document.querySelector(".at-sheet");
+  check("pressing it opens a panel with the Teacher code box",
+    !!sheet && /Join another course/.test(((sheet.querySelector(".at-modaltitle") || {}).textContent) || "") && !!sheet.querySelector('input[placeholder="Teacher code"]'),
+    sheet ? (sheet.textContent || "").slice(0, 120) : "(no panel)");
+  click(document.querySelector('.at-sheet button[aria-label="Close"]'));
+  await sleep(200);
+  check("and its cross closes it", !document.querySelector(".at-sheet"), "the panel is still open");
+  r.unmount();
+  host.remove();
+  teacherQuiet = false;
+  check("and nothing threw on Teaching's Home", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- the teacher's cards on a phone (0.733) ----
+   Two tiles a row, a draft's badge at a tile's foot, and the second view a
+   list rather than a table. The walk has a matchMedia that says no to
+   everything; here it says yes to a phone's width. */
+{
+  const before = errors.length;
+  draftOne = true;
+  const hadMedia = anyWindow.matchMedia;
+  anyWindow.matchMedia = anyGlobal.matchMedia = (/** @type {string} */ q) => ({
+    matches: q === "(max-width: 639px)", media: q,
+    addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
+  });
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /^Material$/.test((b.textContent || "").trim())) || null);
+  await sleep(400);
+  click([...frame().querySelectorAll("[role=tab]")].find((b) => /^Cards$/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const viewBtn = () => frame().querySelector(".at-listline .at-viewbtn");
+  if (frame().querySelector(".at-cardrows")) {
+    click(viewBtn());
+    await sleep(200);
+  }
+  const draftTile = frame().querySelector('.at-cardgrid .at-minicard[data-card="k222222222222"]');
+  check("a teacher's card tile is drawn as the teacher's",
+    !!draftTile && draftTile.classList.contains("teach"), draftTile ? draftTile.className : "(no tile)");
+  check("and a draft's tile still says Draft, at its foot",
+    !!draftTile && /^Draft$/.test(((draftTile.querySelector(".at-minimeta .at-statusbadge") || {}).textContent || "").trim()),
+    draftTile ? (draftTile.textContent || "").trim() : "(no tile)");
+  click(viewBtn());
+  await sleep(300);
+  check("on a phone the second view is a list, not a table",
+    !!frame().querySelector(".at-cardrows") && !frame().querySelector(".at-cardtable"),
+    frame().querySelector(".at-cardtable") ? "a table" : "(neither)");
+  check("and the view button calls it a list",
+    /^View: List — press for grid$/.test((viewBtn() || { getAttribute: () => "" }).getAttribute("aria-label") || ""),
+    (viewBtn() || { getAttribute: () => "(no button)" }).getAttribute("aria-label") || "");
+  const row = frame().querySelector('.at-cardrow[data-card="k222222222222"]');
+  const rowSaid = row ? (row.textContent || "").replace(/\s+/g, " ") : "";
+  check("a row shows the card's meaning, its module and its Draft badge",
+    !!row && /^the book is big$/i.test(((row.querySelector(".at-cardrow-meaning") || {}).textContent || "").trim()) &&
+      /Lesson 1/.test(((row.querySelector(".at-cardrow-sub") || {}).textContent) || "") && /Draft/.test(rowSaid),
+    rowSaid || "(no row)");
+  const loose = [...frame().querySelectorAll(".at-cardrow")].find((x) => /In no module/.test(x.textContent || ""));
+  check("and a card in no module says so", !!loose, "(no row says In no module)");
+  const screensWere = document.querySelectorAll(".at-screen").length;
+  click(row || null);
+  await sleep(500);
+  check("pressing a row opens the card", document.querySelectorAll(".at-screen").length > screensWere,
+    `${screensWere} screens before, ${document.querySelectorAll(".at-screen").length} after`);
+  backOut();
+  await sleep(300);
+  click(viewBtn());
+  await sleep(200);
+  r.unmount();
+  host.remove();
+  anyWindow.matchMedia = anyGlobal.matchMedia = hadMedia;
+  draftOne = false;
+  check("and nothing threw drawing the cards on a phone", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- who is speaking, on a recording (0.632) ----

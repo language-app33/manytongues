@@ -879,6 +879,8 @@
 .at-numparts { display:flex; flex-direction:column; gap:8px; }
 .at-numstate { font-size:13px; color: var(--muted); margin:0; }
 .at-numstate[data-open] { color: var(--jade); }
+/* A part that needs another written first: fainter, still tappable (0.732). */
+.at-numwait { opacity: .6; }
 @media (max-width: 560px) {
   .at-numlabel { flex:0 0 100%; padding-top:0; }
 }
@@ -987,8 +989,19 @@ fieldset.at-cardlock:disabled input[type="checkbox"]:disabled { opacity:.55; }
 .at-dangerline { margin:0 0 12px; color: var(--muted); font-size:14px; }
 /* Manage cards: whose cards, under the title; and Add existing cards the
    width of the list, under its toolbar. */
-.at-managefor { margin:0 0 var(--s3); font-weight:700; color: var(--text-soft); }
 .at-blockbtn { width:100%; justify-content:center; }
+/* "Join another course" at the foot of Teaching's My courses (0.733):
+   dashed and unfilled, as the other buttons that add one more are. */
+.at-joinmore { margin-top: var(--s3); border:2px dashed var(--faint); background:none; color: var(--muted); box-shadow:none; }
+.at-joinmore:hover { border-color: var(--muted); color: var(--text); }
+/* "Add existing cards" on a module's card list (0.728): where the cards
+   go, said where there is room for it on one line, and the short form
+   on a phone. Both are in the button; this picks one. */
+.at-addexisting .at-longlabel { display:none; }
+@media (min-width: 640px) {
+  .at-addexisting .at-longlabel { display:inline; }
+  .at-addexisting .at-shortlabel { display:none; }
+}
 .at-answerpair.headed { gap:0 6px; }
 .at-answerpair.headed > .at-answerhead { grid-column:1 / -1; }
 /* A heading with what acts on its list at the right of its line. */
@@ -1084,3 +1097,18 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-practice-eng { margin-left:8px; }
 .at-practice-row.locked { opacity:.55; }
 .at-practice-lockword { font-size:13px; font-weight:700; color: var(--muted); }
+
+/* A card being read opens with the card itself (0.732, the owner's 4a):
+   its word large, how it is said, what it means, and three dots in the
+   corner. Only while the editor is locked; see CardHero. */
+.at-cardhero { position:relative; text-align:center; padding-top:18px; padding-bottom:18px; }
+.at-cardherodots { position:absolute; top:8px; right:8px; }
+.at-cardheroword { margin:0 40px; font-size:40px; line-height:1.3; font-weight:600; overflow-wrap:anywhere; }
+.at-cardherolat { margin:6px 0 0; font-style:italic; color: var(--muted); }
+.at-cardheroen { margin:6px 0 0; font-weight:700; }
+/* Read, nothing is to be filled in, so no field is marked as needing it. */
+fieldset.at-cardlock:disabled .at-reqstar { display:none; }
+/* "What is practised" on a card being read: a row per form saying in
+   words where it comes up, no tick-boxes (0.732, the owner's 5a). */
+.at-practice.said .at-practicerow { grid-template-columns: minmax(0, 1fr); }
+.at-practicesaid { flex: 0 0 100%; font-size: 13px; color: var(--muted); }

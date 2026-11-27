@@ -9587,3 +9587,134 @@ modules. Left as they were, by choice: the student's Cards and Progress
 tabs with no course (Home has Join a course), the "languages switched on"
 empties, and the sentence-card picker, where a button would leave a
 half-written card.
+
+## An empty course's Modules box offers one button (0.727)
+
+0.724 put a solid Create a module beside the dotted Add a module to this
+course, two styles side by side. The owner chose (1a) one button by what
+the teacher has: Add a module where there are modules, Create a module
+where there are none; (2a) the solid button, as every empty box has, so
+`ModuleSwitch` gained `solid`, which draws its add button as a primary
+`Button` while nothing is chosen; (3a) Create a new module as the first row
+of the sheet, so `ModuleSwitch` gained `onCreate`, which closes the sheet
+and hands over to the course's kind sheet; (4a) the new module opens, as
+from To do. The row is in the filled course's Another module sheet too,
+since it is the same sheet. Only the course screen passes `onCreate`; a
+card's module list keeps its own way to make one (ModulePickScreen).
+## One bar over a list, and a quiet line under it (0.728)
+
+Teaching › Material › Cards had two rows of controls over its list — New,
+three dots and the view button, then the search box with Select, Sort and
+Filter — and Sort and Filter opened by pushing the list down. Selecting put
+a tray of seven buttons over half a phone. The owner designed the
+replacement, and `ItemList` draws it for every list that uses it:
+
+- **One row**: New, the search box, Filter and three dots. On a phone New
+  is + alone, so the box keeps 200px; the words come back from 640px.
+- **A quiet line** under it: the count, the order and the view switch, in
+  small text rather than boxes. They are about how the list is read, not
+  what is in it, and boxes for them were the second row.
+- **Sort waits for Apply; filters apply as they are ticked.** The owner
+  chose the word Apply and chose that it mean what it says: a list
+  reordering behind the panel while someone is still choosing is a list
+  they have lost their place in. A filter is different — watching the
+  count fall is how a teacher knows they have narrowed enough — so the
+  Filter panel's button counts along ("Show 5 cards") and only shuts it.
+- **Chips on one line that scrolls sideways**, never wrapping: three
+  filters on three lines would push the list down as far as the panel did.
+- **Select is in the three dots**, first, because a phone has no room for a
+  sixth icon — except where it would be alone there (People), where it is
+  its own icon rather than dots opening onto one row. A finger held on a
+  tile also starts selecting.
+- **The search box stays while selecting**: narrowing to what is to be
+  ticked is half of selecting, and what was ticked survives a search.
+- **One Actions button** at the foot opens a panel of every bulk action,
+  each with its own picture, Delete last.
+
+The cost: Select and Import are one press further away, New is an icon on
+a phone, a new order needs Apply, and every bulk action is one press
+further. Nothing was removed. `menus` and `count` went from `ItemList`'s
+inputs for `sort`, `filter` and `total`.
+
+## Simpler teacher screens (0.732)
+
+The owner chose each of these on a page of mock-ups (answers `1a, 2b→7a,
+3b, 4a, 5a, 6 none, 7a, 8a, 9a`).
+
+- **Manage cards folded into the module's screen.** A module had two
+  screens over the same cards: one to read them and one to change which
+  they were. The reading one now holds what the managing one did — New
+  card, Add existing cards, Select, Import, Remove from this module — and
+  the managing one is gone. The list is the Cards tab's list, with the
+  same bar, so there is one way to work a list of cards.
+- **Edit replaced by a pencil and a menu.** The module's only fields were
+  its name and its courses, and the courses already saved as they were
+  tapped (0.725). So Edit opened a whole mode for one text box. The name
+  is the heading, and its pencil turns it into a box with Save and Cancel
+  in place; Export and Delete went behind three dots on the title line.
+  Back still asks first when a rename is half typed. Cost: Rename, Export
+  and Delete are each one press further.
+- **A card being read is still the locked editor**, with the card drawn on
+  top. `docs/PROPOSAL-view-only-parity.md` made reading the editor held
+  still so that reading never falls behind editing; that is kept. What
+  changed is only what the Basic tab opens with while locked: a hero (the
+  word, how it is said, what it means, Export behind its dots), with "This
+  card", the advanced tick-box, the stars and the no-vowel-marks note held
+  back until Edit. The note became a "to improve" list with a button that
+  turns the screen to editing. The hero sits above the fields' lock, so its
+  dots work while the rest is held still.
+- **The Content block is hidden only when the hero already says all of
+  it**: one spelling, one way of saying it, one English, nothing recorded
+  or pictured (`onlyWords`). A card with more keeps the block, so nothing
+  on it is out of sight while it is read.
+- **"What is practised" in words while read.** A table of tick-boxes that
+  cannot be ticked read as a form to fill in; one line per form saying
+  where it comes up reads as a fact. Edit brings the tick-boxes back.
+- **Not changed:** the exercise tiles on the Exercises tab, and the
+  Advanced tab, which a card being read shows as before. Courses, which
+  already save on tap, are untouched.
+- **Two departures from the mock-ups.** The line "Students choose and write
+  this word" was a misreading of the Description's own role line, so it is
+  not shown; the Description shows only when one is written. The card's
+  first tab keeps its name, "Basic".
+
+## A simpler teacher Home, New module panel and Cards list (0.733)
+
+All chosen by the owner on a page of mock-ups. Everything here is switched
+on only by the teaching side (a prop or the `teach` class), so the
+learner's Courses page and card grids look and behave as before.
+
+- **Join is a button at the foot of My courses, opening a panel.** A
+  teacher joins a course once; the code box was a whole section on every
+  visit to Home. A teacher with no course at all sees a box saying so with
+  the same button, since the empty list was the screen's whole message.
+  `CoursesPage` takes `joinButton` and `noneAtAll`; without them it draws
+  the old join box, which is what the learner keeps.
+- **The caught-up band kept its cup but went slim.** The cup says "done,
+  not broken"; the height said nothing and pushed My courses down.
+- **Search from six courses.** Five fit on a phone and are read, not
+  searched. `ItemList` now draws no search box at all without `match`
+  (every other list passes one), so "no search" leaves no empty bar.
+- **The three descriptions lead with "independent" and "builds on".**
+  That is the real difference between a deck and a unit. Sharing between
+  courses is not, since a unit can be on several courses' paths too, so
+  neither description mentions it. The personal set's leads with what it
+  is for — words that differ per student — and the owner's example. Each
+  kind has a picture: cards, a new `path` icon (three stops climbing), a
+  person.
+- **Two tiles a row, the three dots kept.** One line for the word and one
+  for the meaning keeps every tile the same height, so the grid reads as a
+  grid; a longer word is a tap away. The dots stay because Edit and
+  Remove on a tile are what a teacher reaches for there. The cost is six
+  to eight cards a phone screen where twelve showed.
+- **A stand-in for a missing meaning.** A card with no English left a
+  blank line that read as broken. Its transliteration is the next best
+  thing to read it by; a picture or recording card says so. `standIn` in
+  `cards.ts`, shared by the tile and the table.
+- **A list on a phone, the table kept for wide screens.** A five-column
+  table scrolled sideways on a phone and showed two columns. The list
+  gives the same facts in a row; sorting moves to the Sort control, which
+  every list already has. `CardRows` shares the table's press, hold and
+  key handling rather than copying it, and `useNarrow` says no where there
+  is no `matchMedia`, so the smoke walk keeps checking the table.
+

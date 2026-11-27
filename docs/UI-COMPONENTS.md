@@ -182,17 +182,20 @@ chooses one of a few rather than acting (0.691): a card's status
 (`StatusMenu`) and `FilterMenu` open the same `PickSheet` of these rows.
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
-The panel a list's Sort or Filter button opens onto. `groups, note`
+The pickers a list's Sort or Filter panel holds. `groups, note, onClear`
 
 A group is `{ key, label, value, quiet, onChange, options }` and draws a
 `Segmented`; `quiet` names the value that counts as not narrowing, and
 `narrowing(groups)` counts the ones that are away from it — that count is
-what the button carries. A group with `custom` draws that instead, for a
-choice a row of buttons cannot say (which decks, of all of them), and `wide`
-gives it a line of its own.
+what the Filter button carries. A group with `custom` draws that instead, for
+a choice a row of buttons cannot say (which decks, of all of them), and `wide`
+gives it a line of its own. `chip` is what the group's chip under a list's bar
+says while it narrows ("Without recordings"; its `label` otherwise), and
+`onReset` puts that one group back — the chip's cross.
 
-It is only the panel: the button, and keeping one panel open at a time,
-belong to `ItemList`'s `menus`.
+It is only the pickers: the button, the panel they open in and the chips
+belong to `ItemList`'s `filter` (0.728). The Sort panel builds its own two
+groups from `ItemList`'s `sort`.
 
 ### `RadioGroup` — 2 uses
 One of a few, as a list of rows rather than a track of segments.
@@ -213,41 +216,81 @@ The languages, through `RadioGroup`. `languages, value, onChange, label, name`
 ## Lists and tiles
 
 ### `ItemList` — 9 uses
-The standard list frame: two rows of controls, bulk-action tray, empty state,
-and paging at 120 items.
+The standard list frame: one bar of controls, a quiet line under it, the
+list, a slim bar at the foot while selecting, empty state, and paging at 120
+items.
 
 `noun, plural, items, itemKey, match, groups, groupOf, size="large"|"small",
-views, onNew, renderItem, selected, onSelectedChange, bulkActions, tools,
-more, narrow, menus, filters, count, empty, busy`
+views, onNew, newOff, renderItem, selected, onSelectedChange, bulkActions,
+tools, more, narrow, sort, filter, total, filters, query, empty, emptyPanel,
+busy`
 
-The controls are **two rows** (0.689): New, the three dots holding `more`
-(Import, where a list has it), `tools` (the screen's own main button) and,
-at the far end, the view button on the first; the search box on a line of
-its own on the second, with Select, the `menus` and `narrow` after it as
-icons. Either row is left out when it would hold nothing. Whichever menu is
-open renders under them, then `filters`, then the tiles.
+**The bar is one row** (0.728): New (+ alone under 640px, "+ New card"
+from there), the search box taking what is left, Filter (with the count of
+filters on, and its word from 640px), `narrow`, and three dots. The dots hold
+Select first, where there is anything to select, then `more` (Import, where a
+list has it); where Select would be alone in them it is an icon of its own
+and there are no dots. `tools`, a screen's own worded button, is on a row of its own above
+the bar. (A module's screen had one, "Manage this deck's cards", until
+0.732, when it took in Manage cards and its list became the Cards tab's.) Each part is left out
+when it would hold nothing, and with `emptyPanel` showing the bar stands
+aside.
 
-`menus` is `[{ key, label, icon, busy, content }]` — one open at a time, so
-two panels can never give two answers to "why is this list short". `busy` is
-the count the button carries; `narrowing(groups)` works it out for a
-`FilterBar`'s groups.
+**The quiet line** under the bar, in small muted type: the count ("14 cards",
+or "5 of 14" while narrowed, against `total`), Clear while a filter is on,
+and at the end the order (opening the Sort panel) and the view switch. It is
+drawn only where it says more than a count — a list with `sort` or `views`,
+or narrowed, or selecting — so People has none. Under it, while filtered,
+each filter in force is a chip on one line that scrolls sideways.
 
-`views` adds the view button, which steps the list through four views —
-small grid, large grid, list and table — with an icon for each. It is
-`{ key, columns, row(item) }`: `row` gives a card's `word` and `meaning` for
-the list view, its `cells` by column key for the table, and the `open` and
-`actions` a tile would have. `key` names the list, and each list keeps the
-view it was left at on the device. `cardWords`, `cardKindLabel` and
-`cardSubtypeLabel` say a card's words, kind and subtype the same way in
-every list.
+`sort` is `{ value, down, options, onApply(value, down) }`, each option
+`{ value, label, down, up, saysDown, saysUp }`: `label` is its name in the
+panel, `down`/`up` its two directions there, `saysDown`/`saysUp` what the
+line reads. **The Sort panel keeps a draft and waits for Apply**; shut any
+other way it changes nothing. `filter` is `{ groups, onClear }` — `FilterBar`
+groups, which **take hold as they are ticked**; the panel's button reads
+"Show 5 cards" and only shuts it. One panel at a time, from the foot of the
+screen (`PickSheet`), its contents scrolling above a button that stays put.
+
+**Selecting** starts from Select, or from a finger held on a tile or table
+row (touch and pen, 500ms, cancelled by 10px of movement; the click after is
+swallowed). While it lasts the search box and Filter stay, New and the dots
+give way to a cross ("Done selecting"), and the line reads "3 selected" with
+Select all. The foot bar says how many and has one **Actions** button, which
+opens a panel of `bulkActions` as rows, each with its `icon`, `danger` ones
+last. It is still fixed to the foot and measured into `--bulk-h`, which the
+list reserves at its end.
+
+`views` adds the view switch — grid or table. It is
+`{ key, columns, row(item) }`: `row` gives a card's `cells` by column key for
+the table, and the `open` and `actions` a tile would have. `key` names the
+list, and each list keeps the view it was left at on the device.
+`cardWords`, `cardKindLabel` and `cardSubtypeLabel` say a card's words, kind
+and subtype the same way in every list.
 
 `match` is `(item, lowercasedQuery) => boolean`. `bulkActions` is
-`[{ label, danger, icon, onClick(ids) }]`, and **`ids` is an array, not the
-Set the list keeps internally** — the tray spreads it before calling, and
-every caller reaches for `.includes` or `.length`.
+`[{ label, icon, danger, onClick(ids) }]`, and **`ids` is an array, not the
+Set the list keeps internally** — every caller reaches for `.includes` or
+`.length`. Give every action an icon of its own; `folder` is drawn where one
+is missing.
 
 `itemKey` defaults to reading `.id`, so items need one unless you pass your
 own.
+
+**No `match`, no search box** (0.733): a box that cannot narrow anything is
+left out, and a bar with nothing else in it is not drawn at all.
+
+**On a phone the table is a list** (0.733). Under 640px wide (`useNarrow()`,
+which reads `(max-width: 639px)` and says no where there is no
+`matchMedia`) the table view is drawn by `CardRows`: one card a row, its
+`meaning` cell over a line of its `decks` cell (or the row's `noDecks`,
+"In no module" for a teacher's card), its `kind` where it is not "Word or
+phrase", and its `status`; its `word` on the right, cut with … at half the
+row. The rows press, tick, answer Enter and Space, and start selecting on a
+held finger exactly as the table's rows do — both use the same helpers. The
+view switch says "List" and shows the list icon there. Sort is from the
+Sort control, since the list has no column headings. `CardRow` gained
+`noDecks` for this.
 
 `groups` is `[{ key, label }]` and `groupOf` is `(item) => key`. Together they
 split the list into labelled runs, each headed with how many are in it
@@ -263,7 +306,19 @@ learning and not started.
 ### `CardTile` — 2 uses
 One card tile for both the learner's and the teacher's lists.
 
-`card, lang, showLat, meta, actions, onClick, className`
+`card, lang, showLat, meta, actions, corner, onClick, className, standIn`
+
+**The teacher's grids pass `className="teach"`** (0.733): two tiles a row
+on a phone, every tile the same height, the word and the meaning one line
+each and cut with …, a 1px outline, and the status badge at the tile's foot
+at its own width, wrapping rather than cut. The grid around them picks up
+the wider columns from the class (`:has()`). The learner's tiles pass
+nothing and are as they were.
+
+`standIn` (0.733) is what goes in the meaning's place on a card with no
+meaning and no name: `standIn(card)` from `cards.ts` gives the first
+transliteration (drawn in italics), else "Picture" or "Recording" with a
+small symbol, else nothing.
 
 `meta` is the one line of small print, and the caller decides what it says.
 It replaced a `moduleTitles` prop, which this file and the gallery both went
@@ -274,6 +329,25 @@ in the interface face rather than the taught script's, and it stands in for
 the meaning line rather than sitting above it. The script keeps its own line
 underneath. Nothing is passed for this — the tile reads it off the card —
 and only a verb whose own word is a cell of its table has one.
+
+### `CoursesPage` — spaces.tsx, 2 uses
+The list of someone's courses: Teaching's Home and the learner's Courses.
+`joinButton` (0.733, Teaching only) puts joining at the foot of My courses
+as a dashed button, `label`, opening a `PickSheet` titled `title` with the
+code box; `noneAtAll` says the person has no course at all, and then a
+`Nudge` saying `none` with a `first` button stands in for the list.
+Without `joinButton` the join box is the section it always was.
+`searchFrom` searches the courses only from that many on (Teaching: six).
+
+### `OpenRow` — spaces.tsx
+A row that opens something, drawn as a module's tile. `icon` (0.733) puts
+a picture in a soft green square beside the words, at the top of them, and
+lets the line under the title take as many lines as it needs: the kinds on
+the New module panel.
+
+### `Empty`
+`slim` (0.733) draws it on one row, the picture beside the words, a third
+of the height: To do on Teaching's Home with nothing in it.
 
 ### `Tile` — 7 uses
 The generic deck/course tile. `title, meta, onOpen, actions, footer`

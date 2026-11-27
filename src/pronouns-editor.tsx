@@ -39,7 +39,7 @@ import { verbOf } from "./languages.ts";
 import { personsOf, picksOf } from "./verbs.ts";
 import { formsOf } from "./cards.ts";
 import { beReadings } from "./variables.ts";
-import { Button, ModuleSwitch, Field, Help, Notice, Screen, plural, useReach } from "./shared.tsx";
+import { Button, ModuleSwitch, Field, Help, Notice, PickSheet, Screen, plural, useReach } from "./shared.tsx";
 import { RecordingScreen, ScriptInput } from "./card-editor.tsx";
 import * as API from "./courses-api.ts";
 
@@ -127,6 +127,17 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, on
     Object.fromEntries(persons.map((p) => [p.id, rowOf(held[p.id], p.label)])),
   );
   const [recording, setRecording] = useState<string | null>(null);
+  /* The panel saying how sentences use the pronouns, and the pronouns
+     whose English is open to change (0.732, the owner's 3b). */
+  const [how, setHow] = useState(false);
+  const [openEn, setOpenEn] = useState<Set<string>>(new Set());
+  const toggleEn = (id: string) =>
+    setOpenEn((was) => {
+      const next = new Set(was);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const reach = useReach();
@@ -233,17 +244,24 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, on
       }
     >
       {sharedNote ? <Help>{sharedNote}</Help> : null}
-      <Help>
-        The words for I, you, he and the rest, written once for {lang.name}. Each becomes a card
-        that can be practised and put in modules, and a sentence with a {"{{pronoun}}"} blank puts
-        its verb in the form that goes with the pronoun it is filled with.
-      </Help>
-      <Help>
-        A sentence can also read each pronoun with &ldquo;to be&rdquo; &mdash; {"{{pronoun-is}}"},
-        for &ldquo;I am tired&rdquo; &mdash; or as a question &mdash; {"{{is-pronoun}}"}, for
-        &ldquo;am I tired?&rdquo;. The two English boxes on each row are what those read as. They
-        are filled in for you; change them only if you want other words.
-      </Help>
+      {/* One sentence, and the rest behind a button (0.732, the owner's 3b). */}
+      <Help>Write each pronoun once. Each becomes a card, and sentences can use them.</Help>
+      <div className="at-row at-mb3">
+        <Button variant="ghost" size="sm" onClick={() => setHow(true)}>How sentences use them</Button>
+      </div>
+      {how ? (
+        <PickSheet
+          title="In a sentence card"
+          lede="Leave a blank and the app fills in a pronoun, with the verb to match."
+          onClose={() => setHow(false)}
+        >
+          <ul className="at-checklist">
+            <li><b>{"{{pronoun}}"}</b>{" \u2014 I, you, he and the rest: \u201c___ went home\u201d"}</li>
+            <li><b>{"{{pronoun-is}}"}</b>{" \u2014 with \u201cto be\u201d: \u201cI am tired\u201d"}</li>
+            <li><b>{"{{is-pronoun}}"}</b>{" \u2014 as a question: \u201cam I tired?\u201d"}</li>
+          </ul>
+        </PickSheet>
+      ) : null}
       <Notice kind="error">{error}</Notice>
       {modules && onModule ? (
         <Field label="Modules" lede="The modules this set is in. A pronoun written later goes into them too.">
@@ -284,33 +302,46 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, on
                   />
                 </Field>
               ) : null}
-              <Field label="English">
-                <input
-                  className="at-input"
-                  value={row.en}
-                  placeholder={p.label}
-                  aria-label={`English for ${p.label}`}
-                  onChange={(e) => setEnglish(p.id, p.label, e.target.value)}
-                />
-              </Field>
-              <Field label={'With \u201cto be\u201d'}>
-                <input
-                  className="at-input"
-                  value={row.enIs}
-                  placeholder={beReadings(englishOf(row, p.label)).is}
-                  aria-label={`With to be, for ${p.label}`}
-                  onChange={(e) => set(p.id, { enIs: e.target.value })}
-                />
-              </Field>
-              <Field label="As a question">
-                <input
-                  className="at-input"
-                  value={row.enAsk}
-                  placeholder={beReadings(englishOf(row, p.label)).ask}
-                  aria-label={`As a question, for ${p.label}`}
-                  onChange={(e) => set(p.id, { enAsk: e.target.value })}
-                />
-              </Field>
+              {/* The English on one line, its three boxes behind Change:
+                  they are filled in for the teacher and rarely touched. */}
+              <p className="at-hint at-mb3">
+                {`English: \u201c${row.en.trim() || p.label}\u201d, \u201c${row.enIs || beReadings(englishOf(row, p.label)).is}\u201d, \u201c${row.enAsk || beReadings(englishOf(row, p.label)).ask}\u201d `}
+                <Button variant="ghost" size="sm" aria-label={openEn.has(p.id) ? `Done with the English for ${p.label}` : `Change the English for ${p.label}`}
+                  onClick={() => toggleEn(p.id)}>
+                  {openEn.has(p.id) ? "Done" : "Change"}
+                </Button>
+              </p>
+              {openEn.has(p.id) ? (
+                <>
+                  <Field label="English">
+                    <input
+                      className="at-input"
+                      value={row.en}
+                      placeholder={p.label}
+                      aria-label={`English for ${p.label}`}
+                      onChange={(e) => setEnglish(p.id, p.label, e.target.value)}
+                    />
+                  </Field>
+                  <Field label={'With \u201cto be\u201d'}>
+                    <input
+                      className="at-input"
+                      value={row.enIs}
+                      placeholder={beReadings(englishOf(row, p.label)).is}
+                      aria-label={`With to be, for ${p.label}`}
+                      onChange={(e) => set(p.id, { enIs: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="As a question">
+                    <input
+                      className="at-input"
+                      value={row.enAsk}
+                      placeholder={beReadings(englishOf(row, p.label)).ask}
+                      aria-label={`As a question, for ${p.label}`}
+                      onChange={(e) => set(p.id, { enAsk: e.target.value })}
+                    />
+                  </Field>
+                </>
+              ) : null}
               <div className="at-chips">
                 <Button
                   variant="ghost"

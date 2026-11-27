@@ -8622,7 +8622,11 @@ function ctx() {
   if (!Ctx) return null;
   if (!audioCtx) audioCtx = new Ctx();
   // Browsers start it suspended until you've interacted with the page.
-  if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  /* Anything but running is woken, not only "suspended" (0.730): an iPhone
+     has a state of its own, "interrupted", for a call, Siri or the app
+     going to the background, and does not always come back from it by
+     itself — so the sounds stayed silent until the app was reopened. */
+  if (audioCtx.state !== "running" && audioCtx.state !== "closed") audioCtx.resume().catch(() => {});
   return audioCtx;
 }
 
@@ -19110,14 +19114,12 @@ function ItemsTab({
   onPriority: (id: string, on: boolean) => void;
 }) {
   const [sheet, setSheet] = useState<any | null>(null); // null | {view:item}
-  const [q, setQ] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
 
   /* Someone tapped "practice" on a deck elsewhere; show just that deck. */
   useEffect(() => {
     if (!moduleWanted) return;
     setFilterTags([moduleWanted]);
-    setQ("");
     if (onModuleWantedUsed) onModuleWantedUsed();
   }, [moduleWanted, onModuleWantedUsed]);
 
@@ -19135,15 +19137,6 @@ function ItemsTab({
         .sort((a, b) => b.created - a.created),
     [items, filterTags]
   );
-
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return items
-      .filter((i) => (filterTags.length ? i.tags.some((t) => filterTags.includes(t)) : true))
-      .filter((i) => cardMatches(i, s))
-      .slice()
-      .sort((a, b) => b.created - a.created);
-  }, [items, q, filterTags]);
 
   return (
     <>
@@ -19168,11 +19161,7 @@ function ItemsTab({
             busy={false}
             empty="No cards match."
             match={cardMatches}
-            count={
-              filtered.length === items.length
-                ? `${plural(items.length, "card")}`
-                : `${filtered.length} of ${items.length}`
-            }
+            total={items.length}
             /* Course cards are not a student's to change, so there is
                nothing to select them for. */
             /* The library's tile, not a copy of it. This screen had its own

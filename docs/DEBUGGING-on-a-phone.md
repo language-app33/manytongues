@@ -100,3 +100,34 @@ under the keyboard. Same component, different amount of content.
   ref read in a mount effect points at an element that is no longer on
   the page. Hold the element in state (`ref={setBox}`) and key the effect
   on it.
+
+## A real WebKit
+
+An emulated iPhone in Playwright is Chromium with an iPhone's size and
+name. It shows the app's layout; it says nothing about what Safari's
+engine makes of the code. For that there is `scripts/webkit-driver.mjs`
+(0.730), which drives WebKitGTK, the same engine built for Linux, with
+real clicks:
+
+```bash
+apt-get install -y webkit2gtk-driver xvfb
+```
+
+Then start the built app as in step 1 above and write a script against
+`open()` from that file; its header shows how. Things it settles that
+Chromium cannot:
+
+- **Whether the app starts at all**, and what the engine logs as it runs.
+- **What a tap is allowed to do**: sound without a tap is refused there as
+  it is on an iPhone, so "does this still play after the wait" can be
+  measured.
+- **A private window.** Its windows are private ones, and a private
+  window in WebKit refuses to keep a recording or picture on the device.
+
+Things it does not: the on-screen keyboard, the notch and home bar, the
+home-screen install, and anything a particular iOS version gets wrong.
+Those still need a phone, and the report should say so.
+
+An **older** Safari cannot be run at all. What can be done is to find what
+it would refuse: `tests/old-safari.test.mjs` holds the one such thing
+found so far.

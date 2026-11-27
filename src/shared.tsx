@@ -101,6 +101,8 @@ export function confirmStrength({ permanent, affectsOthers, name }: {
    ------------------------------------------------------------------ */
 
 const ICONS: Record<string, string> = {
+  /* Three stops joined by a line, climbing: a course's path (0.733). */
+  path: "M6 15.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM18 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.4 15.2l2.4-2.4 1.4 1.4-2.4 2.4zM13.4 9.2l2.4-2.4 1.4 1.4-2.4 2.4z",
   /* An empty ring of dashes: not out yet — the draft beside Published's
      tick. */
   draft: "M20.92 13.17A9 9 0 0 1 19.14 17.48L17.55 16.26A7 7 0 0 0 18.94 12.91zM17.48 19.14A9 9 0 0 1 13.17 20.92L12.91 18.94A7 7 0 0 0 16.26 17.55zM10.83 20.92A9 9 0 0 1 6.52 19.14L7.74 17.55A7 7 0 0 0 11.09 18.94zM4.86 17.48A9 9 0 0 1 3.08 13.17L5.06 12.91A7 7 0 0 0 6.45 16.26zM3.08 10.83A9 9 0 0 1 4.86 6.52L6.45 7.74A7 7 0 0 0 5.06 11.09zM6.52 4.86A9 9 0 0 1 10.83 3.08L11.09 5.06A7 7 0 0 0 7.74 6.45zM13.17 3.08A9 9 0 0 1 17.48 4.86L16.26 6.45A7 7 0 0 0 12.91 5.06zM19.14 6.52A9 9 0 0 1 20.92 10.83L18.94 11.09A7 7 0 0 0 17.55 7.74z",
@@ -133,6 +135,19 @@ const ICONS: Record<string, string> = {
     "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
   folder:
     "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
+  /* A folder with a plus or a minus on it, and a tag with one beside it:
+     putting things into a module or taking them out, and tagging them or
+     untagging them, as rows of a selection's Actions panel (0.728) — where
+     every row has a picture of its own, so two of them cannot both be a
+     folder. */
+  folderAdd:
+    "M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z",
+  folderRemove:
+    "M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-8v-2h8v2z",
+  tagAdd:
+    "M17.63 5.84C17.27 5.33 16.67 5 16 5h-6v2h6l3.55 5L16 17h-6v2h6c.67 0 1.27-.33 1.63-.84L22 12zM6 9H4v3H1v2h3v3h2v-3h3v-2H6z",
+  tagRemove:
+    "M17.63 5.84C17.27 5.33 16.67 5 16 5h-6v2h6l3.55 5L16 17h-6v2h6c.67 0 1.27-.33 1.63-.84L22 12zM1 12h8v2H1z",
   cards:
     "M2.53 19.65l1.34.56v-9.03l-2.43 5.86c-.41 1.02.08 2.2 1.09 2.61zm19.5-3.7L17.07 3.98c-.31-.75-1.04-1.21-1.81-1.23-.26 0-.53.04-.79.15L7.1 5.95c-.75.31-1.21 1.03-1.23 1.8-.01.27.04.54.15.8l4.96 11.97c.31.76 1.05 1.22 1.83 1.23.26 0 .52-.05.77-.15l7.36-3.05c1.02-.42 1.51-1.59 1.09-2.6zM7.88 8.75c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM5.88 19.75c0 1.1.9 2 2 2h1.45l-3.45-8.34v6.34z",
   person:
@@ -800,12 +815,15 @@ export function Section({ title, count, lede, action, children, className = "", 
 /* --- Empty --------------------------------------------------------
    Sixteen different ad-hoc versions of "there is nothing here",
    fifteen of which did not use the class that existed for it. */
-export function Empty({ title, children, action, art }: { title?: Node; children?: Node; action?: Node;
+export function Empty({ title, children, action, art, slim }: { title?: Node; children?: Node; action?: Node;
   /** A small picture above the words, where the screen is otherwise bare
       (0.642: the home screen with nothing to practise). */
-  art?: Node }) {
+  art?: Node;
+  /** On one row, picture beside the words, about a third of the height:
+      a quiet To do on Teaching's Home (0.733). */
+  slim?: boolean }) {
   return (
-    <div className="at-empty2">
+    <div className={`at-empty2${slim ? " slim" : ""}`}>
       {art ? <div className="at-emptyart" aria-hidden="true">{art}</div> : null}
       {title ? <p className="at-eyebrow">{title}</p> : null}
       {children ? <p className="at-hint">{children}</p> : null}
@@ -1348,7 +1366,7 @@ function Written({ text }: { text?: string | null }) {
  * The card is a form rather than a `Card` or an `Item`, because both
  * sides show these: only the wording is read, and that is all a form is.
  */
-export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className }: {
+export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className, standIn }: {
   /* A card, not one of its forms: the tile shows the card's own word —
      the first of them — and says what the card is called, which is a fact
      about the card. */
@@ -1374,6 +1392,10 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
   corner?: Node;
   onClick?: () => void;
   className?: string;
+  /** What goes in the meaning's place on a card with no meaning (0.733,
+      the teacher's grids): its transliteration, or that it is a picture
+      or a recording. See standIn in cards.ts. Left out, the line is blank. */
+  standIn?: { kind: string; text: string } | null;
 }) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   /* A conversation has no front of its own: its first line stands in for
@@ -1450,6 +1472,10 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
         */}
       {card.name
         ? <div className="at-minien at-mininame" dir="auto">{asMeaning(card.name)}</div>
+        : !lead.en && standIn
+        ? standIn.kind === "lat"
+          ? <div className="at-minien standin"><i>{standIn.text}</i></div>
+          : <div className="at-minien standin"><Icon name={standIn.kind === "picture" ? "image" : "play"} size={14} /> {standIn.text}</div>
         : <div className="at-minien"><Written text={asMeaning(lead.en)} /></div>}
       {showLat && lead.lat ? <div className="at-minilat"><Written text={lead.lat} /></div> : null}
       {/* One line of small print, and the caller decides what it says.
@@ -1657,8 +1683,12 @@ export function dateTime(ms?: Millis) {
 /* --- Tile ---------------------------------------------------------
    The deck and course tile. Lived in spaces.tsx, which meant the one
    library the docs point at did not actually hold it. */
-export function Tile({ title, meta, onOpen, actions, footer, note }: {
+export function Tile({ title, badge, meta, onOpen, actions, footer, note }: {
   title?: Node;
+  /** A small label right after the title, such as a module's kind
+      (0.729). It sits beside the title, not inside it, so the title's
+      text stays the name alone. */
+  badge?: Node;
   meta?: Node;
   onOpen?: () => void;
   actions?: Node;
@@ -1673,7 +1703,14 @@ export function Tile({ title, meta, onOpen, actions, footer, note }: {
     <div className="at-deckcard" onClick={onOpen} data-open={onOpen ? "" : undefined}>
       <div className="at-deckrow2">
         <div className="at-deckmain">
-          <div className="at-decktitle">{title}</div>
+          {badge ? (
+            <div className="at-decktitlerow">
+              <div className="at-decktitle">{title}</div>
+              {badge}
+            </div>
+          ) : (
+            <div className="at-decktitle">{title}</div>
+          )}
           {meta ? <div className="at-deckmeta">{meta}</div> : null}
           {note}
         </div>
@@ -2072,6 +2109,10 @@ export interface CardRow {
   cells: Record<string, Node>;
   open?: () => void;
   actions?: Node;
+  /** What the phone's list says under the meaning where `decks` is empty
+      (0.733): "In no module", for a card; left out for a word set, whose
+      line then holds only its badge. */
+  noDecks?: string;
 }
 export interface CardViews<T> {
   /** Which list this is, for remembering the view it was left at. */
@@ -2181,6 +2222,117 @@ export function clipped(text: string, n = 20): string {
 }
 
 /*
+ * What makes a row of a card list a thing to press, shared by the table
+ * and the phone's list (0.733) so the two answer a tap, a key and a held
+ * finger alike: pressing opens the card, or ticks it while selecting.
+ */
+function rowPress(selecting: boolean, picked: Set<string>, toggle: (id: string) => void) {
+  const press = (id: string, row: CardRow) => (selecting ? toggle(id) : row.open && row.open());
+  const keys = (id: string, row: CardRow) => (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    press(id, row);
+  };
+  const tick = (on: boolean) =>
+    selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
+  const pressable = (id: string, row: CardRow) =>
+    selecting || row.open
+      ? {
+          tabIndex: 0,
+          onClick: () => press(id, row),
+          onKeyDown: keys(id, row),
+          ...(selecting ? { "aria-pressed": picked.has(id) } : null),
+        }
+      : {};
+  return { press, keys, tick, pressable };
+}
+
+/*
+ * Whether the screen is phone-narrow: under 640px wide (0.733). Where the
+ * browser cannot say — the smoke walk's, which has no matchMedia — it is
+ * not, so that walk keeps seeing the table it checks.
+ */
+export function useNarrow(): boolean {
+  const query = "(max-width: 639px)";
+  const [narrow, setNarrow] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    setNarrow(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  return narrow;
+}
+
+/*
+ * The table's view on a phone, as a list (0.733, the owner's choice): one
+ * card a row, its meaning over a line of where it is, what kind when it is
+ * not a plain word, and its badge; its word on the right. A table five
+ * columns wide scrolled sideways on a phone and showed two of them.
+ * Same props as CardTable, and the same press, tick and hold.
+ */
+function CardRows<T>({ views, page, itemKey, selecting, picked, toggle, hold, swallowed, headingAt }: {
+  views: CardViews<T>;
+  page: T[];
+  itemKey: (item: T) => string;
+  selecting: boolean;
+  picked: Set<string>;
+  toggle: (id: string) => void;
+  hold: (id: string) => Record<string, any>;
+  swallowed: (e: React.MouseEvent) => boolean;
+  headingAt: (item: T, i: number) => { label: string; n: number } | null;
+}) {
+  const rows = page.map((it) => ({ id: itemKey(it), row: views.row(it) }));
+  const { tick, pressable } = rowPress(selecting, picked, toggle);
+  return (
+    <div className="at-cardrows">
+      {rows.map(({ id, row }, i) => {
+        const head = headingAt(page[i], i);
+        const on = picked.has(id);
+        const kind = typeof row.cells.kind === "string" && row.cells.kind && row.cells.kind !== "Word or phrase" ? ` · ${row.cells.kind}` : "";
+        const where = row.cells.decks || row.noDecks || null;
+        return (
+          <React.Fragment key={id}>
+            {head && (
+              <div className="at-grouprow" role="heading" aria-level={4}>
+                {head.label} <span>{head.n}</span>
+              </div>
+            )}
+            <div className={`at-cardrow${row.open || selecting ? " opens" : ""}${on ? " picked" : ""}`} data-card={id}
+              {...hold(id)}
+              onClickCapture={(e) => { swallowed(e); }}
+              {...((selecting || row.open) ? { role: "button" } : null)}
+              {...pressable(id, row)}>
+              {tick(on)}
+              <span className="at-cardrow-main">
+                <span className="at-cardrow-meaning">{row.cells.meaning}</span>
+                <span className="at-cardrow-sub">
+                  {where}{where ? kind : kind.replace(/^ · /, "")}
+                  {row.cells.status ? <span className="at-cardrow-status">{row.cells.status}</span> : null}
+                </span>
+              </span>
+              <span className="at-cardrow-word">{row.cells.word}</span>
+              {!selecting && row.actions ? (
+                <span className="at-cardrow-acts" onClick={(e) => e.stopPropagation()}>{row.actions}</span>
+              ) : null}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/*
  * A card list drawn as a table, for ItemList.
  *
  * A row does what its tile does: pressing it opens the card, and while
@@ -2191,34 +2343,21 @@ export function clipped(text: string, n = 20): string {
  * The table scrolls sideways inside its own frame where it is wider than
  * the screen, rather than pushing the page wider with it.
  */
-function CardTable<T>({ views, page, itemKey, selecting, picked, toggle, headingAt }: {
+function CardTable<T>({ views, page, itemKey, selecting, picked, toggle, hold, swallowed, headingAt }: {
   views: CardViews<T>;
   page: T[];
   itemKey: (item: T) => string;
   selecting: boolean;
   picked: Set<string>;
   toggle: (id: string) => void;
+  /** A finger held on a row starts selecting, as on a tile — ItemList's. */
+  hold: (id: string) => Record<string, any>;
+  /** Whether a click is the end of such a hold, and so not a press. */
+  swallowed: (e: React.MouseEvent) => boolean;
   headingAt: (item: T, i: number) => { label: string; n: number } | null;
 }) {
   const rows = page.map((it) => ({ id: itemKey(it), row: views.row(it) }));
-  const press = (id: string, row: CardRow) => (selecting ? toggle(id) : row.open && row.open());
-  const keys = (id: string, row: CardRow) => (e: React.KeyboardEvent) => {
-    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
-    e.preventDefault();
-    press(id, row);
-  };
-  const tick = (on: boolean) =>
-    selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
-  /* What makes a row a thing to press. */
-  const pressable = (id: string, row: CardRow) =>
-    selecting || row.open
-      ? {
-          tabIndex: 0,
-          onClick: () => press(id, row),
-          onKeyDown: keys(id, row),
-          ...(selecting ? { "aria-pressed": picked.has(id) } : null),
-        }
-      : {};
+  const { tick, pressable } = rowPress(selecting, picked, toggle);
 
   const acts = !selecting && rows.some((r) => r.row.actions);
   const span = views.columns.length + (selecting ? 1 : 0) + (acts ? 1 : 0);
@@ -2247,7 +2386,10 @@ function CardTable<T>({ views, page, itemKey, selecting, picked, toggle, heading
                     </th>
                   </tr>
                 )}
-                <tr className={`${row.open || selecting ? "opens" : ""}${on ? " picked" : ""}`} data-card={id} {...pressable(id, row)}>
+                <tr className={`${row.open || selecting ? "opens" : ""}${on ? " picked" : ""}`} data-card={id}
+                  {...hold(id)}
+                  onClickCapture={(e) => { swallowed(e); }}
+                  {...pressable(id, row)}>
                   {selecting ? <td className="at-cardtable-tick">{tick(on)}</td> : null}
                   {views.columns.map((c) => (
                     <td key={c.key} className={`at-cardtable-${c.key}`}>{row.cells[c.key]}</td>
@@ -2286,6 +2428,12 @@ export interface FilterGroup {
   custom?: Node;
   /** A line of its own, for a group too wide to share one. */
   wide?: boolean;
+  /** What this group's chip says under a list's bar while it is narrowing
+      — "Without recordings". Its label, where this is left out. */
+  chip?: string;
+  /** This one group back to narrowing nothing: what its chip's cross does.
+      Left out, the chip is drawn with no cross. */
+  onReset?: () => void;
 }
 
 /* The groups with something to offer. A single option is not a choice, and a
@@ -2297,23 +2445,23 @@ const liveGroups = (groups?: FilterGroup[]): FilterGroup[] =>
  * How many of a menu's settings are away from their default.
  *
  * The count on the button that opens it, so a list narrowed by something
- * out of sight is never a mystery. Exported because the button and the
- * panel are now two different places — ItemList draws the first and
- * FilterBar the second — and both have to agree about what "narrowed"
- * means.
+ * out of sight is never a mystery, and the number of chips under a list's
+ * bar. Exported because the button and the panel are two different places
+ * — ItemList draws the first and FilterBar the second — and both have to
+ * agree about what "narrowed" means.
  */
 export function narrowing(groups?: FilterGroup[]): number {
   return liveGroups(groups).filter((g) => g.quiet !== undefined && g.value !== g.quiet).length;
 }
 
 /*
- * A panel of pickers over a list: how to order it, or what to leave out.
+ * A set of pickers over a list: how to order it, or what to leave out.
  *
- * The panel, not the button that opens it. It used to be both, which was
- * right while there was one of them; now a card list carries Sort and Filter
- * as two buttons that open onto two of these, and only one at a time — so
- * the disclosure belongs to ItemList, which draws the row they sit in and is
- * the only thing that can know which of them is open.
+ * The pickers, not the button that opens them nor the panel they are in.
+ * Since 0.728 ItemList puts them in the panel from the foot of the screen —
+ * Filter's live, as they are ticked, and Sort's as a draft until Apply — so
+ * the disclosure belongs to ItemList, which draws the button and is the
+ * only thing that can know which panel is open.
  *
  * Built from Segmented rather than a new control, because picking one of a
  * few is a thing this app already does one way.
@@ -2545,9 +2693,129 @@ export function SheetAction({ icon, label, note, danger, disabled, on, onClick }
   );
 }
 
+/*
+ * One way of ordering a list, as ItemList's Sort panel and the line under
+ * its bar say it (0.728). `label` is its name in the panel ("Changed");
+ * `down` and `up` are the two directions in the panel's words ("Newest
+ * first", "Oldest first"); `saysDown` and `saysUp` are what the line over
+ * the list says while it is in force ("Newest changes"). Four strings
+ * rather than one, because "Most first" said nothing about a date and the
+ * line has to read as a sentence on its own.
+ */
+export interface SortOption {
+  value: string;
+  label: string;
+  down: string;
+  up: string;
+  saysDown: string;
+  saysUp: string;
+}
+export interface ListSort {
+  value: string;
+  down: boolean;
+  options: SortOption[];
+  onApply: (value: string, down: boolean) => void;
+}
+export interface ListFilter {
+  groups: FilterGroup[];
+  onClear: () => void;
+}
+export interface BulkAction {
+  label: string;
+  danger?: boolean;
+  icon?: string;
+  onClick: (ids: string[]) => void;
+}
+
+/*
+ * The Sort panel (0.728). It keeps its own draft of both choices and the
+ * list behind it does not move until Apply: the owner chose the word Apply
+ * and chose that it mean what it says. Shut any other way — its cross,
+ * Escape, a tap outside — and the draft goes with it. Mounted only while
+ * open, so each opening starts again from the order in force.
+ */
+function SortSheet({ sort, onClose }: { sort: ListSort; onClose: () => void }) {
+  const [value, setValue] = useState(sort.value);
+  const [down, setDown] = useState(sort.down);
+  const opt = sort.options.find((o) => o.value === value) || sort.options[0];
+  return (
+    <PickSheet title="Sort" className="at-footsheet at-sortsheet" onClose={onClose}>
+      <div className="at-sheetbody">
+        <FilterBar
+          groups={[
+            {
+              key: "by",
+              label: "Sort by",
+              value,
+              onChange: setValue,
+              options: sort.options.map((o) => ({ value: o.value, label: o.label })),
+            },
+            {
+              key: "order",
+              label: "Order",
+              value: down ? "down" : "up",
+              onChange: (v) => setDown(v === "down"),
+              /* In the words of the one picked above, so they change as it
+                 does: "Newest first" is wrong about a count of forms. */
+              options: opt
+                ? [
+                    { value: "down", label: opt.down },
+                    { value: "up", label: opt.up },
+                  ]
+                : [],
+            },
+          ]}
+        />
+      </div>
+      <div className="at-sheetfoot">
+        <Button
+          variant="primary"
+          wide
+          onClick={() => {
+            sort.onApply(value, down);
+            onClose();
+          }}
+        >
+          Apply
+        </Button>
+      </div>
+    </PickSheet>
+  );
+}
+
+/* How long a finger rests on a tile before the list starts selecting with
+   it ticked, and how far it may wander meanwhile before it counts as a
+   scroll instead. */
+const HOLD_MS = 500;
+const HOLD_SLOP = 10;
+
 /**
- * The standard list frame: New button, search, Select mode, bulk-action
- * tray, empty state, and paging.
+ * The standard list frame: one bar of controls, a quiet line under it, the
+ * list, a slim bar at the foot while selecting, an empty state, and paging.
+ *
+ * The bar is one row since 0.728 (the owner's design): New, the search box,
+ * Filter and three dots. It was two, with Sort, Filter, Select and the view
+ * button as a row of icons under the search box, and Sort and Filter opened
+ * by pushing the list down the page. What changed and why:
+ *
+ * - Sort and Filter open in the panel from the foot of the screen, the one
+ *   every other menu in the app uses, so the list does not jump.
+ * - Filters take effect as they are ticked, and the panel's button counts
+ *   along. Sort waits for Apply, because a list reordering behind a panel
+ *   while somebody is still choosing is a list they have lost their place in.
+ * - The order and the view switch are in a line of small text under the
+ *   bar, with the count. They are about reading the list, not about what is
+ *   in it, and a row of boxes for them was the second row this replaced.
+ * - While filtered, each filter in force is a chip on one sideways line, so
+ *   a short list is never a mystery and one filter comes off in one press.
+ * - Select is in the three dots — a phone has no room for a sixth icon —
+ *   except where it would be alone there, where it is its own icon. A
+ *   finger held on a tile starts selecting too.
+ * - While selecting, the search box and Filter stay: narrowing to what is
+ *   to be ticked is half of selecting. New and the dots give way to a close
+ *   button.
+ * - The tray of buttons at the foot is one Actions button opening a panel,
+ *   which covered half a phone with seven buttons.
  *
  * Generic in the item, so `match`, `renderItem` and `itemKey` all see the
  * same thing the caller passed in `items` rather than an `any`.
@@ -2556,13 +2824,14 @@ export function SheetAction({ icon, label, note, danger, disabled, on, onClick }
  */
 export function ItemList<T>({
   noun,
-  plural,
+  plural: nouns,
   tools,
   more,
   narrow,
-  menus,
+  sort,
+  filter,
   filters,
-  count,
+  total: wholeCount,
   items,
   itemKey = (it) => (it as any).id,
   match,
@@ -2586,32 +2855,33 @@ export function ItemList<T>({
   "person";
   "card". */ noun: string;
   plural?: string;
-  /** Controls in the top row, after New and its three dots: the main
-      thing a screen does with its list, such as "Copy all reports". */
+  /** Worded buttons on a row of their own over the bar: the main thing a
+      screen does with its list, such as "Copy all messages". */
   tools?: Node;
-  /** What the three dots beside New hold — Import, on a list that has it
-      (0.689). Nothing here, no dots. */
+  /** What the three dots hold after Select — Import, on a list that has
+      it (0.689). With nothing here and nothing to select, no dots. */
   more?: (MoreItem | null | false | undefined)[];
   /** Controls that narrow the list in a way of their own, at the end of
-      the search row after Select and the menus — a FilterMenu. */
+      the bar after Filter — a FilterMenu. */
   narrow?: Node;
-  /**
-   * The menus on the search row, after Select — Sort and Filter on a card
-   * list. Each is an icon that opens its `content` in a panel under the
-   * row, and one is open at a time: two panels at once is two answers to
-   * "why is this list short". `busy` is how many of its settings are away
-   * from their default, which the icon carries as a count — `narrowing`
-   * counts a FilterBar's groups for it.
-   */
-  menus?: { key: string; label: string; icon?: string; busy?: number; content?: Node }[];
-  /** Controls under the toolbar — tag pickers and the like. */ filters?: Node;
+  /** How the list is ordered, and how to order it otherwise: the line
+      under the bar says the order, and pressing it opens the Sort panel.
+      See SortOption. */
+  sort?: ListSort;
+  /** The list's filters, as FilterBar groups: the Filter button opens them
+      in a panel, and each group narrowing is a chip under the bar. A
+      group's `chip` is what its chip says and `onReset` takes it off. */
+  filter?: ListFilter;
+  /** Controls under the bar — Add existing cards, on a module's list. */ filters?: Node;
   /**
    * The search, typed somewhere else on the screen. Given, the list draws
    * no search box of its own and narrows by this instead — the Courses tab
    * searches from a button beside its heading.
    */
   query?: string;
-  /** An override for the "n of m" line. */ count?: Node;
+  /** How many there are before the caller's own filters, for "5 of 12".
+      Absent, the items given are all there are. */
+  total?: number;
   items: T[];
   itemKey?: (item: T) => string;
   match?: (item: T, lowercasedQuery: string) => boolean;
@@ -2631,8 +2901,8 @@ export function ItemList<T>({
   groups?: { key: string; label: string }[];
   groupOf?: (item: T) => string;
   size?: "large" | "small";
-  /** The view button and what the line and table views show; absent
-      draws the tiles as they are. See CardViews. */
+  /** The view switch and what the table view shows; absent draws the
+      tiles as they are. See CardViews. */
   views?: CardViews<T>;
   onNew?: () => void;
   /** Where nothing new can go in — a locked deck — New is drawn dimmed,
@@ -2641,11 +2911,13 @@ export function ItemList<T>({
   renderItem: (item: T, state: { selecting: boolean; selected: boolean }) => Node;
   selected?: Set<string>;
   onSelectedChange?: (chosen: Set<string>) => void;
-  bulkActions?: { label: string; danger?: boolean; icon?: string; onClick: (ids: string[]) => void; }[];
+  /** What can be done to the ticked ones, each a row of the Actions panel
+      with its own icon; `danger` ones go last. */
+  bulkActions?: BulkAction[];
   empty?: Node;
   /** Drawn instead of the list's own controls when there is nothing in it
-      at all — a Nudge, holding the way to make the first one. New and the
-      Sort and Filter row stand aside for it. */
+      at all — a Nudge, holding the way to make the first one. The bar
+      stands aside for it. */
   emptyPanel?: Node;
   busy?: boolean;
 }) {
@@ -2657,8 +2929,10 @@ export function ItemList<T>({
   /* How many tiles are on the page. A long list is shown a page at a time:
      every tile rendered at once is what made a big course slow to open. */
   const [limit, setLimit] = useState(PAGE_SIZE);
-  /* Which menu is open, by key. One at a time, and "" for none. */
-  const [openMenu, setOpenMenu] = useState("");
+  /* Which panel is up: Sort, Filter or the bulk Actions. One at a time,
+     and "" for none — two panels at once is two answers to one question. */
+  const [sheet, setSheet] = useState<"" | "sort" | "filter" | "actions">("");
+  const shut = useCallback(() => setSheet(""), []);
   /* How the list is drawn. Read from the device at the first render, so
      the view this list was last left at is the view it opens at. */
   const viewKey = views ? views.key : "";
@@ -2726,16 +3000,17 @@ export function ItemList<T>({
      that cannot do anything. */
   const canSelect = !!(onSelectedChange && bulkActions && bulkActions.length && items.length);
 
-  /* A menu with nothing in it is a button that opens onto nothing. */
-  const live = (menus || []).filter((m) => m && m.key && m.content);
-  const shownMenu = live.find((m) => m.key === openMenu) || null;
-  /* What the view button says. The view it is at, and the one it goes to
+  /* What the view switch says. The view it is at, and the one it goes to
      next — an icon that cycles owes the reader both, and "View: List" alone
      leaves a person pressing it to find out. */
   const viewAt = views ? Math.max(0, VIEWS.findIndex((v) => v.id === view)) : 0;
   const at = VIEWS[viewAt];
   const then = VIEWS[(viewAt + 1) % VIEWS.length];
-  const viewLabel = `View: ${at.name} — press for ${then.name.toLowerCase()}`;
+  /* On a phone the table is drawn as a list (0.733), and called one. */
+  const narrowScreen = useNarrow();
+  const nameOf = (v: { id: ListView; name: string }) => (narrowScreen && v.id === "table" ? "List" : v.name);
+  const viewLabel = `View: ${nameOf(at)} — press for ${nameOf(then).toLowerCase()}`;
+  const TableOrRows = narrowScreen ? CardRows : CardTable;
   const drawn: ListView = views ? at.id : "small";
 
   const startSelecting = () => {
@@ -2745,6 +3020,7 @@ export function ItemList<T>({
 
   const stopSelecting = () => {
     setSelecting(false);
+    setSheet("");
     if (onSelectedChange) onSelectedChange(new Set());
   };
 
@@ -2759,19 +3035,73 @@ export function ItemList<T>({
   const allShown = shown.length > 0 && shown.every((it) => picked.has(itemKey(it)));
 
   /*
-   * Room at the end of the list for the tray that floats over it.
+   * A finger held on a tile starts selecting, with that tile ticked (0.728)
+   * — what a phone's own lists do, and the one way in that does not need
+   * the three dots. Touch and pen only: a mouse has the dots in reach and
+   * a held mouse button is somebody selecting text.
    *
-   * The tray is fixed to the foot of the window, so it is out of the flow
+   * The click that ends the hold is swallowed, or the tile would also open.
+   * The phone's own menu for a held link or picture is kept off while the
+   * hold is running and just after; the CSS keeps iOS's callout off too.
+   */
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdFrom = useRef<{ x: number; y: number } | null>(null);
+  const held = useRef(false);
+  const letGo = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+    holdFrom.current = null;
+  };
+  useEffect(() => letGo, []);
+  const holdable = canSelect && !selecting;
+  const holdProps = (id: string) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      /* A fresh press: whatever the last hold left to swallow has gone. */
+      held.current = false;
+      letGo();
+      if (!holdable || e.pointerType === "mouse") return;
+      holdFrom.current = { x: e.clientX, y: e.clientY };
+      holdTimer.current = setTimeout(() => {
+        holdTimer.current = null;
+        holdFrom.current = null;
+        held.current = true;
+        if (onSelectedChange) onSelectedChange(new Set([id]));
+        setSelecting(true);
+      }, HOLD_MS);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const from = holdFrom.current;
+      if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > HOLD_SLOP) letGo();
+    },
+    onPointerUp: letGo,
+    onPointerCancel: letGo,
+    onPointerLeave: letGo,
+    onContextMenu: (e: React.MouseEvent) => {
+      if (holdTimer.current || held.current) e.preventDefault();
+    },
+  });
+  /* The click after a hold, which is not a tap on the tile. */
+  const swallowed = (e: React.MouseEvent) => {
+    if (!held.current) return false;
+    held.current = false;
+    e.preventDefault();
+    e.stopPropagation();
+    return true;
+  };
+
+  /*
+   * Room at the end of the list for the bar that floats over it.
+   *
+   * The bar is fixed to the foot of the window, so it is out of the flow
    * and the list runs on underneath — which left the last card or two
    * behind it, exactly where somebody selecting things is looking. The
    * shell's own standing room at the bottom (108px) used to be enough and
-   * is not: with three actions the tray is 144px, and on a phone it also
+   * was not once the bar held a tray of buttons; on a phone it also
    * carries the home indicator's inset.
    *
-   * Measured rather than written down. How tall the tray is depends on how
-   * many actions there are, how long their labels are, how wide the window
-   * is — the buttons wrap — and on that inset, so a number here would be
-   * one label away from covering the last card again.
+   * Measured rather than written down. How tall the bar is depends on how
+   * wide the window is, the type size and that inset, so a number here
+   * would be one setting away from covering the last card again.
    */
   const [trayH, setTrayH] = useState(0);
   const watching = useRef<ResizeObserver | null>(null);
@@ -2793,151 +3123,227 @@ export function ItemList<T>({
     watching.current.observe(node);
   }, []);
 
+  const many = nouns || `${noun}s`;
+  const named = (n: number) => `${n} ${n === 1 ? noun : many}`;
+  const whole = wholeCount === undefined ? items.length : wholeCount;
+  const liveFilters = filter ? liveGroups(filter.groups) : [];
+  const filtering = filter ? narrowing(filter.groups) : 0;
+  const sortAt = sort ? sort.options.find((o) => o.value === sort.value) || sort.options[0] : null;
+  const sortSays = sortAt && sort ? (sort.down ? sortAt.saysDown : sortAt.saysUp) : "";
+
   const searchBox = (
     <SearchBox
       className="at-search"
       /* Cards are searched by typing the language they are written in,
          so the box has to lay itself out by what is in it. */
       dir="auto"
-      placeholder={`Search ${plural || `${noun}s`}`}
+      placeholder={`Search ${many}`}
       value={query}
       onChange={setQuery}
     />
   );
+
+  /* The bar's parts, each only where it applies. */
+  const withNew = !!(onNew || newOff) && !bare && !selecting;
+  /* Kept while a filter has emptied the list, so what was typed and the
+     way back out are both still there: "0 of 14", Clear and the chips. */
+  const any = items.length > 0 || whole > 0;
+  /* No match, no box: a search that cannot narrow anything is a bar with
+     nothing in it. Teaching's Home leaves it out under six courses (0.733). */
+  const box = any && !outside && !!match;
+  const filterBtn = liveFilters.length > 0 && !bare;
+  /* The dots: Select first, where there is anything to select, then the
+     list's own. Select alone is its own icon rather than dots opening onto
+     one row. */
+  const dotItems = [canSelect ? { label: "Select", icon: "select", onClick: startSelecting } : null]
+    .concat((more || []).filter(Boolean) as MoreItem[])
+    .filter(Boolean) as MoreItem[];
+  const loneSelect = dotItems.length === 1 && canSelect;
+  const dots = !bare && !selecting && dotItems.length > 0;
+  const closeBtn = selecting && canSelect;
+  const barHolds = withNew || box || filterBtn || !!narrow || dots || closeBtn;
+
+  /* The line under the bar: only where it has something to say beyond a
+     count, so a plain list such as People does not gain one. */
+  const narrowed = shown.length !== whole;
+  const line = !bare && any && (!!sort || !!views || narrowed || (selecting && canSelect));
+
+  const actions = [...(bulkActions || []).filter((a) => !a.danger), ...(bulkActions || []).filter((a) => a.danger)];
 
   return (
     <div
       className="at-listwrap"
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
-      {/* The top row (0.689): New and the three dots holding the list's
-          less used actions, together at the start; the screen's own
-          button after them; and at the far end how to draw the list —
-          which is about reading it rather than about what is in it. Its
-          icon is a picture of the view the list is in. Left out when it
-          would hold nothing. */}
-      {(() => {
-        const withNew = (onNew || newOff) && !bare;
-        const dots = !bare && more && more.some(Boolean);
-        const viewBtn = views && items.length > 0;
-        if (!withNew && !dots && !tools && !viewBtn) return null;
-        return (
-          <div className="at-toolbar at-toolbar-top">
-            {withNew && (
-              <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
-                onClick={newOff || onNew}>
-                <Icon name="add" />
-                New {noun}
-              </button>
-            )}
-            {dots ? (
-              <MoreMenu
-                label={`More for these ${plural || `${noun}s`}`}
-                title={(plural || `${noun}s`).replace(/^./, (c) => c.toUpperCase())}
-                items={more || []}
-              />
-            ) : null}
-            {tools}
-            {viewBtn && (
-              <button
-                className="at-icon at-viewbtn"
-                title={viewLabel}
-                aria-label={viewLabel}
-                onClick={() => {
-                  setView(then.id);
-                  saveView(viewKey, then.id);
-                }}
-              >
-                <Icon name={at.icon} />
-              </button>
-            )}
-          </div>
-        );
-      })()}
+      {/* The screen's own worded button, on a row of its own: "Manage this
+          module's cards" is a sentence, and squeezed in beside the search
+          box it would leave the box no room. */}
+      {tools ? <div className="at-toolbar at-toolsrow">{tools}</div> : null}
 
-      {/* The search row (0.689): the box on a line of its own, wide enough
-          to read what was typed in it on a phone, and after it, as icons,
-          Select and the menus that order and narrow the list. Select is not
-          a filter and comes first; the menus are in the order they are
-          given. */}
-      {(() => {
-        const box = items.length > 0 && !outside;
-        const sel = canSelect && !bare;
-        const menusHere = live.length > 0 && !bare;
-        if (!box && !sel && !menusHere && !narrow) return null;
-        const selLabel = selecting ? "Done selecting" : "Select";
-        return (
-          <div className="at-toolbar at-toolbar-search">
-            {box ? searchBox : <span className="at-toolbarfill" />}
-            {sel && (
-              <button
-                type="button"
-                className={`at-icon ghost at-selectbtn${selecting ? " on" : ""}`}
-                title={selLabel}
-                aria-label={selLabel}
-                aria-pressed={selecting}
-                onClick={() => (selecting ? stopSelecting() : startSelecting())}
-              >
-                <Icon name={selecting ? "close" : "select"} />
-              </button>
-            )}
-            {menusHere && live.map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                className={`at-icon ghost at-menubtn${m.busy ? " on" : ""}${openMenu === m.key ? " open" : ""}`}
-                title={m.busy ? `${m.label} (${m.busy} on)` : m.label}
-                aria-label={m.label}
-                aria-expanded={openMenu === m.key}
-                onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
-              >
-                <Icon name={m.icon || "tune"} />
-                {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
-              </button>
-            ))}
-            {narrow}
-          </div>
-        );
-      })()}
-
-      {shownMenu ? <div className="at-listmenu">{shownMenu.content}</div> : null}
-
-      {filters}
-
-      {canSelect && selecting && (
-        <div className="at-listtools">
-          {shown.length > 0 && (
+      {barHolds ? (
+        <div className={`at-toolbar at-listbar${selecting ? " selecting" : ""}`}>
+          {closeBtn ? (
             <button
-              className="at-btn sm ghost"
-              onClick={() =>
-                onSelectedChange(
-                  allShown ? new Set() : new Set(shown.map((it) => itemKey(it)))
-                )
-              }
+              type="button"
+              className="at-icon ghost at-donebtn"
+              title="Done selecting"
+              aria-label="Done selecting"
+              onClick={stopSelecting}
             >
-              <Icon name="check" />
-              {allShown ? "Select none" : `Select all ${shown.length}`}
+              <Icon name="close" />
             </button>
-          )}
-          {(query || count) && (
-            <span className="at-hint">
-              {count || `${shown.length} of ${items.length}`}
-            </span>
+          ) : null}
+          {withNew ? (
+            /* + alone on a phone, "+ New card" where there is room: the
+               words are hidden by the stylesheet, not left out, so the name
+               is the same to a screen reader at every width. */
+            <button
+              type="button"
+              className={`at-btn primary at-newbtn${newOff ? " off" : ""}`}
+              aria-disabled={newOff ? true : undefined}
+              aria-label={`New ${noun}`}
+              title={`New ${noun}`}
+              onClick={newOff || onNew}
+            >
+              <Icon name="add" />
+              <span className="at-btnword">New {noun}</span>
+            </button>
+          ) : null}
+          {box ? searchBox : <span className="at-toolbarfill" />}
+          {filterBtn ? (
+            <button
+              type="button"
+              className={`at-icon ghost at-filterbtn${filtering ? " on" : ""}${sheet === "filter" ? " open" : ""}`}
+              title={filtering ? `Filter (${filtering} on)` : "Filter"}
+              aria-label="Filter"
+              aria-haspopup="dialog"
+              aria-expanded={sheet === "filter"}
+              onClick={() => setSheet("filter")}
+            >
+              <Icon name="tune" />
+              <span className="at-btnword">Filter</span>
+              {filtering ? <span className="at-filtercount">{filtering}</span> : null}
+            </button>
+          ) : null}
+          {narrow}
+          {dots && loneSelect ? (
+            <button
+              type="button"
+              className="at-icon ghost at-selectbtn"
+              title="Select"
+              aria-label="Select"
+              onClick={startSelecting}
+            >
+              <Icon name="select" />
+            </button>
+          ) : dots ? (
+            <MoreMenu label={`More for these ${many}`} title={many.replace(/^./, (c) => c.toUpperCase())} items={dotItems} />
+          ) : null}
+        </div>
+      ) : null}
+
+      {line ? (
+        <div className="at-listline">
+          {selecting && canSelect ? (
+            <>
+              <span className="at-listcount">{picked.size} selected</span>
+              {shown.length > 0 ? (
+                <button
+                  type="button"
+                  className="at-linebtn at-lineend"
+                  onClick={() =>
+                    onSelectedChange && onSelectedChange(allShown ? new Set() : new Set(shown.map((it) => itemKey(it))))
+                  }
+                >
+                  {allShown ? "Select none" : `Select all ${shown.length}`}
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <span className="at-listcount">{narrowed ? `${shown.length} of ${whole}` : named(whole)}</span>
+              {filter && filtering > 0 ? (
+                <button type="button" className="at-linebtn at-lineclear" onClick={filter.onClear}>
+                  Clear
+                </button>
+              ) : null}
+              {sort && sortAt ? (
+                <button
+                  type="button"
+                  className="at-linebtn at-sortbtn at-lineend"
+                  aria-label={`Sort: ${sortSays}`}
+                  aria-haspopup="dialog"
+                  onClick={() => setSheet("sort")}
+                >
+                  {sortSays}
+                  <Icon name="chevronDown" size={16} />
+                </button>
+              ) : null}
+              {views ? (
+                <button
+                  type="button"
+                  className={`at-linebtn at-viewbtn${sort ? "" : " at-lineend"}`}
+                  title={viewLabel}
+                  aria-label={viewLabel}
+                  onClick={() => {
+                    setView(then.id);
+                    saveView(viewKey, then.id);
+                  }}
+                >
+                  <Icon name={narrowScreen && at.id === "table" ? "viewList" : at.icon} />
+                </button>
+              ) : null}
+            </>
           )}
         </div>
-      )}
+      ) : null}
+
+      {/* Each filter in force, as a chip that takes it off. One line that
+          scrolls sideways rather than wrapping: three filters wrapping onto
+          three lines would push the list down by as much as the panel they
+          replaced. */}
+      {filter && filtering > 0 && !bare ? (
+        <div className="at-filterchips" role="list" aria-label="Filters in force">
+          {liveFilters
+            .filter((g) => g.quiet !== undefined && g.value !== g.quiet)
+            .map((g) => {
+              const says = g.chip || g.label || "";
+              return g.onReset ? (
+                <button
+                  type="button"
+                  role="listitem"
+                  key={g.key || says}
+                  className="at-filterchip"
+                  aria-label={`Remove filter: ${says}`}
+                  onClick={g.onReset}
+                >
+                  <span>{says}</span>
+                  <Icon name="close" size={14} />
+                </button>
+              ) : (
+                <span role="listitem" key={g.key || says} className="at-filterchip">
+                  <span>{says}</span>
+                </span>
+              );
+            })}
+        </div>
+      ) : null}
+
+      {filters}
 
       {/* Nothing to draw, no table: its heading row with no rows under
           it read as a table with something missing, above the empty
           panel or the "nothing matches" line. */}
       {views && drawn === "table" ? (
-        page.length === 0 ? null : <CardTable
+        page.length === 0 ? null : <TableOrRows
           views={views}
           page={page}
           itemKey={itemKey}
           selecting={selecting}
           picked={picked}
           toggle={toggle}
+          hold={holdProps}
+          swallowed={swallowed}
           headingAt={(it, i) => {
             const of = groupRef.current;
             const run = counted && of ? of(it) : null;
@@ -2962,15 +3368,13 @@ export function ItemList<T>({
             <div
               className={`at-tilewrap${selecting ? " selecting" : ""}${on ? " picked" : ""}`}
               key={id}
-              onClickCapture={
-                selecting
-                  ? (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggle(id);
-                    }
-                  : undefined
-              }
+              {...holdProps(id)}
+              onClickCapture={(e) => {
+                if (swallowed(e) || !selecting) return;
+                e.preventDefault();
+                e.stopPropagation();
+                toggle(id);
+              }}
             >
               {selecting && (
                 <button
@@ -3010,44 +3414,60 @@ export function ItemList<T>({
       {bare && !busy && emptyPanel}
       {!shown.length && !busy && !bare && (
         <p className="at-hint">
-          {query ? `No ${plural || `${noun}s`} match "${query}".` : empty}
+          {query ? `No ${many} match "${query}".` : empty}
         </p>
       )}
 
+      {/* The slim bar at the foot while anything is ticked: how many, and
+          one button for what can be done to them (0.728). It was a tray of
+          every action as a button, seven of them on the Cards tab, which
+          covered half a phone's screen over the very cards being chosen. */}
       {selecting && picked.size > 0 && (
         <div className="at-bulkfloat" ref={trayRef}>
-          <div className="at-bulkhead2">
-            <span className="at-bulktitle">Bulk actions</span>
-            <span className="at-bulkcount">{picked.size} selected</span>
-          </div>
-          <div className="at-bulkrow">
-            {(bulkActions || []).map((a) =>
-              a.danger ? (
-                <button
-                  key={a.label}
-                  className="at-icon danger at-bulkdel"
-                  disabled={busy}
-                  title={a.label}
-                  aria-label={a.label}
-                  onClick={() => a.onClick([...picked])}
-                >
-                  <Icon name="delete" />
-                </button>
-              ) : (
-                <button
-                  key={a.label}
-                  className="at-btn sm"
-                  disabled={busy}
-                  onClick={() => a.onClick([...picked])}
-                >
-                  <Icon name={a.icon || "folder"} />
-                  {a.label}
-                </button>
-              )
-            )}
-          </div>
+          <span className="at-bulkcount">{picked.size} selected</span>
+          <Button variant="primary" size="sm" className="at-bulkgo" onClick={() => setSheet("actions")}>
+            Actions
+          </Button>
         </div>
       )}
+
+      {sheet === "sort" && sort ? <SortSheet sort={sort} onClose={shut} /> : null}
+
+      {/* Filters take hold as they are ticked, as they did under the bar,
+          and the button counts what is left; it only closes the panel. */}
+      {sheet === "filter" && filter ? (
+        <PickSheet title="Filter" className="at-footsheet at-filtersheet" onClose={shut}>
+          <div className="at-sheetbody">
+            <FilterBar groups={filter.groups} onClear={filter.onClear} />
+          </div>
+          <div className="at-sheetfoot">
+            <Button variant="primary" wide onClick={shut}>
+              {`Show ${named(shown.length)}`}
+            </Button>
+          </div>
+        </PickSheet>
+      ) : null}
+
+      {sheet === "actions" && selecting && picked.size > 0 ? (
+        <PickSheet title={`${picked.size} selected`} className="at-actionsheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {actions.map((a) => (
+              <SheetAction
+                key={a.label}
+                icon={a.icon || "folder"}
+                label={a.label}
+                danger={a.danger}
+                disabled={busy}
+                onClick={() => {
+                  const ids = [...picked];
+                  setSheet("");
+                  a.onClick(ids);
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
+      ) : null}
     </div>
   );
 }
@@ -6572,9 +6992,11 @@ export interface ModuleWords {
   none: string;
   /** The button once something is chosen. */
   another: string;
+  /** The sheet's first row, where `onCreate` is given. */
+  create: string;
 }
 
-export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = moduleSize, saving, onAdd, disabled = false }: {
+export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = moduleSize, saving, onAdd, onCreate, solid = false, disabled = false }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -6610,6 +7032,14 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
       button calls it, and is there even with no decks yet: making the
       first one is what that screen is for. */
   onAdd?: () => void;
+  /** Making a new one from the sheet: its first row, which closes the
+      sheet and hands over — a course's modules make one on the way
+      (0.727, the owner's 3a). */
+  onCreate?: () => void;
+  /** The add button as the solid green button an empty box offers, while
+      nothing is chosen — the dotted outline belongs beside pills, which an
+      empty box has none of (0.727, the owner's 2a). */
+  solid?: boolean;
   /** Nothing can be chosen or taken off here for now — Build a session's
       "All cards" box, ticked, stands in for both of its pickers. What was
       chosen stays shown, greyed, so unticking the box gives it back. */
@@ -6630,6 +7060,7 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
     note: `A student sees this ${of} only where it is in a module their course uses.`,
     none: `You have no modules yet. Make one under Modules, then this ${of} can go in it.`,
     another: "Another module",
+    create: "Create a new module",
     ...words,
   };
 
@@ -6679,7 +7110,18 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
             yet: what it makes is what stands beside it. Its words are the
             whole invitation while the card is in nothing, and shorten to
             the bare offer once the row can speak for itself. */}
-        {(all.length > 0 || onAdd) && (
+        {(all.length > 0 || onAdd) && solid && !inThese.length ? (
+          <Button
+            size="sm"
+            variant="primary"
+            icon="add"
+            aria-expanded={onAdd ? undefined : open}
+            disabled={disabled}
+            onClick={() => !disabled && (onAdd ? onAdd() : setOpen(true))}
+          >
+            {say.first}
+          </Button>
+        ) : (all.length > 0 || onAdd) && (
           <button
             className="at-deckadd"
             aria-expanded={onAdd ? undefined : open}
@@ -6716,6 +7158,21 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
             />
           )}
           <div className="at-deckpicks">
+            {/* First, above the search's answers, so it is in view however
+                long the list: a new one is made with the kind asked, as New
+                module does, and lands where this sheet puts things. */}
+            {onCreate && (
+              <button
+                className="at-deckpick new"
+                onClick={() => {
+                  setOpen(false);
+                  onCreate();
+                }}
+              >
+                <Icon name="add" size={18} />
+                <span className="at-tickbody"><b>{say.create}</b></span>
+              </button>
+            )}
             {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
             {listed.map((d) => {
               const on = chosen.includes(d.id);

@@ -8,6 +8,222 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.733 — 27 November 2026
+
+**A simpler Home, New module panel and Cards list for teachers.**
+
+**Teaching › Home**
+
+- The "Join a course as a teacher" section is gone. A dashed **Join another
+  course** button sits at the end of My courses and opens a panel from the
+  foot of the screen with the code box. A teacher with no course yet sees a
+  box saying so, with a **Join a course** button that opens the same panel.
+- When there is nothing to do, To do is a slim band: the same dashed box
+  and cup on one row, about a third of the height it was. With something to
+  do it looks as before.
+- **Search courses** shows only with more than five courses.
+
+**The New module panel**
+
+- Each kind has a picture and a new description:
+  - **Deck:** "Cards on one topic, independent of your other decks."
+  - **Unit:** "One lesson on a course's path. Each unit builds on the ones
+    before it, so students do them in order."
+  - **Personal set:** "For words that are different for each student, like
+    My family. Students answer about your pictures once, then practise
+    their own words."
+
+**Teaching › Material › Cards, and the cards inside a module**
+
+- Two tiles a row on a phone, all the same height: the word on one line and
+  the meaning on one line, cut with … when too long. Thinner outlines, more
+  room. The three dots stay on each tile.
+- A card with no English shows its transliteration in italics in the
+  meaning's place; with none, "Picture" or "Recording" with a small symbol;
+  with neither, nothing.
+- The badge for a card students cannot fully see yet (Draft, Ready for
+  review, Changes in draft, Changes ready for review, Recording missing)
+  stays on the tile, at its foot. Published cards show none.
+- On a phone the second view is a **list**, not a table: one card a row
+  with its meaning, and under it its modules, its kind when it is not a
+  plain word, and the same badge. A tablet or computer keeps the full
+  table.
+
+The learner's side is unchanged.
+
+**Trade-offs:** the join code box is one press away; six to eight cards
+show per phone screen where twelve did; on a phone, sorting is done from
+the Sort control, since the list has no column headings.
+
+**To check by hand:** on a real phone, that the join panel stays above the
+keyboard, and that pressing and holding a tile or a list row still starts
+selecting.
+
+## 0.732 — 27 November 2026
+
+**Simpler teacher screens.** A module, the word sets and a card being read
+each ask less of the eye, as chosen on the page of mock-ups.
+
+**A module's screen**
+
+- **Its name is the heading**, with a small pencil beside it. Tap the
+  pencil and the name becomes a box with Save and Cancel, right there.
+- **Three dots at the top right** hold Export and Delete. Delete still asks
+  first.
+- **The card list is on the module's own screen**: the green + for a new
+  card, Add existing cards, Select (in the list's three dots) and Import.
+  The separate "Manage cards" screen and the Edit button are gone.
+- **The language and the number of cards are on one line** under the name,
+  and "Made by … · last changed by …" is at the foot of the screen.
+
+**Word sets**
+
+- **Numbers**: the screen is called "Numbers · (language)", like its tile,
+  and opens with two lines instead of a paragraph. Each part says one plain
+  thing — "Ready", "10 words still to write" or "Needs Numbers 0 to 9
+  first". The next part worth writing is marked **Start here**, and parts
+  that cannot work yet are drawn fainter (they still open). The section at
+  the foot is called "Fix a number".
+- **Pronouns**: each pronoun shows its word, its transliteration and
+  Record. Its English is one line with **Change**, which opens the three
+  English boxes. The long introduction is one sentence; **How sentences use
+  them** opens a panel from the foot of the screen.
+- **The tiles on the Word sets tab** say "Not started" instead of "0 of 11
+  ranges written", and "not in a module yet".
+
+**A card, before Edit**
+
+- **The card is shown as a card**: the word large, how it is said and what
+  it means. Under it, its modules, and a short "to improve" list where
+  there is something to improve (for now: a word written without its
+  vowel marks), with a button that turns the screen to editing.
+- **The red stars, the "Build an advanced card" tick-box and the "This
+  card" heading show only after Edit.** Export is behind three dots on the
+  card. A word that is only its spelling, its sound and its meaning no
+  longer repeats itself in a Content section under the card; one with a
+  recording, a picture or a second answer keeps that section. An empty
+  Description is not shown.
+- **On the Exercises tab** the exercise tiles are exactly as they were.
+  "What is practised" is one row per form saying in words where it comes
+  up ("On its own and in sentences", "In sentences only", "Not
+  practised"); the tick-boxes come back after Edit.
+- **Editing a card looks exactly as it did.**
+
+**Trade-offs**
+
+- Renaming, exporting and deleting a module are each one press further
+  away.
+- A card being read no longer looks like the card being edited.
+- The line "Students choose and write this word" from the mock-up is not
+  shown: it belongs to the Description, which shows only when one is
+  written. The card's first tab keeps its name, "Basic".
+
+**To check by hand**
+
+- On a real phone: that the pencil and the three dots are easy to hit, and
+  the Pronouns screen with the keyboard open.
+
+## 0.731 — 27 November 2026
+
+**Modules has the line Cards has.** Teaching › Material › Modules now shows
+the same quiet line under its bar: how many modules there are, and the
+order they are in, which you tap to change.
+
+- **Three orders:** Added (oldest or newest first), Changed (newest or
+  oldest changes first) and Name (A to Z or Z to A). Like on Cards, a new
+  order waits for Apply.
+- **It starts as before:** oldest added first, the order the tab has always
+  had.
+
+## 0.730 — 27 November 2026
+
+**The app opens on older iPhones and iPads.** On Safari older than 16.4
+(an iPhone or iPad on iOS 16.3 or earlier, or a Mac not updated since
+early 2023) the app showed a blank page and nothing else. It now starts
+there. On the oldest of them, iOS 15 and before, some of the app's look
+may still be missing; that has not been seen on a real device.
+
+**Sounds come back after an interruption on an iPhone.** After a phone
+call, Siri, or the app being left in the background, the sounds for a
+right or wrong answer could stay silent until the app was closed and
+opened again. They now come back with the next answer. To be checked on a
+real iPhone: it cannot be made to happen on a computer.
+
+Both came out of a check of the whole app in Safari's own engine
+(`docs/AUDIT-safari-ios.md`). Practising, the tabs and the teacher's card
+screens ran in it without a fault, in a private window too.
+
+## 0.729 — 27 November 2026
+
+**Every module says what kind it is, by its name.** In Teaching › Material
+› Modules, each tile now has a small outlined badge right after the
+module's name: **Deck**, **Unit** or **Personal set**. The words "Unit"
+and "Personal set" are gone from the line under the name, which now says
+only what needs looking at, who can see the module, and its score. On a
+phone, a long name pushes the badge onto the next line. Other lists of
+modules, such as a course's, are unchanged for now.
+
+
+## 0.728 — 27 November 2026
+
+**A simpler bar above every list.** Teaching › Material › Cards had two
+rows of controls over its cards; now it has one, and every list in the app
+that uses the same bar changes with it.
+
+- **One row:** a green **+** for a new card, the search box, **Filter** and
+  three dots. On a phone the + is the button on its own; on a wider screen
+  it still says New card.
+- **A quiet line under it** says how many cards there are and the order
+  they are in ("14 cards · Newest changes"), with the grid/table switch at
+  its end. Tap the order to change it.
+- **Sort and Filter open in the panel from the foot of the screen**, like
+  every other menu, instead of pushing the list down.
+- **Filters take effect as you tick them.** The panel's button counts along
+  ("Show 5 cards") and just closes it.
+- **Sorting waits for Apply.** Close the Sort panel any other way and the
+  order stays as it was. The order's words now fit what is being sorted:
+  "Newest first" for dates, "With first" for recordings, "Most first" for
+  forms.
+- **While the list is filtered**, the line reads "5 of 14" with **Clear**,
+  and each filter that is on is a chip in a row you can swipe sideways. Tap
+  a chip's cross to take just that filter off.
+- **Select is in the three dots.** On a list where it would be the only
+  thing there, such as People, it is its own button. On a phone or tablet,
+  **pressing and holding a card** also starts selecting, with that card
+  ticked.
+- **While selecting**, the search box and Filter stay, so you can narrow the
+  list and tick what is left; ticks survive a search. A cross ends it, and
+  the line says "3 selected" with Select all.
+- **One Actions button** at the foot replaces the tray of seven buttons. It
+  opens a panel listing every action, each with its own picture, Delete
+  last. Delete still asks first.
+- Inside a module, **Add existing cards** says "to this deck" (or unit, or
+  personal set) where there is room.
+
+Trade-offs: Select and Import are one press further away; New card is an
+icon on a phone; a new order needs Apply; each bulk action is one press
+further.
+
+To check by hand: on an iPhone and on Android, that holding a card starts
+selecting without the phone's own text-selection or link menu appearing;
+that the Filter panel scrolls smoothly with its button in view, including
+with the keyboard open after searching; that the row of chips swipes
+sideways without moving the page; and that the bar at the foot clears the
+phone's home indicator.
+## 0.727 — 27 November 2026
+
+**An empty course offers one button, not two.** In a course's Modules
+section, with no modules in it yet:
+
+- If you already have modules, the box offers only **Add a module**, a
+  green button like every other empty box's. Its list now starts with
+  **Create a new module**.
+- If you have none, it offers only **Create a module**.
+
+**Create a new module** asks what kind, as New module does. The new module
+is put in the course and opens, ready for cards. The same row is in the list
+behind **Another module** once the course has modules.
+
 ## 0.726 — 27 November 2026
 
 **A module's courses change as you tap.** Opening a module in Teaching ›

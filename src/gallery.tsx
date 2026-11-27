@@ -57,7 +57,6 @@ import {
   Tabs,
   Tile,
   TileNote,
-  narrowing,
   plural,
   useSnackbarState,
   ReachBar,
@@ -179,6 +178,8 @@ const PLACES: Record<string, [string, string]> = {
   CoursesPage: [TEACH, "Teaching\u2019s Home, under To do, and a learner\u2019s Courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewModule: [TEACH, "Making a new module"],
+  OpenRow: [TEACH, "New module \u00b7 each kind, with its picture and what it is"],
+  CardTile: [PARTS, "A card's tile \u00b7 what stands for a missing meaning, a picture or a recording"],
   ExportScreen: [TEACH, "Exporting cards or modules"],
   ImportScreen: [TEACH, "Importing cards or modules"],
   LockMark: [TEACH, "A locked module's padlock"],
@@ -203,6 +204,7 @@ const PLACES: Record<string, [string, string]> = {
   SentencePicker: [TEACH, "Editing a card · picking a sentence card as a line"],
   CapitalsBlock: [TEACH, "Editing a card · the tick for whether its English keeps its capital letters in a sentence"],
   BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its modules"],
+  CardHero: [TEACH, "A card being read · the card itself at the top: its word, how it is said, what it means"],
   DescriptionBlock: [TEACH, "Editing a card · Basic or Advanced · the word's description in the language itself, and its English"],
   MeaningsBlock: [TEACH, "Editing a card · Advanced · the other cards with the same word or meaning, the clue, and adding another"],
   CarryAsk: [TEACH, "Editing a card · whether a spelling fix goes onto the other cards with the same word"],
@@ -327,6 +329,7 @@ const PLACES: Record<string, [string, string]> = {
   ItemList: [PARTS, "A searchable list"],
   SearchBox: [PARTS, "A search field, with a cross to clear it"],
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
+  SortSheet: [PARTS, "A list's Sort panel, which waits for Apply"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
   MoreMenu: [PARTS, "Three dots, opening a menu of actions"],
   ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],
@@ -654,6 +657,8 @@ export function ComponentGallery() {
   const demo = useSnackbarState();
   const [keys, setKeys] = useState(false);
   const [order, setOrder] = useState("added");
+  const [orderDown, setOrderDown] = useState(true);
+  const [picks, setPicks] = useState<Set<string>>(() => new Set());
   const [only, setOnly] = useState("any");
   const [maker, setMaker] = useState("");
   const [seg, setSeg] = useState("on");
@@ -785,8 +790,8 @@ export function ComponentGallery() {
 
       <Row
         name="FilterBar"
-        what="The panel a list's Sort or Filter button opens onto: how to order it, or what to leave out."
-        note="Goes in one of ItemList's menus, as its content — ItemList owns the button and keeps one panel open at a time. Give a group a `quiet` value to say which setting counts as not narrowing, and pass the groups through narrowing() to get the count the button carries. A group with `custom` draws that instead of the buttons, for a choice a few buttons cannot say; `wide` gives it a line of its own."
+        what="The pickers a list's Sort or Filter panel holds: how to order it, or what to leave out."
+        note="ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips. Give a group a `quiet` value to say which setting counts as not narrowing; narrowing() counts the groups away from it, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the buttons, for a choice a few buttons cannot say; `wide` gives it a line of its own."
       >
         <V label="two groups" wide>
           <FilterBar
@@ -1083,14 +1088,15 @@ export function ComponentGallery() {
 
       <Row
         name="ItemList"
-        what="The standard list frame: New, its three dots and the view button on one row; the search box, then Select and the menus as icons, on the next; bulk actions, empty state, paging at 120."
-        note="match is (item, lowercasedQuery) => boolean. more is the three dots' items, [{ label, icon, danger, onClick }] — Import, where a list has it. tools is the screen's own button after them; narrow a FilterMenu at the end of the search row. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — grid or table — with { key, columns, row(item) } saying what a table row shows; key is where the list remembers its view."
+        what="The standard list frame: one bar — New, the search box, Filter and three dots holding Select — and a quiet line under it with the count, the order and the view switch. Sort and Filter open in the panel from the foot of the screen; filters in force are chips; while selecting, a slim bar at the foot opens the Actions panel. Empty state, and paging at 120."
+        note="match is (item, lowercasedQuery) => boolean. more is the three dots' items after Select, [{ label, icon, danger, onClick }] — Import, where a list has it; with nothing in more, Select is an icon of its own. tools is the screen's worded button, on a row of its own above the bar; narrow a FilterMenu at the end of the bar. sort is { value, down, options, onApply } — each option { value, label, down, up, saysDown, saysUp }, and the panel waits for Apply. filter is { groups, onClear }, FilterBar's groups, taking hold as they are ticked. total is how many there are before the caller's own filters, for “5 of 12”. bulkActions is [{ label, icon, danger, onClick(ids) }] — rows of the Actions panel, danger last. views adds the view switch — grid or table — with { key, columns, row(item) } saying what a table row shows; key is where the list remembers its view. A finger held on a tile starts selecting."
       >
-        <V label="items + renderItem" wide>
+        <V label="sort + filter + bulk actions" wide>
           <ItemList
             noun="deck"
             plural="decks"
-            items={listItems}
+            items={only === "any" ? listItems : listItems.slice(0, 1)}
+            total={listItems.length}
             itemKey={(d) => d.id}
             match={(d, q) => d.title.toLowerCase().includes(q)}
             size="small"
@@ -1099,31 +1105,43 @@ export function ComponentGallery() {
               columns: [{ key: "title", label: "Title" }],
               row: (d) => ({ cells: { title: d.title } }),
             }}
+            onNew={() => {}}
             more={[{ label: "Import", icon: "upload", onClick: () => {} }]}
-            menus={[
-              {
-                key: "sort",
-                label: "Sort",
-                icon: "sort",
-                busy: narrowing([{ key: "order", value: order, quiet: "added" }]),
-                content: (
-                  <FilterBar
-                    groups={[
-                      {
-                        key: "order",
-                        label: "Sort",
-                        value: order,
-                        onChange: setOrder,
-                        quiet: "added",
-                        options: [
-                          { value: "added", label: "Added" },
-                          { value: "changed", label: "Changed" },
-                        ],
-                      },
-                    ]}
-                  />
-                ),
+            sort={{
+              value: order,
+              down: orderDown,
+              options: [
+                { value: "added", label: "Added", down: "Newest first", up: "Oldest first", saysDown: "Newest added", saysUp: "Oldest added" },
+                { value: "changed", label: "Changed", down: "Newest first", up: "Oldest first", saysDown: "Newest changes", saysUp: "Oldest changes" },
+              ],
+              onApply: (v, down) => {
+                setOrder(v);
+                setOrderDown(down);
               },
+            }}
+            filter={{
+              groups: [
+                {
+                  key: "only",
+                  label: "Shown",
+                  value: only,
+                  onChange: setOnly,
+                  quiet: "any",
+                  chip: "The first only",
+                  onReset: () => setOnly("any"),
+                  options: [
+                    { value: "any", label: "All" },
+                    { value: "first", label: "The first only" },
+                  ],
+                },
+              ],
+              onClear: () => setOnly("any"),
+            }}
+            selected={picks}
+            onSelectedChange={setPicks}
+            bulkActions={[
+              { label: "Export", icon: "download", onClick: () => {} },
+              { label: "Delete", icon: "delete", danger: true, onClick: () => {} },
             ]}
             renderItem={(d) => <Tile title={d.title} meta="12 cards" />}
             empty={<Empty title="No modules">Nothing here yet.</Empty>}
