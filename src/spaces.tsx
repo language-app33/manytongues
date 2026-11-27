@@ -7443,19 +7443,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       out.push({ key: "imported", icon: "upload", text: importedWaiting === 1
         ? "1 imported card is waiting for review. Students won't see it until you publish it."
         : `${importedWaiting} imported cards are waiting for review. Students won't see them until you publish them.` });
-    const byId = new Map(allCards.map((c) => [c.id, c]));
-    for (const c of onCourses) {
-      const held = allModules.filter((d) => !d.personal && (d.courses || []).some((l) => l.courseId === c.id));
-      const its = [...new Set(held.flatMap((d) => d.cardIds || []))].map((id) => byId.get(id)).filter(Boolean) as Card[];
-      const off = notReaching({ parts: held.flatMap((d) => d.parts || []), partsWaiting: held.flatMap((d) => d.partsWaiting || []) }, its);
-      if (off)
-        out.push({ key: `course:${c.id}`, icon: "school", course: c.id,
-          text: `${plural(off.n, "card")} in ${c.title} ${off.n === 1 ? "doesn't" : "don't"} reach students yet: ${off.why}.` });
-    }
+    /* A course's cards that don't reach students yet are not listed here
+       (0.720, the owner's 1c): drafts, cards waiting for review and number
+       words to write are three jobs with three remedies, and a draft kept
+       on purpose held To do open for good. The course's own screen, and
+       each module's, still say it. */
     if (twoMeanings.length > 0)
       out.push({ key: "meanings", icon: "cards", text: `${plural(twoMeanings.length, "card")} ${twoMeanings.length === 1 ? "has" : "have"} more than one meaning on ${twoMeanings.length === 1 ? "it" : "them"}.` });
     return out;
-  }, [mineSide, personalOnly, lostCards, waitingOn, importedWaiting, allCards, allModules, onCourses, twoMeanings]);
+  }, [mineSide, personalOnly, lostCards, waitingOn, importedWaiting, allModules, onCourses, twoMeanings]);
   const [todoKept, setTodoKept] = useState(0);
   useEffect(() => {
     if (todo) setTodoKept(todo.length);
@@ -10668,8 +10664,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         setOpenModule(m);
                       }}>Add cards</Button>;
                     }
-                    if (item.course)
-                      return <Button size="sm" variant="primary" onClick={() => setCourseView(item.course)}>Open the course</Button>;
                     return null;
                   }}
                 />

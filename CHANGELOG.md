@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.720 — 27 November 2026
+
+**To do no longer lists a course's cards that don't reach students yet.**
+The line "257 cards in Ahalan Arabi don't reach students yet: 1 draft, 255
+waiting for review, …" is gone from To do on Home. It mixed three jobs with
+three different fixes, and a single draft kept on purpose stopped To do from
+ever saying you're all caught up. The same line is still on the course's own
+screen, with Show the cards, and each module still says it of itself.
+
+**Trade-off:** Home no longer warns that a course's students are missing
+cards; you see it when you open the course.
+
 ## 0.719 — 27 November 2026
 
 **My space is gone, and what was in it is deleted.** Teaching no longer

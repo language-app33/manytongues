@@ -9545,3 +9545,19 @@ personal deck, at each start (`retireOnStart`, which logs and serves on a
 failure). Creating personal records through the server still works, for
 the tests and for old phones; whatever is made is deleted at the next
 start. The app offers no way in.
+
+## To do leaves out a course's cards that don't reach students (0.720)
+
+**Problem.** To do on Home listed, per course, `notReaching`'s count: drafts,
+cards ready for review and number parts without words, with Open the course.
+Three remedies under one line, a button that led to the course's own copy of
+the same sentence, and drafts — often kept on purpose — kept To do from ever
+being empty.
+
+**Decided (owner, 1c).** Take it out of To do. The course screen's line (with
+Show the cards) and each module's line stay, so the fact is still said where
+the cards are. The import band in To do is unchanged.
+
+**Revisit if** teachers miss that a course's students see nothing: a line for
+a course whose cards *none* reach students is the narrow way back.
+
