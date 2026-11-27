@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.700 — 27 November 2026
+## 0.701 — 27 November 2026
 
 **A card's words no longer look like headings when you are only reading
 it.** Opened without Edit, a card showed its name, its word and its English
@@ -22,6 +22,14 @@ little smaller and at an ordinary weight; the headings are as they were.
 
 To check by hand: on a phone, that the words still read comfortably at the
 new size, the Arabic above all.
+
+## 0.700 — 27 November 2026
+
+**The current tab is grey again.** The green look from 0.699 is undone: the
+tab you are on is back to a raised grey box with a dark grey outline, its
+name in the ordinary text colour and its icon in green. The rest of 0.699
+stays: names in ordinary lettering at the size of the bar's, and the track's
+edge as thick as everything around it.
 
 ## 0.699 — 27 November 2026
 

@@ -9403,3 +9403,13 @@ distinction from a `Segmented` (a faint wash, not a solid fill) and drops
 `--tab-stroke`. Names are in ordinary lettering at the bar's 14px (2a), so
 four tabs on the narrowest phone step down to 11px rather than 9px; and the
 track's edge is the 2px everything else has (3a).
+
+## The selected tab's colours go back to grey (0.700)
+
+Having seen 0.699's green tab, the owner preferred the grey: the
+selected tab is `--raised` with a `--tab-stroke` outline and `--text` for
+its name, as 0.685 had it, and only its icon is in the accent. That keeps
+the reason 0.685 gave — a tab does not look like a `Segmented` — at the
+cost 0.699 named: tabs remain the one place where chosen is not green, and
+the outline is the darkest line on a light screen. 0.699's ordinary
+lettering and 2px track edge stay.
