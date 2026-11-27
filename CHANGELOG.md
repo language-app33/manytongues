@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.691 — 26 November 2026
+
+**Courses opens again for students.** Learning › You › Courses showed
+"Something broke" (reading 'filter') for anyone in a course, since 0.687
+renamed decks to modules in the code: the Courses screen was still being
+handed its modules under the old name and got none. It now gets them, and
+each course counts its modules again. The type check now covers the props
+of every screen that loads on demand, so a rename missed on one side
+fails the build instead of the screen; it found one more such slip, in
+claiming super admin from Settings, which is mended too.
+
 ## 0.690 — 26 November 2026
 
 **Three dots open the same panel everywhere.** The three dots on a module's
