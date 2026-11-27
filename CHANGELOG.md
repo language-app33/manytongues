@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.725 — 27 November 2026
+
+**Each tab in Material says what it holds, in one short line.** In
+Teaching › Material, the three tabs now open with matching sentences:
+
+- Modules: "A module is a group of cards. Add it to a course to teach it."
+- Cards: "A card is something students learn: a word, sentence,
+  conversation or text. Add it to a module to teach it." Cards had no line
+  before.
+- Word sets: "A word set is a ready-made group of cards taught together,
+  like numbers. Fill it in once per language, then add it to a module."
+
+That any teacher in the space can edit a word set is no longer said on the
+Word sets tab; it is said at the top of the set itself, once it is open.
+Leftover wording from My space, which nobody could reach any more, is gone
+from the code.
+
 ## 0.724 — 27 November 2026
 
 **An empty course offers Create a module.** In Teaching › Home › My

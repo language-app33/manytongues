@@ -6435,29 +6435,24 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
+/* Said at the top of an open word set (0.725, the owner's 3a): the Word
+   sets tab says what a set is, the set itself that it is shared. */
+const SHARED_SET = "Any teacher here can edit it.";
+
 /**
- * Modules, Cards and Word sets, inside Material and My space (0.550): the
- * line saying which side you are in, then their tab row (0.689, the
- * owner's wish: the line describes the whole page, not the tab under it).
- * One piece for both sides since 0.685 (the owner's 5a). Word sets is a
- * tab of its own since 0.689, left off where no language taught has one.
+ * Modules, Cards and Word sets, inside Material (0.550): their tab row.
+ * The line about My space being retired went with My space (0.725). Word
+ * sets is a tab of its own since 0.689, left off where no language taught
+ * has one.
  */
-function ModulesOrCards({ tab, onTab, mine, spaceName, withSets }: {
+function ModulesOrCards({ tab, onTab, withSets }: {
   tab: string;
   onTab: (key: string) => void;
-  /** My space, the teacher's own, rather than Material, the space's. */
-  mine: boolean;
-  spaceName: string;
   /** Whether any language switched on has a word set to write. */
   withSets: boolean;
 }) {
   return (
     <>
-      {mine && (
-        <Help className="at-mb3">
-          {`My space is being retired. Move what you want to keep to ${spaceName}, where you now make everything. Nothing here is deleted unless you delete it.`}
-        </Help>
-      )}
       <Tabs
         tabs={[
           ["decks", "Modules", "folder"],
@@ -8863,17 +8858,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const tiles = mineSide ? ownTiles : sharedTiles;
     return (
       <>
-        {mineSide ? (
-          <Help className="at-mb3">
-            Lists every language has, such as numbers and pronouns. You write the words once for the
-            language, then add the set to a module as a whole, or a range of numbers at a time.
-            {personalOnly ? null : ` Share a set to list it in ${spaceName}'s Material, where its teachers can use it and edit it.`}
-          </Help>
-        ) : (
-          <Help className="at-mb3">
-            {`One set of each for every language, used by all of ${spaceName}'s courses. Any teacher here can correct them.`}
-          </Help>
-        )}
+        {/* One line per tab, matching Modules and Cards (0.725). That any
+            teacher here can edit a set is said inside the set instead. */}
+        <Help className="at-mb3">
+          A word set is a ready-made group of cards taught together, like numbers. Fill it in once per language, then add it to a module.
+        </Help>
         {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
         {several
           ? wordSetLangsOn.map((id) => (
@@ -8935,6 +8924,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return (
       <PronounsEditor
         lang={pLang}
+        sharedNote={mineSide ? undefined : SHARED_SET}
         cards={setCards}
         busy={busy}
         onClose={() => {
@@ -8993,6 +8983,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     return (
       <NumberSystemEditor
         lang={numLang}
+        sharedNote={mineSide ? undefined : SHARED_SET}
         numbers={numbers}
         times={clock}
         busy={busy}
@@ -10720,7 +10711,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
           {tab === "cards" && (
             <>
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={setsHere} />
+              <ModulesOrCards tab={tab} onTab={setTab} withSets={setsHere} />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -10789,10 +10780,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {/* Sentences waiting for review and cards with more than one
                   meaning used to be said here, above the list. They are in
                   To do on Home since 0.693 (the owner's 7a); the Review
-                  filter still finds the sentences. And a line saying what a
-                  card is, until 0.714 (the owner's 6a): with no cards the
-                  empty list says it, and with cards it only pushed them
-                  down. */}
+                  filter still finds the sentences. A line saying what a card
+                  is, taken off in 0.714, is back in 0.725 as one of three
+                  matching lines, one per tab (the owner's wording). */}
+              <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
 
               <ItemList
                 noun="card"
@@ -10916,7 +10907,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               language switched on has one, Modules stands in for it. */}
           {tab === "wordsets" && setsHere && (
             <>
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets />
+              <ModulesOrCards tab={tab} onTab={setTab} withSets />
               {wordSetsTab()}
             </>
           )}
@@ -10963,7 +10954,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }
                 />
               )}
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={setsHere} />
+              <ModulesOrCards tab={tab} onTab={setTab} withSets={setsHere} />
               {moduleAction && (
                 <Screen
                   title={
@@ -11045,7 +11036,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               )}
 
               {mineSide ? null : (
-                <Help>A module is something a course learns from: a deck of cards, a unit on a course&apos;s path, or a personal set. Students see a module once it&apos;s added to a course they belong to.</Help>
+                <Help>A module is a group of cards. Add it to a course to teach it.</Help>
               )}
 
               <ItemList

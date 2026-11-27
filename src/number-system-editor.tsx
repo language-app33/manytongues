@@ -189,10 +189,13 @@ export interface EditorProps {
   /** Put a part in a deck or take it out — saved at once, as a deck's own
       screen saves it. */
   onModulePart?: (moduleId: string, rangeId: string, on: boolean) => unknown;
+  /** A line at the top of the set's own screen: that the space's teachers
+      share it (0.725). */
+  sharedNote?: string;
 }
 
 export function NumberSystemEditor({
-  lang, numbers, times, onSave, onClose, busy, error, cards = [], modules: modules = [], onModulePart: onModulePart,
+  lang, numbers, times, onSave, onClose, busy, error, cards = [], modules: modules = [], onModulePart: onModulePart, sharedNote,
 }: EditorProps) {
   const composer = composerFor(lang.id);
   const timeComposer = timeComposerFor(lang.id);
@@ -569,6 +572,7 @@ export function NumberSystemEditor({
        clock and the numbers written out by hand open on a screen of their
        own, and are saved there. */
     <Screen title="Number system" onBack={leave(onClose)} className="cardform">
+      {sharedNote ? <Help>{sharedNote}</Help> : null}
       <NumbersTab
         lang={lang}
         draft={draft}
