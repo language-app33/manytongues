@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.702 — 27 November 2026
+## 0.703 — 27 November 2026
 
 **A module's tile is tidier: its score on the left, who can see it right
 under its name.** In Teaching › Material › Modules, and in My space:
@@ -25,6 +25,21 @@ under its name.** In Teaching › Material › Modules, and in My space:
 
 The rule is gone from every tile that had one, too: courses, the modules
 list in Admin, and the rest.
+
+## 0.702 — 27 November 2026
+
+**A card's words no longer look like headings when you are only reading
+it.** Opened without Edit, a card showed its name, its word and its English
+in the same dark, bold, large type as the headings above them, so "This
+card" over "house" read as two headings in a row. The words are now a
+little smaller and at an ordinary weight; the headings are as they were.
+
+- Editing a card is unchanged: there the words were already in boxes and
+  smaller than the headings.
+- A module's own screen was checked and did not have the problem.
+
+To check by hand: on a phone, that the words still read comfortably at the
+new size, the Arabic above all.
 
 ## 0.701 — 27 November 2026
 

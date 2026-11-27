@@ -1180,10 +1180,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 
 .at-keyfield { letter-spacing:.02em; }
 /* Whether a deck is reaching anyone, at a glance. */
-/* No rule above it (0.702, the owner's 2b): it sits under the tile's text
+/* No rule above it (0.703, the owner's 2b): it sits under the tile's text
    at the spacing of the line of facts. */
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
-/* A module's quality ring, left of its name (0.702). */
+/* A module's quality ring, left of its name (0.703). */
 .at-decklead { flex:0 0 auto; display:flex; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
 .at-reachtext b { color: var(--ink); font-weight:700; }
@@ -3766,12 +3766,15 @@ fieldset.at-cardlock:disabled .at-answerhead { margin-bottom:4px; }
 fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
 
 /* Read, the words at one size: the card's name, each answer and English;
-   how an answer is said a step smaller, in italics (above). */
+   how an answer is said a step smaller, in italics (above). A step under
+   a section's heading and at an ordinary weight (0.702): with no box
+   round them, the same ink at 26px and bold was a second heading under
+   "This card" and "Content". */
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-namefield,
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-input,
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-blanktext,
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-alts > .at-altstack .at-input {
-  font-size:26px !important; font-weight:700 !important; line-height:1.3;
+  font-size:22px !important; font-weight:500 !important; line-height:1.3;
   color: var(--text) !important; -webkit-text-fill-color: var(--text) !important; }
 
 /* The practice player, at a button's size, at the end of the line. */

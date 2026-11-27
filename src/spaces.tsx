@@ -11164,10 +11164,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   return (
                     <Tile
                       title={d.title}
-                      /* Its quality left of its name (0.702, the owner's
+                      /* Its quality left of its name (0.703, the owner's
                          3a): one column of scores down the list. */
                       lead={<QualityRing quality={qualities.get(d.id)} />}
-                      /* One line under the name (0.702, the owner's 1c):
+                      /* One line under the name (0.703, the owner's 1c):
                          what in it needs looking at, then who can see it.
                          Its language and size are off the tile (0.689),
                          and so is how many of its cards send students

@@ -1660,11 +1660,11 @@ export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
   actions?: Node;
   footer?: Node;
   /** Before the title, centred on it and what is under it: a module's
-      quality ring (0.702, the owner's 3a), so the scores of a list stand
+      quality ring (0.703, the owner's 3a), so the scores of a list stand
       in one column down its left. */
   lead?: Node;
   /** A line straight under the title, inside the column beside `lead`,
-      where `footer` sits under the whole row (0.702). */
+      where `footer` sits under the whole row (0.703). */
   note?: Node;
 }) {
   return (
@@ -1686,7 +1686,7 @@ export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
 }
 
 /* The line at the foot of a tile: whether anyone can see it. No rule over
-   it since 0.702 (the owner's wish), so it reads as part of the tile's
+   it since 0.703 (the owner's wish), so it reads as part of the tile's
    text rather than a separate strip. Said in words
    alone — a green or grey dot beside them repeated the sentence in a code
    nobody had been told. `live` is kept on the element for anything that

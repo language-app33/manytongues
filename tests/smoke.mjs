@@ -13198,7 +13198,7 @@ const openPronounTables = async () => {
     check("a module's tile has its quality in a ring, and no language or card count",
       !!lesson && !!lesson.querySelector(".at-qring") && !/\bcards?\b|Arabic/.test(meta),
       lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
-    /* 0.702: the ring left of the name, and who can see it on the line
+    /* 0.703: the ring left of the name, and who can see it on the line
        straight under the name rather than under a rule at the foot. */
     check("its ring is left of its name, and who can see it is right under the name",
       !!lesson && !!lesson.querySelector(".at-deckrow2 > .at-decklead .at-qring") &&
