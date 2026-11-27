@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.691 — 26 November 2026
+## 0.692 — 27 November 2026
 
 **Courses opens again for students.** Learning › You › Courses showed
 "Something broke" (reading 'filter') for anyone in a course, since 0.687
@@ -18,6 +18,16 @@ each course counts its modules again. The type check now covers the props
 of every screen that loads on demand, so a rename missed on one side
 fails the build instead of the screen; it found one more such slip, in
 claiming super admin from Settings, which is mended too.
+
+## 0.691 — 26 November 2026
+
+**A card's status and "Filter by who made it" open the same panel too.**
+The status button on a card (Published, Draft, Ready for review…) and the
+"Filter by who made it" button in Admin › Modules now open the panel the
+three dots open, instead of a small list hanging from the button. The
+current choice is edged in colour and ticked. Unpublish and Discard changes
+are in red and still ask first. Each person in the filter shows how many
+modules they made. The menu behind your initials is unchanged.
 
 ## 0.690 — 26 November 2026
 

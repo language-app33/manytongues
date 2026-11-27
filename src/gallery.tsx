@@ -821,7 +821,7 @@ export function ComponentGallery() {
       <Row
         name="FilterMenu"
         what="One filter, narrow enough to sit beside a search box."
-        note="Goes in ItemList's narrow slot, at the end of the search row, where it takes the width of an icon until it is pressed. FilterBar is the answer when a list wants several pickers at once; this is the answer when it wants one and the choices are a list rather than a few — every teacher who has made a deck, say, which Segmented would wrap into four rows. `quiet` is the value that means everything, and the button lights while anything else is picked."
+        note="Goes in ItemList's narrow slot, at the end of the search row, where it takes the width of an icon until it is pressed; pressed, it opens the app's one panel (the sheet MoreMenu opens), a row per choice with the chosen one ticked. FilterBar is the answer when a list wants several pickers at once; this is the answer when it wants one and the choices are a list rather than a few — every teacher who has made a deck, say, which Segmented would wrap into four rows. `quiet` is the value that means everything, and the button lights while anything else is picked."
       >
         <V label="press it">
           <FilterMenu
@@ -830,9 +830,9 @@ export function ComponentGallery() {
             value={maker}
             onChange={setMaker}
             options={[
-              { value: "", label: "Anyone", note: "12" },
-              { value: "sara", label: "Sara", note: "7" },
-              { value: "omar", label: "Omar Haddad", note: "5" },
+              { value: "", label: "Anyone", note: "12 modules" },
+              { value: "sara", label: "Sara", note: "7 modules" },
+              { value: "omar", label: "Omar Haddad", note: "5 modules" },
             ]}
           />
         </V>

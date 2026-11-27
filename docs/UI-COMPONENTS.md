@@ -175,7 +175,11 @@ clicks stop at it, so a tile it sits on does not open as well.
 ### `SheetAction`
 One row of that panel: its icon in a round well, its name, and a line under
 it where it cannot be done and why. `icon, label, note, danger, disabled,
-onClick`
+on, onClick`
+
+`on` marks the choice that holds now, edged and ticked, where the panel
+chooses one of a few rather than acting (0.691): a card's status
+(`StatusMenu`) and `FilterMenu` open the same `PickSheet` of these rows.
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
 The panel a list's Sort or Filter button opens onto. `groups, note`

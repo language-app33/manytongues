@@ -181,10 +181,10 @@ import {
   useRun,
   useReach,
   useReachHold,
-  Popover,
   ModuleSwitch,
   ModulePickScreen,
   PickSheet,
+  SheetAction,
   BrandMark,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
@@ -2793,8 +2793,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   }
   moduleMakers.sort((a, b) => a.label.localeCompare(b.label));
   const moduleOwnerOptions = [
-    { value: "", label: "Anyone", note: String(modules.length) },
-    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: String(m.count) })),
+    { value: "", label: "Anyone", note: plural(modules.length, "module") },
+    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: plural(m.count, "module") })),
   ];
   /* Filtered before the list sees them, so the count line, "select all" and
      every bulk action work on what is on screen rather than on what a
@@ -6074,6 +6074,16 @@ const STATUS_ICON: Record<string, string> = {
   review: "view",
   changed: "refresh",
 };
+/* Each choice's icon in the status panel: what it leaves the card as. */
+const CHOICE_ICON: Record<string, string> = {
+  draft: "draft",
+  review: "view",
+  published: "verify",
+  "changes:draft": "draft",
+  "changes:review": "view",
+  discard: "refresh",
+  unpublish: "block",
+};
 /* The status as the menu reads while it is shut — "Published", "Draft",
    "Changes in draft". */
 const statusLabel = (card: Card): string =>
@@ -6101,8 +6111,6 @@ function StatusMenu({ card, disabled, onStatus }: {
 }) {
   const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
   const [open, setOpen] = useState(false);
-  /* The same close-on-anything-else the filter menus use, registered only
-     while it is open. */
   const now = statusNow(card);
   const choices = statusChoices(card);
   const shown = statusLabel(card);
@@ -6125,10 +6133,10 @@ function StatusMenu({ card, disabled, onStatus }: {
           className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
           aria-label={`Status: ${shown}`}
           title={`Status: ${shown}`}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={open}
           disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
         >
           {/* Where the card stands, in words and in its colour, opening
               like the other menus on the screen. */}
@@ -6136,23 +6144,23 @@ function StatusMenu({ card, disabled, onStatus }: {
           {shown}
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
+        {/* The statuses open in the app's one panel (0.690, the owner's
+            1a), its status now ticked. */}
         {open && (
-          <Popover className="at-pickmenu at-statuspick" role="menu" onClose={() => setOpen(false)}>
-            {choices.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                role="menuitem"
-                className={`at-pickline${c.value === now ? " on" : ""}`}
-                onClick={() => pick(c.value)}
-              >
-                <span className="at-pickmark">
-                  {c.value === now ? <Icon name="check" size={16} /> : null}
-                </span>
-                <span className="at-picktext">{c.label}</span>
-              </button>
-            ))}
-          </Popover>
+          <PickSheet title="Card status" lede={`Now: ${shown}`} className="at-statussheet" onClose={() => setOpen(false)}>
+            <div className="at-sheetacts">
+              {choices.map((c) => (
+                <SheetAction
+                  key={c.value}
+                  icon={CHOICE_ICON[c.value] || "verify"}
+                  label={c.label.replace(/…$/, "")}
+                  danger={c.value === "discard" || c.value === "unpublish"}
+                  on={c.value === now}
+                  onClick={() => pick(c.value)}
+                />
+              ))}
+            </div>
+          </PickSheet>
         )}
       </span>
       {asking === "discard" && (
