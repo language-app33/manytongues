@@ -13302,7 +13302,7 @@ const openPronounTables = async () => {
 
 /* ---- personal sets are the App admin's to switch on (0.683) ----
    A space whose card does not say so offers only a deck and a unit on
-   New module's sheet (back in 0.721); the tiles sit in the spaced list
+   New module's sheet (back in 0.722); the tiles sit in the spaced list
    every list of tiles uses, not straight on the sheet. */
 {
   const before = errors.length;
@@ -13346,7 +13346,7 @@ const openPronounTables = async () => {
 
 /* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
    New module asks first what kind: a deck, a unit or a personal set
-   (0.633, back in 0.721). A unit asks for its course, and can also be
+   (0.633, back in 0.722). A unit asks for its course, and can also be
    made from a course's path. A personal set is made as a deck
    and marked as a set. An ordinary deck has no Personal set section; a set
    has one, with no switch: its question changed, two lists added, a word
