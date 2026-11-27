@@ -3069,7 +3069,7 @@ test("a deck says which of its cards don't reach students yet", () => {
     notReaching({ parts: five, partsWaiting: ["numbers:20-99", "numbers:100-999"] }, [{ status: "draft" }, { status: "review" }, {}]).long,
     "4 don't reach students yet: 1 draft, 1 waiting for review, 2 need their number words written",
   );
-  assert.equal(notReaching({ parts: [], partsWaiting: [] }, [{ status: "draft" }]).short, "1 not reaching students");
+  assert.equal(notReaching({ parts: [], partsWaiting: [] }, [{ status: "draft" }]).long, "1 doesn't reach students yet: 1 draft");
   /* A part no longer on the deck is not counted against it. */
   assert.equal(notReaching({ parts: ["numbers:0-9"], partsWaiting: ["numbers:10-19"] }, []), null);
 });

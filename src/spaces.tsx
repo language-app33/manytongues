@@ -11169,9 +11169,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           <LockMark locked={d.locked && MODULE_LOCKS} />
                           {/* Its language and size are off the tile (0.689,
                               the owner's wish): what is left is whether it
-                              is a unit, and what in it needs looking at. */}
+                              is a unit, and what in it needs looking at.
+                              How many of its cards send students nothing
+                              yet is off it too (0.701, the owner's wish):
+                              the module's own screen says that, and why. */}
                           {(() => {
-                            const off = notReaching(d, (d.cardIds || []).map((id) => cardById.get(id)).filter(Boolean) as Card[]);
                             const ids = new Set(d.cardIds || []);
                             /* How many of its cards have a recording the
                                server lacks, so it is seen from the list. */
@@ -11182,8 +11184,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                                  place on each path is on its own screen. */
                               isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
                               waiting ? <span key="w">{waiting}</span> : null,
-                              /* Its cards that send students nothing yet (0.563). */
-                              off ? <span key="o" className="at-notreach">{off.short}</span> : null,
                               lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
                             ].filter(Boolean) as React.ReactElement[];
                             return parts.flatMap((p, i) => (i ? [" · ", p] : [p]));

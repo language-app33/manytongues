@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.701 — 27 November 2026
+## 0.702 — 27 November 2026
 
 **A card's words no longer look like headings when you are only reading
 it.** Opened without Edit, a card showed its name, its word and its English
@@ -22,6 +22,14 @@ little smaller and at an ordinary weight; the headings are as they were.
 
 To check by hand: on a phone, that the words still read comfortably at the
 new size, the Arabic above all.
+
+## 0.701 — 27 November 2026
+
+**A module's tile no longer counts the cards that don't reach students.**
+In Teaching › Material › Modules, the red "1 not reaching students" line is
+off the tile. Open the module and it is still there, with the reasons: how
+many are drafts, waiting for review, or need their number words written.
+To do on Home still says it for each course too.
 
 ## 0.700 — 27 November 2026
 

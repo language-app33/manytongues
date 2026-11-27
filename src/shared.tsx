@@ -457,7 +457,7 @@ export function moduleSize(d: { cardCount?: number; parts?: string[] }, cards = 
 export function notReaching(
   d: { parts?: string[]; partsWaiting?: string[] },
   cards: { status?: string }[],
-): { n: number; long: string; short: string; why: string } | null {
+): { n: number; long: string; why: string } | null {
   const drafts = cards.filter((c) => c.status === "draft").length;
   const review = cards.filter((c) => c.status === "review").length;
   const held = d.parts || [];
@@ -472,7 +472,6 @@ export function notReaching(
   return {
     n,
     long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
-    short: `${n} not reaching students`,
     /* The reasons alone, for a sentence that names the cards its own way —
        a course's (0.679). */
     why,
