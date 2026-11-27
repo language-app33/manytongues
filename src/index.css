@@ -1186,10 +1186,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* No rule above it (0.715, the owner's 2b): it sits under the tile's text
    at the spacing of the line of facts. */
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
-/* A module's quality ring, left of its name (0.715). Its room is kept when
-   a new module has no ring yet (0.709), so every name in the list starts
-   at the same place. */
-.at-decklead { flex:0 0 44px; min-height:44px; display:flex; }
+/* A three-dots button with no outline (0.720, the owner's wish, on a
+   module's tile): the icon alone, the 44px it can be pressed in kept. */
+.at-morebtn.bare { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
 .at-reachtext b { color: var(--ink); font-weight:700; }
 /* A card shown rather than edited: label on the left, value on the right,
