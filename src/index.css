@@ -1180,8 +1180,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 
 .at-keyfield { letter-spacing:.02em; }
 /* Whether a deck is reaching anyone, at a glance. */
-.at-reach { display:flex; align-items:center; gap:8px; margin-top:10px;
-  padding-top:10px; border-top:1px solid var(--line); flex-wrap:wrap; }
+/* No rule above it (0.702, the owner's 2b): it sits under the tile's text
+   at the spacing of the line of facts. */
+.at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
+/* A module's quality ring, left of its name (0.702). */
+.at-decklead { flex:0 0 auto; display:flex; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
 .at-reachtext b { color: var(--ink); font-weight:700; }
 /* A card shown rather than edited: label on the left, value on the right,

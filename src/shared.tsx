@@ -1653,21 +1653,30 @@ export function dateTime(ms?: Millis) {
 /* --- Tile ---------------------------------------------------------
    The deck and course tile. Lived in spaces.tsx, which meant the one
    library the docs point at did not actually hold it. */
-export function Tile({ title, meta, onOpen, actions, footer }: {
+export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
   title?: Node;
   meta?: Node;
   onOpen?: () => void;
   actions?: Node;
   footer?: Node;
+  /** Before the title, centred on it and what is under it: a module's
+      quality ring (0.702, the owner's 3a), so the scores of a list stand
+      in one column down its left. */
+  lead?: Node;
+  /** A line straight under the title, inside the column beside `lead`,
+      where `footer` sits under the whole row (0.702). */
+  note?: Node;
 }) {
   return (
     /* data-open marks a tile that actually opens something, so only those
        get the hover treatment. */
     <div className="at-deckcard" onClick={onOpen} data-open={onOpen ? "" : undefined}>
       <div className="at-deckrow2">
+        {lead ? <div className="at-decklead">{lead}</div> : null}
         <div className="at-deckmain">
           <div className="at-decktitle">{title}</div>
           {meta ? <div className="at-deckmeta">{meta}</div> : null}
+          {note}
         </div>
         {actions ? <div className="at-deckacts">{actions}</div> : null}
       </div>
@@ -1676,7 +1685,9 @@ export function Tile({ title, meta, onOpen, actions, footer }: {
   );
 }
 
-/* The line under a deck's rule: whether anyone can see it. Said in words
+/* The line at the foot of a tile: whether anyone can see it. No rule over
+   it since 0.702 (the owner's wish), so it reads as part of the tile's
+   text rather than a separate strip. Said in words
    alone — a green or grey dot beside them repeated the sentence in a code
    nobody had been told. `live` is kept on the element for anything that
    wants to tell the two apart. */

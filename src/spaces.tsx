@@ -11164,36 +11164,51 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   return (
                     <Tile
                       title={d.title}
-                      meta={
-                        <>
-                          <LockMark locked={d.locked && MODULE_LOCKS} />
-                          {/* Its language and size are off the tile (0.689,
-                              the owner's wish): what is left is whether it
-                              is a unit, and what in it needs looking at.
-                              How many of its cards send students nothing
-                              yet is off it too (0.701, the owner's wish):
-                              the module's own screen says that, and why. */}
-                          {(() => {
-                            const ids = new Set(d.cardIds || []);
-                            /* How many of its cards have a recording the
-                               server lacks, so it is seen from the list. */
-                            const lost = cards.filter((c) => ids.has(c.id) && cardLostRecordings(c)).length;
-                            const waiting = moduleWaiting(d).replace(/^ · /, "");
-                            const parts = [
-                              /* A unit says so (0.688, the owner's 1b): its
-                                 place on each path is on its own screen. */
-                              isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
-                              waiting ? <span key="w">{waiting}</span> : null,
-                              lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
-                            ].filter(Boolean) as React.ReactElement[];
-                            return parts.flatMap((p, i) => (i ? [" · ", p] : [p]));
-                          })()}
-                        </>
-                      }
+                      /* Its quality left of its name (0.702, the owner's
+                         3a): one column of scores down the list. */
+                      lead={<QualityRing quality={qualities.get(d.id)} />}
+                      /* One line under the name (0.702, the owner's 1c):
+                         what in it needs looking at, then who can see it.
+                         Its language and size are off the tile (0.689),
+                         and so is how many of its cards send students
+                         nothing yet (0.701): its own screen says that. */
+                      note={(() => {
+                        const ids = new Set(d.cardIds || []);
+                        /* How many of its cards have a recording the server
+                           lacks, so it is seen from the list. */
+                        const lost = cards.filter((c) => ids.has(c.id) && cardLostRecordings(c)).length;
+                        const waiting = moduleWaiting(d).replace(/^ · /, "");
+                        const reach = d.personal ? (
+                          /* My space (0.545, 59b): whether you practise it. */
+                          d.practise !== false ? "Practised in your Learning" : "Not practised"
+                        ) : live ? (
+                          <>
+                            Available to students in the{" "}
+                            {inCourses.length === 1 ? "course" : "courses"}{" "}
+                            <b>{inCourses.join(", ")}</b>
+                          </>
+                        ) : (
+                          "Not in a course yet — nobody can see it"
+                        );
+                        const parts = [
+                          /* A unit says so (0.688, the owner's 1b): its place
+                             on each path is on its own screen. */
+                          isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
+                          waiting ? <span key="w">{waiting}</span> : null,
+                          lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
+                          !d.personal && d.set ? <span key="s">Personal set</span> : null,
+                          <span key="r">{reach}</span>,
+                        ].filter(Boolean) as React.ReactElement[];
+                        return (
+                          <TileNote live={d.personal ? d.practise !== false : live}>
+                            <LockMark locked={d.locked && MODULE_LOCKS} />
+                            {parts.flatMap((p, i) => (i ? [" · ", p] : [p]))}
+                          </TileNote>
+                        );
+                      })()}
                       onOpen={() => { setUnitCourse(null); setOpenModule(d.id); }}
                       actions={
                         <>
-                          <QualityRing quality={qualities.get(d.id)} />
                           {/* Everything else done with a module, behind its
                               three dots (0.689; the owner's 1a). */}
                           <MoreMenu
@@ -11240,29 +11255,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                             ]}
                           />
                         </>
-                      }
-                      footer={
-                        d.personal ? (
-                          /* My space (0.545, 59b): whether you practise it. */
-                          <TileNote live={d.practise !== false}>
-                            {d.practise !== false ? "Practised in your Learning" : "Not practised"}
-                          </TileNote>
-                        ) : (
-                        <>
-                        {d.set ? <TileNote live={live}>Personal set</TileNote> : null}
-                        <TileNote live={live}>
-                          {live ? (
-                            <>
-                              Available to students in the{" "}
-                              {inCourses.length === 1 ? "course" : "courses"}{" "}
-                              <b>{inCourses.join(", ")}</b>
-                            </>
-                          ) : (
-                            <>Not in a course yet — nobody can see it</>
-                          )}
-                        </TileNote>
-                        </>
-                        )
                       }
                     />
                   );

@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.702 — 27 November 2026
+
+**A module's tile is tidier: its score on the left, who can see it right
+under its name.** In Teaching › Material › Modules, and in My space:
+
+- The quality score's ring sits left of the module's name instead of out
+  on the right beside the three dots, so the scores of a list stand in one
+  column you can run your eye down.
+- The thin rule across the foot of the tile is gone, and the line saying
+  who can see it ("Available to students in the course …", "Not in a course
+  yet", "Practised in your Learning") sits straight under the name.
+- When a module is a unit, has cards to review or is a personal set, that
+  is said on the same line, first: "Unit · Available to students in the
+  course Arabic 101".
+
+The rule is gone from every tile that had one, too: courses, the modules
+list in Admin, and the rest.
+
 ## 0.701 — 27 November 2026
 
 **A module's tile no longer counts the cards that don't reach students.**
