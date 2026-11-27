@@ -1165,7 +1165,8 @@ function standingShort(at: Standing | null): string {
  * remembers the view it was left at.
  */
 const STUDENT_COLUMNS = [
-  { key: "word", label: "Word" },
+  /* "Card", and cut after twenty characters, as a teacher's table (0.717). */
+  { key: "word", label: "Card" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
   { key: "subtype", label: "Subtype" },
@@ -1183,7 +1184,7 @@ function studentViews(
       const said = cardWords(it, L);
       return {
         cells: {
-          word: said.word,
+          word: said.short,
           meaning: said.en,
           kind: cardKindLabel(it),
           subtype: cardSubtypeLabel(it, L),

@@ -1122,7 +1122,8 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-tilewrap.picked > .at-item { border-color: var(--accent); }
 /* A tap on a tile ticks it while selecting, so a tile's own edit and delete
    would only be a second answer to the same tap. */
-.at-tilewrap.selecting .at-miniacts, .at-tilewrap.selecting .at-deckacts { display:none; }
+.at-tilewrap.selecting .at-miniacts, .at-tilewrap.selecting .at-deckacts,
+.at-tilewrap.selecting .at-minicorner { display:none; }
 .at-tilewrap > .at-ckbox.pick { position:absolute; top:10px; right:10px; z-index:2; }
 /* The bar that rises once something is ticked: a plain tray across the
    bottom, not a floating pill. */
@@ -1185,7 +1186,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* No rule above it (0.715, the owner's 2b): it sits under the tile's text
    at the spacing of the line of facts. */
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
-/* A three-dots button with no outline (0.717, the owner's wish, on a
+/* A three-dots button with no outline (0.718, the owner's wish, on a
    module's tile): the icon alone, the 44px it can be pressed in kept. */
 .at-morebtn.bare { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
@@ -1328,6 +1329,15 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    ب or a ج. */
 .at-minicard .ar { padding-bottom:2px; }
 .at-miniacts { display:flex; gap:6px; margin-top:auto; padding-top:6px; }
+/* A card's three dots, in the tile's top corner with no edge of their own
+   (0.717): the tile's edge is the frame, and the dots are a mark on it
+   rather than a button beside the card. The first line keeps clear of
+   them. Where selecting puts its tick in the same corner, they step aside. */
+.at-minicorner { position:absolute; top:2px; right:2px; display:flex; }
+.at-minicorner .at-morebtn { border:none; background:transparent; width:36px; height:36px; min-height:36px;
+  padding:0; flex:none; color: var(--muted); }
+.at-minicorner .at-morebtn:hover, .at-minicorner .at-morebtn.on { color: var(--ink); }
+.at-minicard.cornered > .ar, .at-minicard.cornered > .at-minikind { padding-right:26px; }
 /* The tick that puts something into a bulk selection. */
 .at-ckbox.pick { position:absolute; top:8px; right:8px; width:22px; height:22px;
   border:2px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
