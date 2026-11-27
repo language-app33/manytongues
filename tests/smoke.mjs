@@ -9463,7 +9463,7 @@ const openPronounTables = async () => {
       thisModule ? "the title box is live" : "(no This deck)");
   }
 
-  /* Two views, in turn (0.703): the grid, and a table of five columns. */
+  /* Two views, in turn (0.714): the grid, and a table of five columns. */
   const sizeBtn = () => one(".at-viewbtn", null);
   const viewIcon = () => {
     const p = one(".at-viewbtn path", null);
@@ -9471,7 +9471,7 @@ const openPronounTables = async () => {
   };
   check("the list starts as a grid of tiles", !!one(".at-cardgrid .at-minicard", null) && !one(".at-cardtable", null));
   /* A tile is the card and its three dots: Edit and Remove are in them,
-     not two buttons on every tile (0.703). */
+     not two buttons on every tile (0.714). */
   {
     const tile = one(".at-cardgrid .at-minicard", null);
     const acts = tile ? [...tile.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") || "") : [];
