@@ -4269,7 +4269,7 @@ test("anything that is not a picture, or too large a one, is refused as an image
   assert.equal(unnamed.json.error, "bad-hash");
 });
 
-/* A word's description in the language itself, and its English (0.691):
+/* A word's description in the language itself, and its English (0.694):
    kept on the card's own word, trimmed and capped, and never on a
    sentence. See src/description.ts. */
 test("a word keeps its description and its English on its own word, and a sentence keeps none", async () => {

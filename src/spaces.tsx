@@ -151,6 +151,8 @@ import {
   Lede,
   Notice,
   Nudge,
+  Empty,
+  TeaArt,
   Screen,
   Section,
   Segmented,
@@ -181,10 +183,10 @@ import {
   useRun,
   useReach,
   useReachHold,
-  Popover,
   ModuleSwitch,
   ModulePickScreen,
   PickSheet,
+  SheetAction,
   BrandMark,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
@@ -1716,6 +1718,37 @@ export function verifyBackup(file: any) {
    ------------------------------------------------------------------ */
 
 
+/*
+ * To do, at the top of Teaching's Home (0.693): everything waiting on the
+ * teacher, each with the way to it, gathered from where it used to be said
+ * — bands across the top, lines over the Cards list, a note inside each
+ * course. With nothing waiting it says so warmly, under a cup of tea, so
+ * an empty To do reads as done rather than as broken.
+ */
+function TodoSection({ items, actionsOf }: {
+  items: { key: string; icon: string; text: string; course?: string }[];
+  actionsOf: (item: { key: string; icon: string; text: string; course?: string }) => Node;
+}) {
+  return (
+    <section className="at-section at-coursesection" data-el="todo">
+      <h3 className="at-sectionhead">To do</h3>
+      {items.length ? (
+        <div className="at-todolist">
+          {items.map((it) => (
+            <div key={it.key} data-el="todo-item" data-todo={it.key}>
+              <Nudge icon={it.icon} tone="attention" action={<div className="at-todoacts">{actionsOf(it)}</div>}>
+                {it.text}
+              </Nudge>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty art={<TeaArt />}>You&rsquo;re all caught up. Your students have everything they need.</Empty>
+      )}
+    </section>
+  );
+}
+
 export function CoursesPage({
   courses,
   languages,
@@ -1731,14 +1764,19 @@ export function CoursesPage({
   renderCourse,
   footer,
   groups,
+  top,
 }: {
   courses: Course[];
+  /** What comes before the courses: Teaching's To do (0.693). */
+  top?: Node;
   /** The courses under a heading each, in place of one "My courses" list:
       a learner's spaces, when they are in more than one (memberships). */
   groups?: { key: string; title: string; courses: Course[] }[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
+  /** A line over the list. Neither side has one since 0.693: the tiles say
+      what opening one does. */
   lead?: Node;
   emptyLead?: Node;
   joinTitle?: Node;
@@ -1753,9 +1791,8 @@ export function CoursesPage({
   const [code, setCode] = useState("");
   return (
     <>
-      <Help>
-        {courses.length ? lead : emptyLead}
-      </Help>
+      {top}
+      {(courses.length ? lead : emptyLead) ? <Help>{courses.length ? lead : emptyLead}</Help> : null}
 
       <Notice kind="error">{error}</Notice>
 
@@ -2793,8 +2830,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   }
   moduleMakers.sort((a, b) => a.label.localeCompare(b.label));
   const moduleOwnerOptions = [
-    { value: "", label: "Anyone", note: String(modules.length) },
-    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: String(m.count) })),
+    { value: "", label: "Anyone", note: plural(modules.length, "module") },
+    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: plural(m.count, "module") })),
   ];
   /* Filtered before the list sees them, so the count line, "select all" and
      every bulk action work on what is on screen rather than on what a
@@ -3420,9 +3457,17 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         {`${d.ownerName} · ${moduleSize(d)}`}
                       </>
                     }
+                    /* Behind three dots, as on Material's tiles (0.692):
+                       the app's one panel of actions on a thing. */
                     actions={
-                        <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation();
+                      <MoreMenu
+                        label={`More for ${d.title}`}
+                        title={d.title}
+                        items={[{
+                          label: `Delete ${moduleKind(d)}`,
+                          icon: "delete",
+                          danger: true,
+                          onClick: () => {
                             if (d.locked && MODULE_LOCKS) {
                               snack(lockedDeleteNote([d.title]), "warn");
                               return;
@@ -3443,7 +3488,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               ),
                               action: () => API.deleteModule(d.id),
                             });
-                          }} />
+                          },
+                        }]}
+                      />
                     }
                     footer={
                       <TileNote live={d.courseTitles.length > 0}>
@@ -6074,6 +6121,16 @@ const STATUS_ICON: Record<string, string> = {
   review: "view",
   changed: "refresh",
 };
+/* Each choice's icon in the status panel: what it leaves the card as. */
+const CHOICE_ICON: Record<string, string> = {
+  draft: "draft",
+  review: "view",
+  published: "verify",
+  "changes:draft": "draft",
+  "changes:review": "view",
+  discard: "refresh",
+  unpublish: "block",
+};
 /* The status as the menu reads while it is shut — "Published", "Draft",
    "Changes in draft". */
 const statusLabel = (card: Card): string =>
@@ -6101,8 +6158,6 @@ function StatusMenu({ card, disabled, onStatus }: {
 }) {
   const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
   const [open, setOpen] = useState(false);
-  /* The same close-on-anything-else the filter menus use, registered only
-     while it is open. */
   const now = statusNow(card);
   const choices = statusChoices(card);
   const shown = statusLabel(card);
@@ -6125,10 +6180,10 @@ function StatusMenu({ card, disabled, onStatus }: {
           className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
           aria-label={`Status: ${shown}`}
           title={`Status: ${shown}`}
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={open}
           disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
         >
           {/* Where the card stands, in words and in its colour, opening
               like the other menus on the screen. */}
@@ -6136,23 +6191,23 @@ function StatusMenu({ card, disabled, onStatus }: {
           {shown}
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
+        {/* The statuses open in the app's one panel (0.690, the owner's
+            1a), its status now ticked. */}
         {open && (
-          <Popover className="at-pickmenu at-statuspick" role="menu" onClose={() => setOpen(false)}>
-            {choices.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                role="menuitem"
-                className={`at-pickline${c.value === now ? " on" : ""}`}
-                onClick={() => pick(c.value)}
-              >
-                <span className="at-pickmark">
-                  {c.value === now ? <Icon name="check" size={16} /> : null}
-                </span>
-                <span className="at-picktext">{c.label}</span>
-              </button>
-            ))}
-          </Popover>
+          <PickSheet title="Card status" lede={`Now: ${shown}`} className="at-statussheet" onClose={() => setOpen(false)}>
+            <div className="at-sheetacts">
+              {choices.map((c) => (
+                <SheetAction
+                  key={c.value}
+                  icon={CHOICE_ICON[c.value] || "verify"}
+                  label={c.label.replace(/…$/, "")}
+                  danger={c.value === "discard" || c.value === "unpublish"}
+                  on={c.value === now}
+                  onClick={() => pick(c.value)}
+                />
+              ))}
+            </div>
+          </PickSheet>
         )}
       </span>
       {asking === "discard" && (
@@ -6512,6 +6567,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   });
 
   const [courseView, setCourseView] = useState<any | null>(null);
+  /* Which part of the open course is on screen (0.693, the owner's 4b):
+     Course, People or Exercises. Each course opens on Course. */
+  const [courseTab, setCourseTab] = useState("course");
+  useEffect(() => setCourseTab("course"), [courseView]);
   /* The course a unit's page was opened from (0.616): its checklist, its
      number and its Publish are that course's. And what the server last
      answered when publishing was refused, which may be stricter than this
@@ -7351,6 +7410,51 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     () => onCards.filter((c) => waitingIds.has(c.id)).length,
     [onCards, waitingIds]
   );
+
+  /*
+   * What is waiting on the teacher, for To do at the top of Home (0.693).
+   *
+   * Each of these used to be said where it was found — two bands across
+   * the top of every tab, two above the Cards list, one inside each
+   * course — and is now said once, here, each with the way to it. They
+   * are about what students get, so they are read off the space's side:
+   * worked out while that side is on screen, and the count kept for the
+   * badge on Home while the teacher is in My space, whose cards students
+   * never see.
+   */
+  const todo: { key: string; icon: string; text: string; course?: string }[] | null = useMemo(() => {
+    if (mineSide || personalOnly) return null;
+    const out: { key: string; icon: string; text: string; course?: string }[] = [];
+    if (lostCards > 0)
+      out.push({ key: "lost", icon: "mic", text: lostCards === 1
+        ? "A recording is missing on 1 card. Record it again so students can hear it."
+        : `Recordings are missing on ${lostCards} cards. Record them again so students can hear them.` });
+    if (waitingOn > 0)
+      out.push({ key: "sentences", icon: "verify", text: waitingOn === 1
+        ? "1 sentence card is waiting for you to review its sentences."
+        : `${waitingOn} sentence cards are waiting for you to review their sentences.` });
+    if (importedWaiting > 0)
+      out.push({ key: "imported", icon: "upload", text: importedWaiting === 1
+        ? "1 imported card is waiting for review. Students won't see it until you publish it."
+        : `${importedWaiting} imported cards are waiting for review. Students won't see them until you publish them.` });
+    const byId = new Map(allCards.map((c) => [c.id, c]));
+    for (const c of onCourses) {
+      const held = allModules.filter((d) => !d.personal && (d.courses || []).some((l) => l.courseId === c.id));
+      const its = [...new Set(held.flatMap((d) => d.cardIds || []))].map((id) => byId.get(id)).filter(Boolean) as Card[];
+      const off = notReaching({ parts: held.flatMap((d) => d.parts || []), partsWaiting: held.flatMap((d) => d.partsWaiting || []) }, its);
+      if (off)
+        out.push({ key: `course:${c.id}`, icon: "school", course: c.id,
+          text: `${plural(off.n, "card")} in ${c.title} ${off.n === 1 ? "doesn't" : "don't"} reach students yet: ${off.why}.` });
+    }
+    if (twoMeanings.length > 0)
+      out.push({ key: "meanings", icon: "cards", text: `${plural(twoMeanings.length, "card")} ${twoMeanings.length === 1 ? "has" : "have"} more than one meaning on ${twoMeanings.length === 1 ? "it" : "them"}.` });
+    return out;
+  }, [mineSide, personalOnly, lostCards, waitingOn, importedWaiting, allCards, allModules, onCourses, twoMeanings]);
+  const [todoKept, setTodoKept] = useState(0);
+  useEffect(() => {
+    if (todo) setTodoKept(todo.length);
+  }, [todo]);
+  const todoCount = todo ? todo.length : todoKept;
 
   /* Every blank the teacher's cards have written, for the filter to offer.
      Read off the cards, so a blank appears in the list the moment a card
@@ -10076,6 +10180,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          or taken out is saved as it is tapped. */
       <Screen title="Course" className="cardform" onBack={() => setCourseView(null)}>
             <Notice kind="error">{error}</Notice>
+            {/* Three parts, in the tabs Material's lists are chosen with
+                (0.693, the owner's 4b): what the course is and teaches,
+                who is in it, and what its students are asked. */}
+            <Tabs
+              label="Course, people or exercises"
+              tabs={[["course", "Course", "school"], ["people", "People", "group"], ["exercises", "Exercises", "tune"]]}
+              value={courseTab}
+              onChange={setCourseTab}
+            />
+            {courseTab === "course" && (
+            <div role="tabpanel" aria-label="course">
 
             <div className="at-formblock">
               <div className="at-formhead">
@@ -10106,29 +10221,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 hint="Share this with a class so they can join and study."
               />
             </div>
-
-            <div className="at-formblock">
-              <div className="at-formhead">
-                <span className="at-formnum">People</span>
-                <span className="at-formrole">Your administrator adds and removes people.</span>
-              </div>
-              {people("Teachers", c.teachers, "Nobody yet.")}
-              {people("Students", c.students, "Nobody has joined yet. Share the student code above.")}
-            </div>
-
-            <PracticeSection
-              course={c}
-              cards={cards.filter((k) => (k.decks || []).some((d) => (c.decks || []).includes(d)))}
-              lang={languages[c.language as LangId] || null}
-              busy={busy}
-              onSave={(next) =>
-                run(async () => {
-                  const r: any = await API.setCoursePractice(c.id, next);
-                  const saved = r && r.course && r.course.practice;
-                  if (saved) setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, practice: saved } : x)));
-                }, `${c.title} now asks ${next.mode === "custom" ? "the exercises you chose" : next.mode === "none" ? "no English" : next.mode === "little" ? "little English" : "everything, with translation"}`)
-              }
-            />
 
             {pathSection}
 
@@ -10216,6 +10308,37 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 </Nudge>
               )}
             </div>
+            </div>
+            )}
+            {courseTab === "people" && (
+            <div role="tabpanel" aria-label="people">
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">People</span>
+                <span className="at-formrole">Your administrator adds and removes people.</span>
+              </div>
+              {people("Teachers", c.teachers, "Nobody yet.")}
+              {people("Students", c.students, "Nobody has joined yet. Share the student code on the Course tab.")}
+            </div>
+            </div>
+            )}
+            {courseTab === "exercises" && (
+            <div role="tabpanel" aria-label="exercises">
+            <PracticeSection
+              course={c}
+              cards={cards.filter((k) => (k.decks || []).some((d) => (c.decks || []).includes(d)))}
+              lang={languages[c.language as LangId] || null}
+              busy={busy}
+              onSave={(next) =>
+                run(async () => {
+                  const r: any = await API.setCoursePractice(c.id, next);
+                  const saved = r && r.course && r.course.practice;
+                  if (saved) setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, practice: saved } : x)));
+                }, `${c.title} now asks ${next.mode === "custom" ? "the exercises you chose" : next.mode === "none" ? "no English" : next.mode === "little" ? "little English" : "everything, with translation"}`)
+              }
+            />
+            </div>
+            )}
       </Screen>
     );
   }
@@ -10224,7 +10347,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     <SpaceFrame
       space="Teaching"
       tabs={[
-        ["courses", "Courses", "school"],
+        /* Home (0.693, Courses until then): To do, then the courses. The
+           key stays "courses", which a resumed session may hold. */
+        ["courses", "Home", "school"],
         /* Material is the space's decks and cards, My space the teacher's
            own (0.550): the same lists, one side each. Decks and Cards are
            chosen inside each. */
@@ -10239,8 +10364,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         if (k === "material" || k === "myspace") {
           setSide(k === "myspace" ? "mine" : "space");
           if (tab !== "decks" && tab !== "cards" && tab !== "wordsets") setTab("decks");
-        } else setTab(k);
+        } else {
+          /* To do is about what students get, the space's side. */
+          if (k === "courses") setSide("space");
+          setTab(k);
+        }
       }}
+      /* How many things To do holds, on Home's own button, so they are
+         seen from every tab (0.693, the owner's 5a). */
+      counts={todoCount > 0 && !personalOnly ? { courses: todoCount } : undefined}
       error={error}
       busy={busy}
     >
@@ -10256,57 +10388,34 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {`Not sent, and discarded: ${lastDropped.map((d) => `${d.name} (${API.explain(new Error(d.msg))})`).join("; ")}`}
             </TopBanner>
           )}
-          {/* Recordings the server does not hold, on cards students have:
-              they get the card and cannot hear it. In the band across the
-              top, like the line above and for the same reason, and on until
-              every one is put right — there is nothing to dismiss, because
-              the fix is the only way to make it true. */}
-          {lostCards > 0 && (
-            <TopBanner
-              kind="error"
-              actions={
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setCardFilter({ ...NO_CARD_FILTER, audio: "lost" });
-                    setTab("cards");
-                  }}
-                >
-                  {lostCards === 1 ? "Show the card" : "Show the cards"}
-                </Button>
+          {/* Missing recordings and what an import brought in used to be
+              bands across the top of every tab here. Both are in To do on
+              Home since 0.693 (the owner's 5a), with its count on Home's
+              button in the bar. */}
+          {splitting && (
+            <MeaningSplits
+              cards={twoMeanings}
+              busy={busy}
+              onClose={() => setSplitting(false)}
+              onSplit={(card) =>
+                run(
+                  async () => {
+                    const { kept, made } = splitByMeaning(card);
+                    const modulesOf = card.decks || [];
+                    absorbSaved(await sendOrKeep({ ...kept, lang: kept.lang || "" }, modulesOf));
+                    for (const one of made) absorbSaved(await sendOrKeep({ ...one, lang: one.lang || "" }, modulesOf));
+                    return made.length + 1;
+                  },
+                  (n: number) => `Split into ${n} cards`,
+                )
               }
-            >
-              Some recordings are missing. Record them again so students can hear them.
-            </TopBanner>
-          )}
-          {/* What an import brought in and students don't have yet (0.679):
-              on until every card of it is published, or the teacher puts
-              it away. */}
-          {importedWaiting > 0 && (
-            <TopBanner
-              actions={
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setCardFilter({ ...NO_CARD_FILTER, status: "waiting" });
-                      setOpenModule(null);
-                      setCourseView(null);
-                      setTab("cards");
-                    }}
-                  >
-                    {importedWaiting === 1 ? "Show the card" : "Show the cards"}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setImportedIds([])}>
-                    Dismiss
-                  </Button>
-                </>
+              onKeep={(card) =>
+                run(
+                  async () => absorbSaved(await sendOrKeep({ ...card, together: true }, card.decks || [])),
+                  "Kept as one card",
+                )
               }
-            >
-              {importedWaiting === 1
-                ? "1 imported card is waiting for review. Students won't see it until you publish it."
-                : `${importedWaiting} imported cards are waiting for review. Students won't see them until you publish them.`}
-            </TopBanner>
+            />
           )}
 
           {tab === "courses" && (
@@ -10315,7 +10424,38 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               languages={languages}
               busy={busy}
               error={error}
-              lead="Open a course to see its modules, its people and its student code."
+              top={todo ? (
+                <TodoSection
+                  items={todo}
+                  actionsOf={(item) => {
+                    const toCards = (filter: typeof NO_CARD_FILTER) => {
+                      setCardFilter(filter);
+                      setSide("space");
+                      setTab("cards");
+                    };
+                    if (item.key === "lost")
+                      return <Button size="sm" variant="primary" onClick={() => toCards({ ...NO_CARD_FILTER, audio: "lost" })}>
+                        {lostCards === 1 ? "Show the card" : "Show the cards"}
+                      </Button>;
+                    if (item.key === "sentences")
+                      return <Button size="sm" variant="primary" onClick={() => toCards({ ...NO_CARD_FILTER, review: "waiting" })}>
+                        {waitingOn === 1 ? "Show it" : "Show them"}
+                      </Button>;
+                    if (item.key === "imported")
+                      return <>
+                        <Button size="sm" variant="primary" onClick={() => toCards({ ...NO_CARD_FILTER, status: "waiting" })}>
+                          {importedWaiting === 1 ? "Show the card" : "Show the cards"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setImportedIds([])}>Dismiss</Button>
+                      </>;
+                    if (item.key === "meanings")
+                      return <Button size="sm" variant="primary" onClick={() => setSplitting(true)}>Review</Button>;
+                    if (item.course)
+                      return <Button size="sm" variant="primary" onClick={() => setCourseView(item.course)}>Open the course</Button>;
+                    return null;
+                  }}
+                />
+              ) : null}
               emptyLead={
                 courses.length
                   ? "None of your courses is in the languages switched on. The language button at the top brings the others back."
@@ -10421,54 +10561,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {statusAction && statusActionScreen()}
 
 
-              {/* What is waiting on the teacher: sentences nobody has read
-                  yet, and what students have reported. Said above the list
-                  rather than left to a filter, because both are work that
-                  keeps a student from a sentence or shows them a wrong
-                  one. */}
-              {waitingOn > 0 && cardFilter.review !== "waiting" && (
-                <div className="at-reviewbanner">
-                  <span>
-                    {`${plural(waitingOn, "sentence card")} ${waitingOn === 1 ? "is" : "are"} waiting for review.`}
-                  </span>
-                  <Button size="sm" variant="primary" onClick={() => setCardFilter((f) => ({ ...f, review: "waiting" }))}>
-                    Show {waitingOn === 1 ? "it" : "them"}
-                  </Button>
-                </div>
-              )}
-              {twoMeanings.length > 0 && (
-                <div className="at-reviewbanner">
-                  <span>{`${plural(twoMeanings.length, "card")} ${twoMeanings.length === 1 ? "has" : "have"} more than one meaning on ${twoMeanings.length === 1 ? "it" : "them"}.`}</span>
-                  <Button size="sm" onClick={() => setSplitting(true)}>
-                    Review
-                  </Button>
-                </div>
-              )}
-              {splitting && (
-                <MeaningSplits
-                  cards={twoMeanings}
-                  busy={busy}
-                  onClose={() => setSplitting(false)}
-                  onSplit={(card) =>
-                    run(
-                      async () => {
-                        const { kept, made } = splitByMeaning(card);
-                        const modulesOf = card.decks || [];
-                        absorbSaved(await sendOrKeep({ ...kept, lang: kept.lang || "" }, modulesOf));
-                        for (const one of made) absorbSaved(await sendOrKeep({ ...one, lang: one.lang || "" }, modulesOf));
-                        return made.length + 1;
-                      },
-                      (n: number) => `Split into ${n} cards`,
-                    )
-                  }
-                  onKeep={(card) =>
-                    run(
-                      async () => absorbSaved(await sendOrKeep({ ...card, together: true }, card.decks || [])),
-                      "Kept as one card",
-                    )
-                  }
-                />
-              )}
+              {/* Sentences waiting for review and cards with more than one
+                  meaning used to be said here, above the list. They are in
+                  To do on Home since 0.693 (the owner's 7a); the Review
+                  filter still finds the sentences. */}
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a module so students get it.
               </Help>
@@ -10993,7 +11089,6 @@ export function StudentCourses({
       languages={languages}
       busy={busy}
       error={error}
-      lead="Open a course to see its modules."
       emptyLead={onJoin ? "You're not in a course yet. Enter the code your teacher gave you below." : "There are no courses here yet."}
       joinTitle="Join a course"
       joinHint="Enter the code your teacher gave you."

@@ -4875,10 +4875,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
-  check("and it opens the app's menu of what can be done from there",
-    statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
-  if (statusBtn) click(statusBtn);
+  /* In the app's one panel since 0.690: a row per choice, the one that
+     holds now ticked. */
+  const statusLines = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
+    .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
+  check("and it opens the app's panel of what can be done from there, the status now ticked",
+    statusLines.join(" | ") === "Published ✓ | Unpublish", statusLines.join(" | ") || "(no panel)");
+  click(document.querySelector('.at-statussheet [aria-label="Close"]'));
   await sleep(100);
   /* On the title's own line since 0.484, as icons, each named out loud,
      with Export by the "This card" heading rather than among them. */
@@ -8536,11 +8539,20 @@ const openPronounTables = async () => {
 {
   takeSaves = true;
   const frameNow = () => /** @type {any} */ (document.querySelector(".at-screen.bare") || document);
-  const banner = [...frameNow().querySelectorAll(".at-reviewbanner")]
-    .find((b) => /more than one meaning/.test(b.textContent || ""));
-  check("the Cards tab says which cards have more than one meaning on them",
-    !!banner, banner ? (banner.textContent || "").trim() : "(no banner)");
-  click(banner && [...banner.querySelectorAll("button")].find((b) => /^Review$/.test((b.textContent || "").trim())));
+  /* Said in To do on Home since 0.693, not over the Cards list. */
+  check("the Cards list no longer carries a line about cards with more than one meaning",
+    !/more than one meaning on/.test(frameNow().textContent || ""), "(line still there)");
+  const dockTab = (/** @type {RegExp} */ re) => /** @type {any} */ ([...document.querySelectorAll(".at-dock [role=tab]")]
+    .find((b) => re.test((b.textContent || "").trim())) || null);
+  click(dockTab(/^Home/));
+  await sleep(400);
+  const item = /** @type {any} */ (frameNow().querySelector('[data-todo="meanings"]'));
+  check("Home's To do says which cards have more than one meaning on them",
+    !!item && /more than one meaning/.test(item.textContent || ""),
+    item ? (item.textContent || "").trim() : ((frameNow().querySelector('[data-el="todo"]') || {}).textContent || "(no To do)"));
+  check("and Home's button in the bar counts what To do holds",
+    /^Home\d+$/.test(((dockTab(/^Home/) || {}).textContent || "").trim()), ((dockTab(/^Home/) || {}).textContent || "(no tab)").trim());
+  click(item && [...item.querySelectorAll("button")].find((b) => /^Review$/.test((b.textContent || "").trim())));
   await sleep(300);
   const splits = [...document.querySelectorAll(".at-screen")]
     .find((sc) => /^More than one meaning$/.test(((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim()));
@@ -8549,6 +8561,10 @@ const openPronounTables = async () => {
       /Keep as one card/.test(splits.textContent || ""),
     splits ? (splits.textContent || "").slice(0, 160) : "(no screen)");
   click(splits && [...splits.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  await sleep(300);
+  click(dockTab(/^Material$/));
+  await sleep(300);
+  click([...frameNow().querySelectorAll("[role=tab]")].find((b) => /^Cards$/.test((b.textContent || "").trim())) || null);
   await sleep(300);
 
   const tile = [...frameNow().querySelectorAll(".at-minicard")]
@@ -13075,7 +13091,7 @@ const openPronounTables = async () => {
   }
   const frame = () => host.querySelector(".at-screen.bare") || host;
   const tab = [...host.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
-    .filter((b) => /^Courses$/.test((b.textContent || "").trim())).pop();
+    .filter((b) => /^Home\d*$/.test((b.textContent || "").trim())).pop();
   click(tab || null);
   await sleep(500);
   const courseTile = [...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || ""));

@@ -842,6 +842,27 @@ export function ChatArt() {
   );
 }
 
+/* --- TeaArt -------------------------------------------------------
+   A cup of tea on its saucer, steam rising, drawn as the logo is: loose
+   loops in its four colours, and its dot (0.693). For To do on Teaching's
+   Home when nothing is waiting: time for a cup. The lines carry their own
+   colours, so it reads the same in either theme; the dot follows the
+   page's ink, as the Home card's does. */
+export function TeaArt() {
+  return (
+    <svg className="at-teaart" viewBox="0 0 240 150" width="240" height="150" focusable="false">
+      <g fill="none" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M100 46C92 36 110 28 102 14" stroke="#A99BE0" />
+        <path d="M128 46C120 36 138 28 130 14" stroke="#A99BE0" />
+        <path d="M156 75C178 68 192 84 184 98C177 110 160 110 151 101" stroke="#F7C548" />
+        <path d="M74 62C100 57 138 57 162 62C165 98 150 123 118 124C86 125 71 100 74 62Z" stroke="#FF7A59" />
+        <path d="M50 134C78 126 158 124 188 132C194 140 162 144 118 144C76 144 44 141 50 134Z" stroke="#7FD1C7" />
+      </g>
+      <circle cx="117" cy="90" r="7" fill="currentColor" />
+    </svg>
+  );
+}
+
 /* --- Nudge ---------------------------------------------------------
    "Nothing here yet", said inside an open deck or course where the
    section would otherwise be one grey line. An icon, one warm sentence,
@@ -1197,8 +1218,11 @@ export function TabTitle({ children }: { children?: Node }) {
   );
 }
 
-export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
+export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, counts, children }: {
   tabs: [string, string, string?][];
+  /** A number on a tab's button in the bar: what Teaching's To do holds,
+      on Home (0.693). */
+  counts?: Record<string, number>;
   /** Which of Teaching, Admin or Super admin this is. Each tab is headed
       with its own name (0.553); the mode itself is said by where you are,
       at the title's right (0.601), so it no longer prefixes the name. */
@@ -1237,7 +1261,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {/* No app name here (0.554): each tab is headed with its own name
               below. The space's sections are in the bar at the foot. */}
           <Notice kind="error">{error}</Notice>
-          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
+          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} counts={counts} dock />
           {/* The tab's own name at the top (0.553), in the words of the bar.
               A screen opened over the tab covers it, with its own title. */}
           {space && tabs.find((t) => t[0] === tab) ? (
@@ -2374,15 +2398,16 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   quiet?: string;
 }) {
   const [open, setOpen] = useState(false);
-
-  /* The same close-on-anything-else the corner menu uses. Registered only
-     while it is open, and the menu stops the click that opened it from
-     closing it again. */
+  const shut = useCallback(() => setOpen(false), []);
 
   if (!options || options.length < 2) return null;
   const on = value !== quiet;
   const chosen = options.find((o) => o.value === value);
 
+  /* The choices open in the app's one panel (0.690, the owner's 2a): the
+     sheet three dots open, a row each with the chosen one ticked — a long
+     list of people scrolls there, where a list hanging from the button ran
+     off a phone. */
   return (
     <div className="at-pickwrap" onClick={(e) => e.stopPropagation()}>
       <button
@@ -2391,35 +2416,34 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
         /* The label says what the filter does; the title also says where it
            has got to, because the lit button alone does not name the person
            the list has been narrowed to. */
-        title={on && chosen ? `${label}: ${chosen.label}` : label}
+        title={on && chosen ? `${label}: ${typeof chosen.label === "string" ? chosen.label : ""}` : label}
         aria-label={label}
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-pressed={on}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
       >
         <Icon name={icon} />
       </button>
 
       {open && (
-        <Popover className="at-pickmenu" onClose={() => setOpen(false)}>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={`at-pickline${o.value === value ? " on" : ""}`}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-            >
-              <span className="at-pickmark">
-                {o.value === value ? <Icon name="check" size={16} /> : null}
-              </span>
-              <span className="at-picktext">{o.label}</span>
-              {o.note ? <span className="at-picknote">{o.note}</span> : null}
-            </button>
-          ))}
-        </Popover>
+        <PickSheet title={label || "Filter"} className="at-picksheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {options.map((o) => (
+              <SheetAction
+                key={o.value}
+                icon={o.value === quiet ? "group" : icon}
+                label={o.label}
+                note={o.note}
+                on={o.value === value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(o.value);
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
       )}
     </div>
   );
@@ -2495,20 +2519,25 @@ export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
 /* One thing to do in a panel of them (0.680): its icon in a round well,
    and its name, with a line under it where it cannot be done and why.
    Drawn like a row of "Where you are", the other panel of places to go.
-   In the library since 0.690, where MoreMenu draws its rows with it. */
-export function SheetAction({ icon, label, note, danger, disabled, onClick }: {
+   In the library since 0.690, where MoreMenu draws its rows with it, and
+   so do the pickers that choose one of a few — a card's status, whose
+   modules to show — where `on` marks the one chosen now with a tick. */
+export function SheetAction({ icon, label, note, danger, disabled, on, onClick }: {
   icon: string;
-  label: string;
-  note?: string;
+  label: Node;
+  note?: Node;
   danger?: boolean;
   disabled?: boolean;
+  /** The choice that holds now, in a sheet of choices. */
+  on?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`at-sheetact${danger ? " danger" : ""}`}
+      className={`at-sheetact${danger ? " danger" : ""}${on ? " on" : ""}`}
       disabled={disabled}
+      aria-current={on ? "true" : undefined}
       onClick={onClick}
     >
       <span className="at-sheetactico" aria-hidden="true">
@@ -2518,6 +2547,11 @@ export function SheetAction({ icon, label, note, danger, disabled, onClick }: {
         <b>{label}</b>
         {note ? <i>{note}</i> : null}
       </span>
+      {on ? (
+        <span className="at-sheetacton" aria-hidden="true">
+          <Icon name="check" size={20} />
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -5548,7 +5582,7 @@ export function cardToItem(card: Card, moduleTitle: string, courseId: string, mo
       ...formOf(f, id),
       ...(copies[id] ? { joinedFrom: copies[id] } : null),
       /* The card's description and its English, on its own word, where it
-         is asked: a word or phrase with one form (0.691). Kept off a card
+         is asked: a word or phrase with one form (0.694). Kept off a card
          with more, which the editor says is not asked. */
       ...(id === localIdFor(card.id) && descriptionAsked(card as any) ? storedDescription(f) : null),
     }));

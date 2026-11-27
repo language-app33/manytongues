@@ -927,10 +927,6 @@
 .at-reviewmark.no.on { background: var(--rose); border-color: var(--rose); color:#fff; }
 .at-reviewmark:focus-visible { outline:2px solid var(--brass); outline-offset:2px; }
 .at-narrowlist { max-height: 50vh; overflow:auto; margin-top:10px; }
-.at-reviewbanner { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-  margin:0 0 12px; padding:10px 12px; border-radius: var(--r-sm);
-  border:1px solid var(--tag-line); background: var(--tag-bg); }
-.at-reviewbanner > span { flex:1 1 12em; min-width:0; font-size: var(--fs-sm); font-weight:600; }
 .at-reportlist { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
 .at-report { padding:12px; border:1px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
   display:flex; flex-direction:column; gap:4px; min-width:0; }
@@ -941,17 +937,13 @@
 .at-reportnote { font-size: var(--fs-sm); color: var(--text-soft); }
 .at-reportwho { font-size: var(--fs-xs); color: var(--muted); }
 /* A card's status, beside Edit on its screen: the app's menu button (see
-   .at-menubtn) and its menu (see .at-pickmenu), hung from the button's
-   right edge, since the button sits at the end of the card's top line —
-   so the menu opens back across the screen. Edged in where the card
-   stands. See StatusMenu; Popover keeps it on the screen wherever the
-   button goes next. */
+   .at-menubtn), opening the app's one panel of choices (0.690, see
+   StatusMenu). Edged in where the card stands. */
 .at-statusmenu { position:relative; display:inline-flex; }
 .at-statusbtn.published { border-color: var(--jade); }
 .at-statusbtn.published { color: var(--jade); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { color: var(--brass); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { border-color: var(--brass); }
-.at-statuspick { left:auto; right:0; top:calc(100% + 6px); }
 /* At the start of a line or a table row: the badge's words, smaller, and
    on two lines rather than one long one. */
 .at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;

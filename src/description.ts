@@ -1,5 +1,5 @@
 /*
- * A word's description, in the language itself (0.691).
+ * A word's description, in the language itself (0.694).
  *
  * A few words a teacher writes about a word in the language being learnt —
  * "where you buy bread" for *bakery* — with its English beside it if they
