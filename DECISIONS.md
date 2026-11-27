@@ -9545,3 +9545,14 @@ personal deck, at each start (`retireOnStart`, which logs and serves on a
 failure). Creating personal records through the server still works, for
 the tests and for old phones; whatever is made is deleted at the next
 start. The app offers no way in.
+
+## New module asks what kind again (0.720)
+
+The owner's word: bring back the sheet 0.710 removed. `newModule()` opens
+the `PickSheet` of `NEW_KINDS` again (outside My space), and To do's
+"Create a module" opens it too, keeping `namingFor`: a unit's course
+radio starts on that course (`NewModule`'s `initialCourse`), and a deck
+or a personal set is attached to it. The sheet is drawn at the frame's
+level, beside `MeaningSplits`, so it opens from Home as well as Material.
+"New personal set" left the Material list's `more` menu: one place to
+choose a kind. `PathSection`'s New unit stays.

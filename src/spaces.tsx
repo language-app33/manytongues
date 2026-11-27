@@ -5024,10 +5024,16 @@ function lockedDeleteNote(titles: string[]): string {
  * deck (its courses, its lock, what it holds) is on the deck's screen once
  * it is saved, as a card's exercises wait for the card to be saved.
  */
-/* The three kinds a new deck can be (0.633), fixed once it is made. Since
-   0.710 New module makes a deck straight away; a unit is made from a
-   course's path, and a personal set from the three dots beside New module. */
+/* The three kinds a new module can be (0.633), fixed once it is made.
+   Chosen first, on a sheet, from New module and from To do's Create a
+   module (0.720, as before 0.710). A unit can also be made from a
+   course's path. */
 type NewKind = "deck" | "unit" | "set";
+const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
+  { kind: "deck", title: "Deck", meta: "A set of cards, for any course." },
+  { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
+  { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
+];
 
 function NewModule({
   choices,
@@ -5038,6 +5044,7 @@ function NewModule({
   onClose,
   kind = "deck",
   courses = [],
+  initialCourse = "",
 }: {
   choices: Record<LangId, Lang>;
   mustAsk?: boolean;
@@ -5049,10 +5056,14 @@ function NewModule({
   kind?: NewKind;
   /** The courses a unit can be made in. */
   courses?: { id: string; title: string }[];
+  /** The course a unit starts in: the one To do's Create a module was for. */
+  initialCourse?: string;
 }) {
   const [title, setTitle] = useState("");
   const [lang, setLang] = useState(initialLang || "");
-  const [courseId, setCourseId] = useState(courses.length === 1 ? courses[0].id : "");
+  const [courseId, setCourseId] = useState(
+    initialCourse && courses.some((c) => c.id === initialCourse) ? initialCourse : courses.length === 1 ? courses[0].id : ""
+  );
   const [discarding, setDiscarding] = useState(false);
   const snack = useSnackbar();
   const unit = kind === "unit";
@@ -6674,12 +6685,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The course a new module is being made for, from To do on Home
      (0.695): it is made in that course's language and put in it. */
   const [namingFor, setNamingFor] = useState<Course | null>(null);
-  /* What kind of module naming makes. New module is a deck, in one step
-     (0.710): no sheet asking which kind first. */
+  /* What kind of module naming makes: chosen on a sheet first (0.633,
+     back in 0.720 after 0.710 took it out), except in My space, where
+     only a deck can be made. */
+  const [choosingKind, setChoosingKind] = useState(false);
   const [newKind, setNewKind] = useState<NewKind>("deck");
   const newModule = () => {
     setNewKind("deck");
-    setNaming("new");
+    if (mineSide) setNaming("new");
+    else setChoosingKind(true);
   };
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
   /* Open a card to read it: the editor, locked. */
@@ -8136,6 +8150,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <NewModule
         kind={newKind}
         courses={courses.map((c) => ({ id: c.id, title: c.title }))}
+        initialCourse={namingFor ? namingFor.id : ""}
         choices={choicesOn}
         mustAsk={mustAskOn && !namingFor}
         initialLang={namingFor ? (namingFor.language as LangId) : knownOn.length === 1 ? soleLangOn : ""}
@@ -8150,8 +8165,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 ? await API.createUnit(courseId, title)
                 : await API.createModule(title, "", namingFor ? (namingFor.language as LangId) : lang || soleLangOn, mineSide);
               if (newKind === "set" && r && r.deck && r.deck.id) await API.saveSet(r.deck.id, emptySet());
-              /* Made from To do for a course: put in that course. */
-              if (namingFor && newKind === "deck" && r && r.deck && r.deck.id) await API.attachModule(r.deck.id, namingFor.id);
+              /* Made from To do for a course: put in that course. A unit
+                 is already on its course's path. */
+              if (namingFor && newKind !== "unit" && r && r.deck && r.deck.id) await API.attachModule(r.deck.id, namingFor.id);
               setNaming(null);
               setNamingFor(null);
               await refresh();
@@ -10592,6 +10608,21 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               bands across the top of every tab here. Both are in To do on
               Home since 0.693 (the owner's 5a), with its count on Home's
               button in the bar. */}
+          {choosingKind && (
+            <PickSheet title="New module" lede="What kind of module? This can't be changed once it is made." onClose={() => { setChoosingKind(false); setNamingFor(null); }}>
+              {/* Spaced as every list of tiles is (0.683); a personal set
+                  only where the App admin switched them on (0.720). */}
+              <div className="at-decklist2">
+                {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
+                  <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+                    setChoosingKind(false);
+                    setNewKind(k.kind);
+                    setNaming("new");
+                  }} />
+                ))}
+              </div>
+            </PickSheet>
+          )}
           {splitting && (
             <MeaningSplits
               cards={twoMeanings}
@@ -10657,7 +10688,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         setSide("space");
                         setNewKind("deck");
                         setNamingFor(c || null);
-                        setNaming("new");
+                        setChoosingKind(true);
                       }}>Create a module</Button>;
                     }
                     if (item.module) {
@@ -11038,7 +11069,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               )}
 
               {mineSide ? null : (
-                <Help>A module is a set of cards a course learns from. Students see a module once it&apos;s added to a course they belong to.</Help>
+                <Help>A module is something a course learns from: a deck of cards, a unit on a course&apos;s path, or a personal set. Students see a module once it&apos;s added to a course they belong to.</Help>
               )}
 
               <ItemList
@@ -11071,14 +11102,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                more={[
-                  ...(modules.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []),
-                  /* A personal set, where the space has them (0.710). */
-                  ...(setsOn && !mineSide ? [{ label: "New personal set", icon: "add", onClick: () => {
-                    setNewKind("set");
-                    setNaming("new");
-                  } }] : []),
-                ]}
+                /* A personal set is on New module's sheet again (0.720), not
+                   here. */
+                more={modules.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
                 onNew={mineSide ? undefined : newModule}
                 selected={selModules}
                 onSelectedChange={setSelModules}
