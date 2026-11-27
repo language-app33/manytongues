@@ -9450,3 +9450,13 @@ when the device had no stored answer (`teachesKey()` absent, read before
 Teaching — unless the person already chose (`pickedSpace`, set by
 `pickMode` and `goToSpace`), the page was opened with `?open=`, or the
 space is being tried. A stored "0" still opens Learning.
+
+## A course lists people by name, and its modules come first (0.707)
+
+Teachers could not tell students apart, and the thing they open a course
+for was at the bottom. `my-courses` adds `people` (handle → display name,
+one `namesOf` call for the whole answer) to each course the caller teaches
+or whose space they manage; never to a student, never stored. The People
+tab shows the name, the handle under it, and initials from the name. The
+Course tab's blocks are reordered: This course, Modules, Join code, Path,
+Word sets.

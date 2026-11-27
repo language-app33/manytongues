@@ -5461,6 +5461,19 @@ async function handle(req) {
             teacherCode: role === "teacher" ? c.teacherCode : undefined,
           };
         });
+      /* Names for a course's people (0.707), so its People tab can say who
+         they are: only where the caller teaches it or manages the space,
+         looked up once for the whole answer, and never stored. */
+      const named = out.filter((c) => c.teaching || iManage);
+      if (named.length) {
+        const names = await namesOf(named.flatMap((c) => [...(c.teachers || []), ...(c.students || [])]));
+        for (const c of named) {
+          /** @type {Record<string, string>} */
+          const people = {};
+          for (const h of [...(c.teachers || []), ...(c.students || [])]) people[h] = names[h] || h;
+          c.people = people;
+        }
+      }
       return jsonTagged(req, { ok: true, courses: out });
     }
 

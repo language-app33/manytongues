@@ -13139,8 +13139,11 @@ const openPronounTables = async () => {
     rows.join(" | ") || "no path section");
   check("a published unit can be opened for the class; a draft cannot",
     /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
-  const screenText = ((pathBlock && pathBlock.closest(".at-screen")) || document.body).textContent || "";
-  const modulesPart = screenText.slice(screenText.lastIndexOf("Modules"));
+  /* The Modules block itself (0.707: it now sits above the path, so the
+     text after the word is no longer only its own). */
+  const modulesBlock = [...(((pathBlock && pathBlock.closest(".at-screen")) || document).querySelectorAll(".at-formblock"))]
+    .find((b) => ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Modules");
+  const modulesPart = (modulesBlock && modulesBlock.textContent) || "";
   check("a unit is not among the course's ordinary decks", /Lesson 1/.test(modulesPart) && !/Greetings unit|Family unit/.test(modulesPart),
     modulesPart.replace(/\s+/g, " ").slice(0, 200));
   click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);

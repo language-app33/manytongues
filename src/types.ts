@@ -1362,6 +1362,8 @@ export interface Course {
   pathLive?: Record<string, Millis>;
   /** The ids of the path units a teacher has opened early for this course's class. */
   opened?: string[];
+  /** Display names of its teachers and students by handle (0.707): sent to its teachers only, never stored. */
+  people?: Record<string, string>;
 }
 
 /**

@@ -10350,14 +10350,22 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const people = (title: string, list: string[], none: string) => (
       <Field label={`${title} · ${list.length}`}>
         {list.length ? (
-          list.map((h) => (
-            <div className="at-person" key={h}>
-              <span className="at-avatar">{h.slice(0, 2).toUpperCase()}</span>
-              <span className="at-personname">
-                <PersonName handle={h} me={account.handle} />
-              </span>
-            </div>
-          ))
+          list.map((h) => {
+            /* By name, with the handle under it (0.707). */
+            const name = c.people?.[h];
+            const initials = name
+              ? name.trim().split(/\s+/).slice(0, 2).map((w) => w.charAt(0)).join("").toUpperCase()
+              : h.slice(0, 2).toUpperCase();
+            return (
+              <div className="at-person" key={h}>
+                <span className="at-avatar">{initials}</span>
+                <span className="at-personname">
+                  <PersonName name={name} handle={h} me={account.handle} />
+                  {name ? <span className="at-handle">{h}</span> : null}
+                </span>
+              </div>
+            );
+          })
         ) : (
           <Help>{none}</Help>
         )}
@@ -10421,37 +10429,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 <p className="at-fieldvalue">{languageName(languages, c.language)}</p>
               </Field>
             </div>
-
-            {/* Only the student code lives here. The teacher code hands over
-                control of the material, so who holds it is the
-                administrator's decision to make, in the admin space. */}
-            <div className="at-formblock">
-              <div className="at-formhead">
-                <span className="at-formnum">Join code</span>
-                <span className="at-formrole">
-                  This is the code students join with. Teacher codes are your
-                  administrator's to hand out.
-                </span>
-              </div>
-              <CodeBox
-                label="Student code"
-                code={c.code}
-                hint="Share this with a class so they can join and study."
-              />
-            </div>
-
-            <CourseWordSets
-              key={c.id}
-              course={c}
-              lang={languages[c.language as LangId] || null}
-              onOpenSets={() => {
-                setCourseView(null);
-                setSide("space");
-                setTab("wordsets");
-              }}
-            />
-
-            {pathSection}
 
             {/* What the course teaches, as a deck says which courses carry
                 it: the names, each with its way out, and the way to add
@@ -10537,6 +10514,37 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 </Nudge>
               )}
             </div>
+            {/* Only the student code lives here. The teacher code hands over
+                control of the material, so who holds it is the
+                administrator's decision to make, in the admin space. */}
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Join code</span>
+                <span className="at-formrole">
+                  This is the code students join with. Teacher codes are your
+                  administrator's to hand out.
+                </span>
+              </div>
+              <CodeBox
+                label="Student code"
+                code={c.code}
+                hint="Share this with a class so they can join and study."
+              />
+            </div>
+
+            {pathSection}
+
+            <CourseWordSets
+              key={c.id}
+              course={c}
+              lang={languages[c.language as LangId] || null}
+              onOpenSets={() => {
+                setCourseView(null);
+                setSide("space");
+                setTab("wordsets");
+              }}
+            />
+
             </div>
             )}
             {courseTab === "people" && (

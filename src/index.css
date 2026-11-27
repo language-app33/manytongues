@@ -1107,6 +1107,8 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   letter-spacing:0; text-transform:none; color: var(--ink); }
 
 .at-personname { font-size:14px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
+/* A course's People tab (0.707): the name, and the handle under it. */
+.at-personname .at-handle { display:block; font-size:12px; font-weight:400; color: var(--muted); }
 .at-panel .at-decklist2 .at-deckcard { background: var(--raised); }
 .at-listtools { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
 /* Dialog titles and screen titles are the same rank, so they are the same

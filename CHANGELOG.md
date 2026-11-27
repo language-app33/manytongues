@@ -8,6 +8,15 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.707 — 27 November 2026
+
+**A course lists its people by name.** The People tab now shows each
+teacher's and student's name, with their handle beneath it. It used to show
+handles only.
+
+**A course's modules come first.** On the Course tab, Modules now sits
+directly under the course's name, above the join code and the path.
+
 ## 0.706 — 27 November 2026
 
 **A teacher's first screen is Teaching.** Signing in on a new device as
