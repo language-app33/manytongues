@@ -9718,8 +9718,60 @@ learner's Courses page and card grids look and behave as before.
   key handling rather than copying it, and `useNarrow` says no where there
   is no `matchMedia`, so the smoke walk keeps checking the table.
 
+## Chips for filters, rows for Sort, the funnel, and the Exercises tab (0.735)
 
-## A calmer module screen and a more rewarding Numbers set (0.735)
+The owner chose each of these on a page of mock-ups (answers 1a, 2a, 3a,
+4a, 6a, 7a, 8a, 9a, 10a).
+
+- **Filters are chips, with no "Any".** Every Filter group drew a segmented
+  track with "Any" lit green, so a list narrowing nothing looked as busy as
+  one narrowed three ways. Now nothing lit means a group narrows nothing,
+  a lit chip pressed again lets go, and green means one thing: this is
+  narrowing the list. The Filter button turns the same green (it was
+  gold) while anything is. `ChipPick` does both kinds of group — one at a
+  time, with the "none" value left undrawn, and several at once for Kind
+  and its subtypes — so Kind's tick list and its "Tick a kind" line went.
+  The module and blank lists under "In these" / "Leaves one" stay tick
+  lists: they are as long as the teacher's material.
+- **Sort kept its Apply and its two steps**, as rows and one switch. "Sort
+  by" is `RadioGroup` rows with a mark; "Order" is one `Segmented` in
+  ordinary letters whose words follow the row picked. A list reordering
+  behind the panel while a teacher is still choosing is still the thing
+  Apply prevents (0.728).
+- **A funnel for filtering, the sliders kept for settings.** The Filter
+  button and `FilterMenu`'s default are the funnel. The other uses of
+  `tune` were checked one by one: the course's Exercises tab, a card's
+  Advanced tab, the admin space, Build a session, a session's Mode and a
+  card's subtype are settings, not filters, and keep it. The Modules list's
+  "who made it" filter already had its own picture (a person) and keeps it.
+- **The translation choice as four rows that explain themselves.** Each tap
+  changes what students get at once, so each choice says what it does
+  before it is made rather than after.
+- **"What this asks" over folded groups under a preset; everything open
+  under Custom.** A preset decides the switches, so under one the groups
+  are for reading — a row each with its count, opened one at a time, a
+  tick, a dash or "Where needed" per exercise. Under Custom the teacher
+  decides, so every exercise is on show with its switch. The old "locked"
+  rows inside the Custom list could no longer be reached and were removed.
+- **The sliding switch is used on this tab only.** The OFF / ON pair it
+  replaces was used nowhere else in the app, so `Switch` changes one
+  screen; it is in the shared library for the next on/off.
+- **The Basic tab's three small changes**, only while a card is written: a
+  line under "Build an advanced card" saying what it is for; a worded link
+  under the last answer, shown once that answer has text, in place of the
+  bare + in the heading (which read as adding a language, and an empty
+  second box was never what was meant); and Description folded to one row
+  with Add. Whether it starts folded is decided once, when the block first
+  draws, so emptying the boxes while typing does not fold them away. The
+  links keep the + button's accessible name, "Add another accepted
+  answer". The Advanced tab's forms keep their + and − column.
+- **Card name was deliberately left required and first.**
+- An English description is still kept only beside one in the language
+  itself; that rule (`storedDescription`) is unchanged, so a card saved
+  with only the English opens with Description folded again.
+
+
+## A calmer module screen and a more rewarding Numbers set (0.736)
 
 All chosen by the owner on a page of mock-ups.
 

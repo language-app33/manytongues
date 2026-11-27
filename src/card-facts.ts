@@ -810,7 +810,7 @@ export const CARD_FACTS: FieldRule[] = [
     reader: "both",
     shown: (value) => {
       const range = value as { kind?: string; label?: string } | null;
-      /* A part of the numbers by its range, as partName says it (0.735). */
+      /* A part of the numbers by its range, as partName says it (0.736). */
       return range && range.label ? [range.kind === "numbers" ? `Numbers · ${range.label}` : range.label] : [];
     },
   },

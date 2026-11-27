@@ -523,7 +523,7 @@ test("Arabic writes its figures digit for digit, with its own thousands mark", a
   assert.equal(LANGUAGES["vi"].numerals, undefined);
 });
 
-/* How much of a part's own words is written (0.735): the thin bar on a
+/* How much of a part's own words is written (0.736): the thin bar on a
    part under way counts the boxes of the words it is the first to need,
    and only those. */
 test("a part's progress counts its own boxes, and how many hold a word", () => {

@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.735 — 27 November 2026
+## 0.736 — 27 November 2026
 
 **A calmer module screen and a more rewarding Numbers set**, as chosen on
 the page of mock-ups.
@@ -75,6 +75,73 @@ row are about half the width they were.
 **To check by hand:** on a real phone, typing Arabic into the half-width
 boxes with the phone's own keyboard and with the on-screen keys, and how
 the green glow looks.
+
+## 0.735 — 27 November 2026
+
+**Simpler Sort and Filter panels, a course's Exercises tab, and a card's
+Basic tab while it is written**, as chosen on the page of mock-ups.
+
+**The Sort panel** (every list that has one)
+
+- **"Sort by" is a list of rows** with a mark on the chosen one. **"Order"
+  is one two-part switch** under it, full width, in ordinary letters. Apply
+  stays: the list does not move until it is pressed.
+
+**The Filter panel** (every list that has one)
+
+- **Every group is full width**, one under another. Its choices are
+  rounded chips in ordinary letters that wrap as they need. Kind is chips
+  too.
+- **There is no "Any" chip.** Nothing lit in a group means it narrows
+  nothing. Tap a chip to filter; tap it again to stop. Only filters that
+  are on are green.
+
+**The Filter button**
+
+- **Its picture is a funnel**, wherever there is a Filter button. While
+  filters are on it is **green** with the count (it was gold), the same
+  green as a lit chip.
+
+**Course › Exercises**
+
+- **The translation choice is four rows**, each with its explanation always
+  showing and a mark on the chosen one. No translation now reads "No
+  English: only pictures, sound and the language itself."
+- **Under With, Little or No translation**, a label "What this asks" sits
+  over the four groups ("What it means", "Which word it is", "Write it from
+  a cue", "Write it from its meaning"), each a row with its count ("9 of 15
+  on"). Tap a group to read its exercises, each with a tick, a dash, or
+  "Where needed".
+- **Under Custom** everything is open, as before, and each exercise has
+  **one sliding switch** instead of the OFF / ON pair. The group headings
+  are small capital labels with their counts.
+
+**A card's Basic tab, while writing it**
+
+- **"Build an advanced card"** has one line under it: "For several forms, a
+  sentence with blanks, a verb table or a conversation."
+- **The bare + beside "Arabic" and "English" is gone.** Once a box has
+  something in it, a worded link appears under it: "+ Another way to write
+  it" for the word, "+ Another accepted answer" for the English.
+- **Description is one row**, "Optional. Adds two kinds of exercise.", with
+  **Add**. Add opens the two boxes as before. A card that has a description
+  opens with them showing.
+- Card name is unchanged: required, and first. A card being read is
+  unchanged.
+
+**Trade-offs**
+
+- The Sort panel is a little taller.
+- A teacher has to learn that tapping a lit chip turns it off.
+- A second accepted answer cannot be added until the first is typed.
+- Description is one press further.
+- The OFF / ON pair was used only on the course's Exercises tab, so the
+  sliding switch changes that tab alone.
+
+**To check by hand**
+
+- On a real phone: that the Filter panel scrolls smoothly with its Show
+  button in view, and that the sliding switches are easy to hit.
 
 ## 0.734 — 27 November 2026
 

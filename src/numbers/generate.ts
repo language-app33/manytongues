@@ -1239,7 +1239,7 @@ const HOMES: WeakMap<Composer, Map<string, string>> = new WeakMap();
 
 /**
  * How much of a part's own words is written: the boxes of the words it is
- * the first to need, and how many of them hold a word (0.735). Drawn as a
+ * the first to need, and how many of them hold a word (0.736). Drawn as a
  * thin bar on a part under way. A box the composer can do without is not
  * counted: leaving it empty is not leaving the part unfinished.
  */

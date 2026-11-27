@@ -290,7 +290,7 @@ export function NumberSystemEditor({
   const labels = useMemo(() => new Map(slotSpecs.map((s) => [s.slot, s.label])), [slotSpecs]);
   const checks = useMemo(() => (composer ? rangeChecks(composer, counted) : []), [composer, counted]);
   /*
-   * The moment a part becomes ready (0.735, the owner's choice): the parts
+   * The moment a part becomes ready (0.736, the owner's choice): the parts
    * open when the screen opened, and after each save that went through, so
    * a save can tell which it has just finished. Those are said in a
    * message and marked "Just finished" on their tiles until the teacher
@@ -631,7 +631,7 @@ export function NumberSystemEditor({
         onFix={() => setFixing(true)}
         onCheck={() => setTrying(true)}
       />
-      {/* Small print at the foot since 0.735: the headline is what this
+      {/* Small print at the foot since 0.736: the headline is what this
           screen opens on. */}
       {sharedNote ? <Help className="at-mt5">{sharedNote}</Help> : null}
     </Screen>
@@ -735,7 +735,7 @@ export function countingStatus(check: RangeCheck, labels: Map<string, string>): 
   return `Counting: ${waitingOn(counting.warnings, labels)}`;
 }
 
-/** The tick before a finished part's name (0.735): a solid green circle,
+/** The tick before a finished part's name (0.736): a solid green circle,
     never the green outline and fill that mean "chosen" elsewhere. */
 function DoneTick() {
   return <span className="at-numtick" aria-hidden="true"><Icon name="check" size={16} /></span>;
@@ -775,7 +775,7 @@ function NumbersTab({ lang, draft, checks, slots, render, justReady, homes, labe
   const next = parts.find((c) => !c.open && /still to write$/.test(statusOf(c)));
 
   /*
-   * What students can do now, as a headline with no box (0.735, the
+   * What students can do now, as a headline with no box (0.736, the
    * owner's choice): how far the unbroken run of finished parts from the
    * start lets them count, then how many parts are ready and which is
    * next, and a step for each part that fills in.
@@ -837,7 +837,7 @@ function NumbersTab({ lang, draft, checks, slots, render, justReady, homes, labe
         </Notice>
       ) : null}
 
-      {/* No "Parts" heading over them since 0.735: the headline says what
+      {/* No "Parts" heading over them since 0.736: the headline says what
           they are. */}
       <div className="at-numparts at-mt5">
           {parts.map((check) => {
@@ -1333,7 +1333,7 @@ function WordGrid({ lang, draft, setDraft, slots, onRecord, countedAt }: {
 }) {
   /*
    * Cut into runs of numbers that share an explanation and a number of
-   * boxes (0.735, the owner's choice). A run's explanation is said once,
+   * boxes (0.736, the owner's choice). A run's explanation is said once,
    * above it, where 3 to 9 used to say the same sentence seven times. A
    * run of numbers with exactly two boxes is drawn as rows: the number,
    * then its two boxes side by side under the run's column headings. One
