@@ -10653,6 +10653,15 @@ const openPronounTables = async () => {
   check("and the key it hands back is put on the screen to be kept",
     /cedar-harbour-quartz-ember-4f2a/.test(host5.textContent || ""),
     (host5.textContent || "").slice(0, 200).replace(/\s+/g, " "));
+  /* The key screen is short (0.698): the key, one Copy, one line; no
+     sign-in link repeated, and no tick-box to get past. */
+  {
+    const text = host5.textContent || "";
+    const carryOn = [...host5.querySelectorAll("button")].find((b) => /^I've saved it, carry on$/.test((b.textContent || "").trim()));
+    check("the key screen asks only to save the key, with the button live straight away",
+      /Save your sign-in key/.test(text) && !/Your private sign-in link/.test(text) && !!carryOn && !carryOn.disabled,
+      text.slice(0, 200).replace(/\s+/g, " "));
+  }
   check("nothing threw on the way in", errors.length === before,
     errors.slice(before, before + 3).join(" | "));
 
@@ -12601,7 +12610,7 @@ const openPronounTables = async () => {
     check("and her practice is kept where her key keeps it, not under the link's code",
       remoteDocs.has(/** @type {any} */ (lina).syncToken) && !remoteDocs.has(await digestOf(lina.linkKey)),
       [...remoteDocs.keys()].map((k) => k.slice(0, 8)).join(", ") || "nothing synced");
-    check("without stopping them to tick that the key is saved", !/Keep this somewhere safe/.test(app.host.textContent || ""),
+    check("without stopping them to tick that the key is saved", !/Save your sign-in key/.test(app.host.textContent || ""),
       (app.host.textContent || "").slice(0, 100));
     check("and the key is taken out of the address", window.location.hash === "", window.location.hash);
     app.close();

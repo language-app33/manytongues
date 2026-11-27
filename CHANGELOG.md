@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.698 — 27 November 2026
+
+**Signing up asks for less.** The screen after you choose your name now
+shows your sign-in key, one Copy button and one line about keeping it safe.
+The sign-in link and your handle are no longer repeated there; both are in
+Settings. The tick-box is gone: the button works straight away.
+
+To check by hand: on a phone, that the password manager still offers to
+save the key when the button is pressed.
+
 ## 0.697 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
