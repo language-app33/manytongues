@@ -5582,7 +5582,7 @@ export function cardToItem(card: Card, moduleTitle: string, courseId: string, mo
       ...formOf(f, id),
       ...(copies[id] ? { joinedFrom: copies[id] } : null),
       /* The card's description and its English, on its own word, where it
-         is asked: a word or phrase with one form (0.694). Kept off a card
+         is asked: a word or phrase with one form (0.695). Kept off a card
          with more, which the editor says is not asked. */
       ...(id === localIdFor(card.id) && descriptionAsked(card as any) ? storedDescription(f) : null),
     }));

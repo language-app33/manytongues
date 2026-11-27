@@ -2383,6 +2383,26 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(40);
 }
 
+/* ---- Courses, from the student's menu (0.694) ----
+   It broke with "reading 'filter'" once the code said module: Learning
+   still handed the screen its modules under the old name, and the screen
+   got none. A course tile counting its modules is the proof it got them. */
+{
+  const before = errors.length;
+  if (!document.querySelector(".at-cmenu")) click(document.querySelector(".at-cornerbtn"));
+  await sleep(60);
+  click([...document.querySelectorAll(".at-cmenu button, .at-cmenu [role=menuitem]")]
+    .find((b) => /^Courses$/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const tile = [...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || ""));
+  const said = tile ? (tile.textContent || "").replace(/\s+/g, " ") : document.body.textContent.slice(0, 160).replace(/\s+/g, " ");
+  check("the student's Courses opens from the menu and counts each course's modules",
+    !!tile && /[1-9]\d* modules?/.test(said) && !/Something broke/.test(document.body.textContent || ""), said);
+  check("and nothing threw opening it", errors.length === before, errors.slice(before, before + 3).join(" | "));
+  click(document.querySelector(".at-screen .at-back, [aria-label='Back']"));
+  await sleep(200);
+}
+
 /* ---- the card tiles, in the student's list ----
    They carried the language, the decks the card was in, how many forms it
    had and how many recordings — four facts in a tile you scan past. Now:

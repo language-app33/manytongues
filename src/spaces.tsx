@@ -3868,7 +3868,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
    Becoming the administrator — once, from Account settings
    ------------------------------------------------------------------ */
 
-export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) {
+export function ClaimAdmin({ onDone }: { onDone?: (claimed?: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
@@ -3903,7 +3903,7 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
               await API.claimAdmin(key.trim());
               reach.ok();
               setOpen(false);
-              onDone();
+              onDone?.();
             } catch (e) {
               if (!reach.caught(e, claim)) setError(API.explain(e));
             } finally {
@@ -11066,7 +11066,7 @@ export function StudentCourses({
   /** Your spaces, when Learning shows more than one: the courses go under
       a heading per space (memberships). */
   spaces?: { id: string; name: string }[];
-  modules: (Module & { courseId: string, courseTitle?: string })[];
+  modules: (Module & { courseId?: string, courseTitle?: string })[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;

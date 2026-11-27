@@ -3574,7 +3574,7 @@ async function handle(req) {
                  description's English, where the teacher wrote one — see
                  src/description.ts. On the card's own word, and only on a
                  word or phrase: a sentence or a scene has none. Absent
-                 where empty, which is every form written before 0.694. */
+                 where empty, which is every form written before 0.695. */
               ...(fi === 0 && takesDescription(card) ? storedDescription(f) : {}),
             })),
           /* Which word cards this one teaches by containing them. A phrase

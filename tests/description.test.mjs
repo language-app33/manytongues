@@ -1,5 +1,5 @@
 /*
- * A word's description, in the language itself (0.694): the editor's
+ * A word's description, in the language itself (0.695): the editor's
  * rules, the two questions asked from it, and what reaches a student's
  * device. See src/description.ts.
  */

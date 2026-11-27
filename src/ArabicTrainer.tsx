@@ -122,8 +122,10 @@ type SpaceName = {
   [K in keyof SpacesModule]: SpacesModule[K] extends React.ComponentType<any> ? K : never;
 }[keyof SpacesModule];
 
-const fromSpaces = (name: SpaceName): React.ComponentType<any> =>
-  React.lazy(() =>
+/* Typed by the component it loads, so a prop renamed on one side and not
+   the other fails the type check rather than the screen (0.694). */
+const fromSpaces = <K extends SpaceName>(name: K) =>
+  React.lazy<SpacesModule[K]>(() =>
     import("./spaces.tsx")
       .then((m) => {
         try {
@@ -133,7 +135,7 @@ const fromSpaces = (name: SpaceName): React.ComponentType<any> =>
         }
         return { default: m[name] };
       })
-      .catch(recoverChunk)
+      .catch(recoverChunk) as Promise<{ default: SpacesModule[K] }>
   );
 const Onboarding = fromSpaces("Onboarding");
 const AdminSpace = fromSpaces("AdminSpace");
@@ -14425,7 +14427,7 @@ export default function ArabicTrainer() {
      being shown two hints. Without a meaning to give, the nudge is the
      pronunciation, as it always was. */
   /* A description's English is English, so a course that shows none
-     offers none behind the nudge either (0.694). */
+     offers none behind the nudge either (0.695). */
   const hintHidden = !!(spec && spec.hintField === "descEn" && englishModeFor(exercise ? String(exercise.id || "") : "") === "hidden");
   const hintValue = !phraseHint && !hintHidden && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
   const hintAt = phraseHint || hintValue;
@@ -16996,7 +16998,7 @@ export default function ArabicTrainer() {
                     ) : spec.promptField === "desc" ? (
                       /* A description, in the language itself: a phrase
                          in the script, set the way a phrase with a gap
-                         is (0.694). */
+                         is (0.695). */
                       <Field value={item.desc} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
@@ -18052,7 +18054,7 @@ export default function ArabicTrainer() {
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
             courses={learnCourses}
-            decks={learnModules}
+            modules={learnModules}
             spaces={!spaceNow && learnSpaces.length > 1 ? learnSpaces : undefined}
             mySpaceIds={accountOrgs.map((o) => o.id)}
             languages={LANGUAGES}

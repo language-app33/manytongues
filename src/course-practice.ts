@@ -45,7 +45,7 @@ export const usesEnglish = (type: string): boolean => ENGLISH_TYPES.includes(typ
 
 /*
  * What can teach a word's meaning without English: a picture, a recording,
- * a phrase, a scene, or a description in the language itself (0.694). A form whose only questions without English need
+ * a phrase, a scene, or a description in the language itself (0.695). A form whose only questions without English need
  * none of these (writing it from its transliteration, say) has nothing but
  * English to teach it, and in a *No translation* course is not asked.
  */

@@ -9,7 +9,8 @@ considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
 <<<<<<< HEAD
-## 0.694 — 27 November 2026
+<<<<<<< HEAD
+## 0.695 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
 card has a new Description box: on the Basic tab of a basic card, and on the
@@ -38,6 +39,19 @@ so a word with one is still asked.
 To check on a phone: how a long description wraps above the four choices,
 and with the keyboard open on the writing exercise.
 =======
+=======
+## 0.694 — 27 November 2026
+
+**Courses opens again for students.** Learning › You › Courses showed
+"Something broke" (reading 'filter') for anyone in a course, since 0.687
+renamed decks to modules in the code: the Courses screen was still being
+handed its modules under the old name and got none. It now gets them, and
+each course counts its modules again. The type check now covers the props
+of every screen that loads on demand, so a rename missed on one side
+fails the build instead of the screen; it found one more such slip, in
+claiming super admin from Settings, which is mended too.
+
+>>>>>>> origin/beta
 ## 0.693 — 27 November 2026
 
 **Teaching opens on Home, with To do at the top.** The first tab in
