@@ -262,11 +262,12 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
       {headed && !locked && String(list[list.length - 1] || "").trim() !== "" && (
         <button
           type="button"
-          className="at-linkbtn at-addanswer"
+          className="at-addanswer"
           aria-label={of ? `${addLabel} for ${of}` : addLabel}
           onClick={() => commit(list.concat([""]))}
         >
-          + Another accepted answer
+          <Icon name="add" size={18} />
+          Another accepted answer
         </button>
       )}
     </div>
@@ -656,11 +657,12 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
       {headed && !locked && String((rows[rows.length - 1] || { text: "" }).text || "").trim() !== "" && (
         <button
           type="button"
-          className="at-linkbtn at-addanswer"
+          className="at-addanswer"
           aria-label="Add another accepted answer"
           onClick={() => commit(rows.concat([{ text: "", lat: "" }]))}
         >
-          + Another way to write it
+          <Icon name="add" size={18} />
+          Another way to write it
         </button>
       )}
     </div>

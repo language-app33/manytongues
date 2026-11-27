@@ -3995,4 +3995,29 @@ p.at-pathhome { cursor:default; font-weight:700; }
 
 /* Another accepted answer, as a worded link under the last box on a card's
    Basic tab (0.735, the owner's 9a). */
-.at-addanswer { align-self:flex-start; margin-top:8px; font-weight:700; font-size:15px; min-height:32px; }
+/* Green and bold with a +, no underline (0.738, the owner's 4b): an action
+   on this screen, like Clear on a list's line, not a link away. */
+.at-addanswer { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; margin-top:8px;
+  padding:4px 0; min-height:36px; background:none; border:0; cursor:pointer;
+  font-family: var(--ui); font-weight:800; font-size:15px; color: var(--accent); }
+.at-addanswer:hover { color: var(--text); }
+.at-addanswer:focus-visible { outline:3px solid var(--brass); outline-offset:2px; border-radius:6px; }
+
+/* TileChoice (0.738, the owner's 2b): a picture, a name and a line, a tick
+   on the chosen one, as the New module panel's kinds are drawn. */
+.at-tilechoices { display:flex; flex-direction:column; gap:10px; }
+.at-tilechoice { display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  padding:12px; border:1px solid var(--line); border-radius: var(--r); background: var(--surface);
+  font:inherit; color: var(--text); cursor:pointer; transition: background 120ms, border-color 120ms; }
+.at-tilechoice.on { border-color: var(--jade); background: var(--jade-bg); }
+.at-tilechoice:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-tilechoice:disabled { cursor:default; opacity:.6; }
+@media (hover: hover) { .at-tilechoice:hover:not(:disabled):not(.on) { border-color: var(--text-soft); } }
+.at-tilechoiceico { flex:none; width:40px; height:40px; border-radius: var(--r-sm); display:grid; place-items:center;
+  background: var(--raised); color: var(--text-soft); }
+.at-tilechoice.on .at-tilechoiceico { background: var(--jade); color: var(--onjade); }
+.at-tilechoicetext { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-tilechoicetext > b { font-size:16px; font-weight:800; }
+.at-tilechoicetext > i { font-style:normal; font-size:14px; color: var(--text-soft); line-height:1.35; }
+.at-tilechoicetick { flex:none; color: var(--jade); display:grid; }
+@media (prefers-reduced-motion: reduce) { .at-tilechoice { transition:none; } }

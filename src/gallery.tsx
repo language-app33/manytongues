@@ -57,6 +57,7 @@ import {
   Stat,
   Switch,
   Tabs,
+  TileChoice,
   Tile,
   TileNote,
   plural,
@@ -68,7 +69,7 @@ import {
    Icon itself: a name missing from here renders as a blank square, which is
    visible rather than silent. */
 const ICON_NAMES = [
-  "add", "search", "close", "delete", "edit", "tune", "filter", "sort", "size", "check",
+  "add", "search", "close", "delete", "edit", "tune", "filter", "english", "englishLittle", "sort", "size", "check",
   "back", "save", "folder", "cards", "person", "group", "key", "download",
   "verify", "play", "pause", "view", "select", "school", "copy", "refresh",
   "mic", "remove", "chevronDown", "chevronUp", "menu", "help", "theme",
@@ -335,6 +336,7 @@ const PLACES: Record<string, [string, string]> = {
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
   SortSheet: [PARTS, "A list's Sort panel, which waits for Apply"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
+  TileChoice: [PARTS, "One of a few, as tiles with a picture · a course's How much English"],
   MoreMenu: [PARTS, "Three dots, opening a menu of actions"],
   ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],
   Tabs: [PARTS, "A row of tabs"],
@@ -669,6 +671,7 @@ export function ComponentGallery() {
   const [chip, setChip] = useState("any");
   const [chips, setChips] = useState<string[]>(["word"]);
   const [switched, setSwitched] = useState(true);
+  const [tiled, setTiled] = useState("with");
   const [segBig, setSegBig] = useState("b");
   const [checked, setChecked] = useState(["one"]);
   const [tab, setTab] = useState("first");
@@ -982,6 +985,25 @@ export function ComponentGallery() {
         </V>
         <V label="disabled">
           <Switch on={false} onChange={() => {}} label="Unavailable" disabled />
+        </V>
+      </Row>
+
+      <Row
+        name="TileChoice"
+        what="One of a few, as tiles with a picture, a name and a line, and a tick on the chosen one."
+        note="The New module panel's look, as a real radio group (0.738). For a choice that changes something at once, where each option is worth reading before it is tapped: a course's How much English. options are { value, label, note, icon }; label is what a screen reader says for the group. RadioGroup is the plainer rows, for a form."
+      >
+        <V label="value + onChange" wide>
+          <TileChoice
+            label="How much English"
+            value={tiled}
+            onChange={setTiled}
+            options={[
+              { value: "with", label: "With translation", note: "Students see English in questions and answers.", icon: "english" },
+              { value: "little", label: "Little translation", note: "Students see English only where a card needs it.", icon: "englishLittle" },
+              { value: "none", label: "No translation", note: "No English: only pictures, sound and the language itself.", icon: "image" },
+            ]}
+          />
         </V>
       </Row>
 

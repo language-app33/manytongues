@@ -9834,3 +9834,31 @@ All chosen by the owner on a page of mock-ups.
   run of numbers with the same explanation and the same number of boxes
   shares one explanation above it. The boxes keep their names
   (`"3, counting"`), which the tests and screen readers go by.
+
+## Follow-ups to 0.735: the Filter line, tiles, "If needed", the add links (0.738)
+
+Chosen on a page of options (answers 1a, 2b, 3a, 4b, 5a, 6b).
+
+- **One line at the top of the Filter panel, not one per group.** "Tap to
+  show only matching cards." The chips that hide cards instead ("Not in
+  these", "Fills none") say so in their own names; a line under every
+  group was seven lines saying "show only". Kept to six words at the
+  owner's request (shorten it); "tap again to undo" is left to be found.
+- **`TileChoice` for the translation choice.** The owner asked whether the
+  four were in the newest component; they were in the older tick rows.
+  The newest is the New module panel's tile (picture, name, line), so
+  `TileChoice` draws that as a real radio group with a tick on the chosen
+  one. `RadioGroup` stays for plainer choices in a form, such as Sort by.
+  Two pictures were drawn for it: `english` (EN in a box) and
+  `englishLittle` (EN with only the box's corners).
+- **"If needed", defined once above the list.** "Where needed" did not say
+  what decided the need. The definition sits above the groups only under
+  Little translation, the one place the term appears, headed "In the list
+  below" and with the term drawn exactly as in the rows, so it reads as a
+  key to what follows rather than as a note about the choice above (the
+  owner's note on 3a).
+- **The add-answer links lost their underline.** They had taken the app's
+  general link style (`at-linkbtn`), which reads as going somewhere else.
+  Green, bold and a + picture, as Clear on a list's line, says "do this
+  here". Their accessible name is unchanged.
+

@@ -115,6 +115,13 @@ const ICONS: Record<string, string> = {
     "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
   edit:
     "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  /* English in a box: a course that shows English (0.738, the owner's 2b);
+     the same letters with only the box's corners, a course that shows a
+     little of it. Pictures for the Exercises tab's choices. */
+  english:
+    "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM4 6v12h16V6zM6.5 8H11v1.6H8.3v1.6h2.4v1.6H8.3v1.6H11V16H6.5zM12.5 8h1.7l2.3 4.4V8h1.7v8h-1.7l-2.3-4.4V16h-1.7z",
+  englishLittle:
+    "M2 4h5v2H4v3H2zM17 4h5v5h-2V6h-3zM22 20h-5v-2h3v-3h2zM2 20v-5h2v3h3v2zM6.5 8H11v1.6H8.3v1.6h2.4v1.6H8.3v1.6H11V16H6.5zM12.5 8h1.7l2.3 4.4V8h1.7v8h-1.7l-2.3-4.4V16h-1.7z",
   /* A funnel: Filter, everywhere (0.735, the owner's 4a). `tune` stays for
      settings: the Exercises tab, a card's Advanced tab. */
   filter: "M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39c.51-.66.04-1.61-.79-1.61H5.04c-.83 0-1.3.95-.79 1.61z",
@@ -3488,7 +3495,8 @@ export function ItemList<T>({
       {/* Filters take hold as they are ticked, as they did under the bar,
           and the button counts what is left; it only closes the panel. */}
       {sheet === "filter" && filter ? (
-        <PickSheet title="Filter" className="at-footsheet at-filtersheet" onClose={shut}>
+        /* One line saying what a chip does (0.738, the owner's 1a and 5a). */
+        <PickSheet title="Filter" lede="Tap to show only matching cards." className="at-footsheet at-filtersheet" onClose={shut}>
           <div className="at-sheetbody">
             <FilterBar groups={filter.groups} onClear={filter.onClear} />
           </div>
@@ -5308,6 +5316,53 @@ export function Switch({ on, onChange, label, disabled }: {
     >
       <span />
     </button>
+  );
+}
+
+/**
+ * One of a few, as tiles with a picture (0.738, the owner's 2b): the New
+ * module panel's look — a picture, a name, a line saying what it does —
+ * with a tick on the chosen one. For a choice that changes something at
+ * once, where each option is worth reading before it is tapped.
+ */
+export function TileChoice<T extends string>({ options, value, onChange, label, disabled }: {
+  options: { value: T; label: Node; note?: Node; icon: string }[];
+  value?: T | null;
+  onChange: (value: T) => void;
+  /** Said to a screen reader for the group. */
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="at-tilechoices" role="radiogroup" aria-label={label}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            className={`at-tilechoice${on ? " on" : ""}`}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+          >
+            <span className="at-tilechoiceico" aria-hidden="true">
+              <Icon name={o.icon} size={22} />
+            </span>
+            <span className="at-tilechoicetext">
+              <b>{o.label}</b>
+              {o.note ? <i>{o.note}</i> : null}
+            </span>
+            {on ? (
+              <span className="at-tilechoicetick" aria-hidden="true">
+                <Icon name="check" size={22} />
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

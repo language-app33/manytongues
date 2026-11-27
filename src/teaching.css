@@ -1141,6 +1141,11 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-practice-state.on { color: var(--jade); }
 .at-practice-state.off { color: var(--muted); font-weight:800; }
 .at-practice-state.where { font-size:12px; color: var(--muted); }
+/* What "If needed" means, once, over the list (0.738, the owner's 6b). */
+.at-practice-key { margin:4px 0 6px; padding:8px 10px; border-radius: var(--r-sm); background: var(--well);
+  font-size:13.5px; line-height:1.4; color: var(--text-soft); }
+.at-practice-keyhead { display:block; font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color: var(--muted); margin-bottom:2px; }
+.at-practice-key > .at-practice-state.where { display:inline; white-space:nowrap; }
 
 /* A card being read opens with the card itself (0.732, the owner's 4a):
    its word large, how it is said, what it means, and three dots in the

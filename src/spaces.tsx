@@ -136,6 +136,7 @@ import {
   ConfirmModal,
   RadioGroup,
   Switch,
+  TileChoice,
   Field,
   formHasAudio,
   FilterMenu,
@@ -2009,6 +2010,13 @@ const MODE_LABEL: Record<PracticeMode, string> = {
 };
 /* What each preset does (0.708); since 0.735 always under its own row, so
    a teacher reads all four before a tap that changes what students get. */
+/* Each choice's picture (0.738, the owner's 2b). */
+const MODE_ICON: Record<PracticeMode, string> = {
+  with: "english",
+  little: "englishLittle",
+  none: "image",
+  custom: "tune",
+};
 const MODE_SAYS: Record<PracticeMode, string> = {
   with: "Students see English in questions and answers.",
   little: "Students see English only where a card needs it.",
@@ -2222,19 +2230,19 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           What students in this course are asked. Phones on an older version of the app ask everything until they update.
         </span>
       </div>
-      {/* Four rows, each saying what it does, with a mark on the chosen
-          one (0.735, the owner's 6a): every tap changes what students get,
-          so each choice explains itself before it is made. */}
-      <RadioGroup
-        name={`practice-mode-${course.id}`}
+      {/* Four choices, each saying what it does (0.735, the owner's 6a):
+          every tap changes what students get, so each explains itself
+          before it is made. Since 0.738 (the owner's 2b) as tiles with a
+          picture, the New module panel's look. */}
+      <TileChoice
         label="How much English"
-        quiet
         value={now.mode}
+        disabled={busy}
         onChange={(mode) => {
           if (busy) return;
           if (mode !== now.mode) ask({ mode, off: now.off });
         }}
-        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m], note: MODE_SAYS[m] }))}
+        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m], note: MODE_SAYS[m], icon: MODE_ICON[m] }))}
       />
       {/* Switches set under an earlier Custom choice still apply. */}
       {now.mode !== "custom" && now.off.length > 0 && (
@@ -2261,6 +2269,16 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
       {now.mode !== "custom" && (
         <div className="at-field at-practice-asks">
           <label className="at-label">What this asks</label>
+          {/* What "If needed" in the rows means, said once above them and
+              drawn as it is drawn there, so the eye links the two (0.738,
+              the owner's 3a and 6b). Only Little translation uses it. */}
+          {now.mode === "little" && (
+            <p className="at-practice-key">
+              <span className="at-practice-keyhead">In the list below</span>
+              <span className="at-practice-state where">If needed</span>
+              {" = asked only for a card with no other way in, such as a word with no picture or recording."}
+            </p>
+          )}
           {byLevel.map(([level, types]) => {
             const on = types.filter((t) => switchOf(now, t) !== "off").length;
             const open = opened.has(level);
@@ -2303,7 +2321,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
                             –
                           </span>
                         ) : (
-                          <span className="at-practice-state where">Where needed</span>
+                          <span className="at-practice-state where">If needed</span>
                         )}
                       </div>
                     );

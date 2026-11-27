@@ -240,6 +240,16 @@ moment an option needs explaining — a segment holds two or three words and
 nothing else. Built from the same `at-tickrow` furniture as `CheckList`, with
 `type="radio"` doing the exclusivity, so it needs no styling of its own.
 
+### `TileChoice` — 1 use
+One of a few, as tiles: a picture, a name and a line saying what it does,
+with a tick on the chosen one. `options, value, onChange, label, disabled`
+
+Each option is `{ value, label, note?, icon }`. The New module panel's look,
+as a real radio group (`role="radio"`, `aria-checked`). For a choice that
+changes something at once, where each option is worth reading before it is
+tapped: a course's How much English (0.738). For plainer choices in a form,
+`RadioGroup`.
+
 ### `LanguageRadio` — 4 uses
 The languages, through `RadioGroup`. `languages, value, onChange, label, name`
 
@@ -494,7 +504,7 @@ its play buttons resolve to "missing" rather than fetching.
 ## Odds and ends
 
 - **`Icon`** — 22 uses. `name, size=20`. Available names: `add, search, close,
-  delete, edit, tune, filter, sort, size, check, back, save, folder, cards, person,
+  delete, edit, tune, filter, english, englishLittle, sort, size, check, back, save, folder, cards, person,
   group, key, download, verify, play, pause, view, select, school, copy,
   refresh, mic, remove, chevronDown, chevronUp, soundOff, flag, menu, help,
   theme, language, lock`.

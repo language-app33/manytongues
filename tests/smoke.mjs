@@ -3356,7 +3356,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     "CheckList", "LanguageRadio", "ModeSelector", "Section", "Tabs", "Screen",
     "SpaceFrame", "Empty", "Stat", "Tile", "TileNote", "CardTile", "CardReadout",
     "ItemList", "ConfirmModal", "PlayButton", "ClipList", "Icon", "LanguageTag",
-    "Snackbar", "KeysButton", "FilterBar", "ChipPick", "Switch",
+    "Snackbar", "KeysButton", "FilterBar", "ChipPick", "Switch", "TileChoice",
   ].filter((n) => !shown.includes(n));
   check("every component in the library has a row", missing.length === 0, `missing: ${missing.join(", ")}`);
 
@@ -5903,8 +5903,11 @@ const openPronounTables = async () => {
       `${editor().querySelectorAll(".at-answerheadrow button").length} buttons in the headings · ${links().join(" | ")}`);
     setBox(scriptBoxes()[0], "كتاب");
     await sleep(200);
-    check("typing the word brings + Another way to write it under it, named for a screen reader as before",
-      links().join(" | ") === "+ Another way to write it" &&
+    /* Since 0.738 (the owner's 4b): a + picture and the words, green and
+       bold, no underline — not the app's link style. */
+    check("typing the word brings Another way to write it under it, with a + picture, named for a screen reader as before",
+      links().join(" | ") === "Another way to write it" &&
+        !!editor().querySelector("button.at-addanswer svg.at-ic") && !editor().querySelector("button.at-addanswer.at-linkbtn") &&
         editor().querySelector("button.at-addanswer")?.getAttribute("aria-label") === "Add another accepted answer",
       links().join(" | ") || "(no link)");
     click(editor().querySelector("button.at-addanswer"));
@@ -5918,8 +5921,8 @@ const openPronounTables = async () => {
     await sleep(150);
     setBox(englishBoxes()[0], "book");
     await sleep(200);
-    check("and typing the English brings + Another accepted answer under it",
-      scriptBoxes().length === 1 && links().join(" | ") === "+ Another accepted answer",
+    check("and typing the English brings Another accepted answer under it",
+      scriptBoxes().length === 1 && links().join(" | ") === "Another accepted answer",
       `${scriptBoxes().length} script boxes · ${links().join(" | ") || "(no link)"}`);
     setBox(englishBoxes()[0], "");
     await sleep(150);
@@ -9698,6 +9701,11 @@ const openPronounTables = async () => {
     document.querySelectorAll(".at-sheet").length === 1 && !document.querySelector(".at-sortsheet") &&
       sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Modules | Blanks | Review",
     `${document.querySelectorAll(".at-sheet").length} panels · ${sortLabels().join(" | ")}`);
+  /* One line saying what a chip does (0.738, the owner's 1a and 5a). */
+  check("the Filter panel says, under its title, what tapping a chip does",
+    ((document.querySelector(".at-filtersheet .at-hint") || {}).textContent || "").trim() === "Tap to show only matching cards." &&
+      !!((document.querySelector(".at-filtersheet .at-hint") || { compareDocumentPosition: () => 0 }).compareDocumentPosition(document.querySelector(".at-filtersheet .at-filterbar") || document.body) & 4),
+    ((document.querySelector(".at-filtersheet .at-hint") || {}).textContent || "(no line)").trim());
   check("with a button that says how many cards it is showing",
     (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
     (sheetFoot(".at-filtersheet") || {}).textContent || "(no button)");
@@ -14049,14 +14057,17 @@ const openPronounTables = async () => {
        itself; under a preset a fixed "What this asks" over four folded
        groups with their counts, read-only; under Custom sliding switches. */
     const tabPanel = () => /** @type {any} */ (courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || document.createElement("div"));
-    const modeRows = () => [...tabPanel().querySelectorAll('[role="radiogroup"][aria-label="How much English"] .at-tickrow')];
+    /* Since 0.738 (the owner's 2b) the four are tiles with a picture. */
+    const modeRows = () => [...tabPanel().querySelectorAll('[role="radiogroup"][aria-label="How much English"] button.at-tilechoice[role="radio"]')];
     const modeRow = (/** @type {string} */ name) => /** @type {any} */ (modeRows().find((r) => ((r.querySelector("b") || {}).textContent || "").trim() === name) || null);
-    check("the translation choice is four radio rows, each with its explanation showing",
+    check("the translation choice is four tiles, each with a picture and its explanation showing, the chosen one ticked",
       modeRows().length === 4 &&
         modeRows().map((r) => ((r.querySelector("b") || {}).textContent || "").trim()).join(" | ") === "With translation | Little translation | No translation | Custom" &&
         modeRows().every((r) => !!((r.querySelector("i") || {}).textContent || "").trim()) &&
         ((modeRow("No translation") || { querySelector: () => null }).querySelector("i") || {}).textContent === "No English: only pictures, sound and the language itself." &&
-        !!(modeRow("With translation") || { querySelector: () => null }).querySelector("input:checked"),
+        modeRows().every((r) => !!r.querySelector(".at-tilechoiceico svg")) &&
+        modeRow("With translation")?.getAttribute("aria-checked") === "true" && !!modeRow("With translation")?.querySelector(".at-tilechoicetick") &&
+        modeRows().filter((r) => r.getAttribute("aria-checked") === "true").length === 1,
       modeRows().map((r) => (r.textContent || "").trim()).join(" | ") || "(no rows)");
     const folds = () => [...tabPanel().querySelectorAll("button.at-practice-fold")];
     const foldNamed = (/** @type {string} */ n) => /** @type {any} */ (folds().find((b) => ((b.querySelector("b") || {}).textContent || "").trim() === n) || null);
@@ -14076,8 +14087,28 @@ const openPronounTables = async () => {
     click(foldNamed("What it means"));
     await sleep(150);
     check("and pressing it again folds it", openRows().length === 0, `${openRows().length} rows still open`);
+    check("With translation has no If needed key, since nothing in it is asked only if needed",
+      !tabPanel().querySelector(".at-practice-key"), "(a key is showing)");
+    /* "If needed" (0.738, the owner's 3a and 6b): under Little translation
+       a key over the list says what it means, the term drawn as in the rows. */
+    click(modeRow("Little translation"));
+    await sleep(500);
+    const key = () => /** @type {any} */ (tabPanel().querySelector(".at-practice-asks > .at-practice-key"));
+    check("Little translation is ticked, and a key above the groups says what If needed means in the list below",
+      modeRow("Little translation")?.getAttribute("aria-checked") === "true" && !!key() &&
+        ((key().querySelector(".at-practice-keyhead") || {}).textContent || "") === "In the list below" &&
+        ((key().querySelector(".at-practice-state.where") || {}).textContent || "") === "If needed" &&
+        /= asked only for a card with no other way in, such as a word with no picture or recording\.$/.test((key().textContent || "").trim()) &&
+        !!(key().compareDocumentPosition(folds()[0]) & 4),
+      key() ? (key().textContent || "").trim() : "(no key)");
+    click(foldNamed("What it means"));
+    await sleep(200);
+    const stateWords = () => openRows().map((r) => ((r.querySelector(".at-practice-state.where") || {}).textContent || "").trim()).filter(Boolean);
+    check("and the English exercises in the list say If needed, not Where needed",
+      stateWords().length > 0 && stateWords().every((w) => w === "If needed") && !/Where needed/.test(panel()),
+      stateWords().join(" | ") || "(none)");
     const savesBefore = practiceSaves.length;
-    click((modeRow("Custom") || { querySelector: () => null }).querySelector("input"));
+    click(modeRow("Custom"));
     await sleep(500);
     check("and Custom shows them", /Match the pairs/.test(panel()), panel().slice(0, 200));
     const switches = () => [...tabPanel().querySelectorAll('button[role="switch"]')];
