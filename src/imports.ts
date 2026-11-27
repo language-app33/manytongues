@@ -24,14 +24,14 @@
  * it is the screen's, through the same calls the card editor makes.
  */
 
-import type { Card, Deck } from "./types.ts";
+import type { Card, Module } from "./types.ts";
 import { leadOf, wordOf } from "./cards.ts";
 import { GRAMMAR, grammarFields, inScript, LANGUAGES, normDimValue } from "./languages.ts";
 import { joinAlternatives } from "./answers.ts";
 
 export type ImportFile = {
   cards: Card[];
-  decks: Deck[];
+  decks: Module[];
   /** Recordings and pictures, by the hash they are stored under. */
   clips: Record<string, string>;
   images: Record<string, string>;
@@ -51,7 +51,7 @@ export function readImportFile(parsed: any): ImportFile | string {
     else if (key.startsWith("clip:") && typeof value === "string") file.clips[key.slice(5)] = value;
     else if (key.startsWith("image:") && typeof value === "string") file.images[key.slice(6)] = value;
   }
-  if (!file.cards.length && !file.decks.length) return "There are no cards or decks in that file.";
+  if (!file.cards.length && !file.decks.length) return "There are no cards or modules in that file.";
   return file;
 }
 
@@ -77,32 +77,32 @@ export type CardMatch = {
   inDecks: string[];
 };
 
-export type DeckMatch = { deck: Deck; existing?: Deck };
+export type ModuleMatch = { deck: Module; existing?: Module };
 
-export function matchImport(file: ImportFile, have: Card[], haveDecks: Deck[]) {
+export function matchImport(file: ImportFile, have: Card[], haveModules: Module[]) {
   const byId = new Map(have.map((c) => [c.id, c]));
   const byWord = new Map<string, Card>();
   for (const c of have) {
     const k = wordKey(c);
     if (k && !byWord.has(k)) byWord.set(k, c);
   }
-  const titled = (d: Deck) => `${d.lang}|${String(d.title || "").trim().toLowerCase()}`;
-  const decks: DeckMatch[] = file.decks.map((deck) => ({
-    deck,
+  const titled = (d: Module) => `${d.lang}|${String(d.title || "").trim().toLowerCase()}`;
+  const modules: ModuleMatch[] = file.decks.map((module) => ({
+    deck: module,
     existing:
-      haveDecks.find((d) => d.id === deck.id) ||
-      haveDecks.find((d) => titled(d) === titled(deck)),
+      haveModules.find((d) => d.id === module.id) ||
+      haveModules.find((d) => titled(d) === titled(module)),
   }));
   const cards: CardMatch[] = file.cards.map((card) => {
-    const inDecks = file.decks.filter((d) => (d.cardIds || []).includes(card.id)).map((d) => d.id);
+    const inModules = file.decks.filter((d) => (d.cardIds || []).includes(card.id)).map((d) => d.id);
     const same = byId.get(card.id);
-    if (same) return { card, kind: "same", existing: same, inDecks };
+    if (same) return { card, kind: "same", existing: same, inDecks: inModules };
     const k = wordKey(card);
     const twin = k ? byWord.get(k) : undefined;
-    if (twin) return { card, kind: "sameWord", existing: twin, inDecks };
-    return { card, kind: "new", inDecks };
+    if (twin) return { card, kind: "sameWord", existing: twin, inDecks: inModules };
+    return { card, kind: "new", inDecks: inModules };
   });
-  return { cards, decks };
+  return { cards, decks: modules };
 }
 
 /**

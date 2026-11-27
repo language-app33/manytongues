@@ -64,10 +64,10 @@ test("a member in two spaces at one of their addresses sends that space from the
   signIn(false, [main, lingua]);
   serve();
   at("/lingua");
-  await API.myDecks();
+  await API.myModules();
   assert.equal(sent[0].org, "lingua");
   at("/");
-  await API.myDecks();
+  await API.myModules();
   assert.equal(sent[1].org, "main");
 });
 
@@ -75,7 +75,7 @@ test("an App admin at another space's address waits for the lookup", async () =>
   signIn(true, [main]);
   serve();
   at("/lingua");
-  const going = API.myDecks();
+  const going = API.myModules();
   await tick();
   assert.equal(sent.length, 0, "nothing leaves before the space is known");
   API.setAddressOrg("lingua");
@@ -87,11 +87,11 @@ test("a failed lookup fails the waiting request, and the next one waits again", 
   signIn(true, [main]);
   serve();
   at("/lingua");
-  const first = API.myDecks();
+  const first = API.myModules();
   API.spaceLookupFailed(new Error("offline"));
   await assert.rejects(first, /offline/);
   let done = false;
-  const second = API.myDecks().then(() => {
+  const second = API.myModules().then(() => {
     done = true;
   });
   await tick();
@@ -116,9 +116,9 @@ test("an App admin at their own address or the plain one does not wait", async (
   signIn(true, [main]);
   serve();
   at("/main");
-  await API.myDecks();
+  await API.myModules();
   at("/");
-  await API.myDecks();
+  await API.myModules();
   assert.deepEqual(sent.map((s) => s.org), ["main", undefined]);
 });
 
@@ -140,10 +140,10 @@ test("at an address that is no space, every request fails with that", async () =
   signIn(true, [main]);
   serve();
   at("/nowhere");
-  const first = API.myDecks();
+  const first = API.myModules();
   API.spaceLookupFailed(new Error("no-space"));
   await assert.rejects(first, /no-space/);
-  await assert.rejects(API.myDecks(), /no-space/);
+  await assert.rejects(API.myModules(), /no-space/);
   assert.equal(sent.length, 0);
   API.setAddressOrg("");
 });

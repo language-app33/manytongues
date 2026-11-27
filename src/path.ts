@@ -33,7 +33,7 @@
  * "Units: a course's path".
  */
 import type { Lang } from "./types.ts";
-import { deckQuality, NAME_KINDS } from "./deck-quality.ts";
+import { moduleQuality, NAME_KINDS } from "./module-quality.ts";
 import { isDialog } from "./dialogs.ts";
 import { holedParts, reviewOf, sentencesOf } from "./review.ts";
 import type { Review } from "./review.ts";
@@ -49,20 +49,20 @@ export interface PathCourse {
   pathLive?: Record<string, number>;
   opened?: string[];
 }
-export interface PathDeck {
+export interface PathModule {
   id: string;
   unit?: true;
   cardIds?: string[];
 }
 
 /** Whether a deck is a path unit. */
-export function isPathUnit(deck: PathDeck | null | undefined): boolean {
-  return !!deck && deck.unit === true;
+export function isPathUnit(module: PathModule | null | undefined): boolean {
+  return !!module && module.unit === true;
 }
 
 /** Whether a unit is published in this course. */
-export const isLiveIn = (course: PathCourse | null | undefined, deckId: string): boolean =>
-  !!course && !!course.pathLive && Object.prototype.hasOwnProperty.call(course.pathLive, deckId);
+export const isLiveIn = (course: PathCourse | null | undefined, moduleId: string): boolean =>
+  !!course && !!course.pathLive && Object.prototype.hasOwnProperty.call(course.pathLive, moduleId);
 
 /**
  * The course's path units in order. Only those that still exist in `decks`.
@@ -70,20 +70,20 @@ export const isLiveIn = (course: PathCourse | null | undefined, deckId: string):
  */
 export function pathUnits(
   course: PathCourse | null | undefined,
-  decks: PathDeck[],
+  modules: PathModule[],
   opts: { published?: boolean } = {},
-): PathDeck[] {
+): PathModule[] {
   if (!course || !Array.isArray(course.path) || !course.path.length) return [];
-  const byId = new Map((decks || []).filter(Boolean).map((d) => [d.id, d]));
+  const byId = new Map((modules || []).filter(Boolean).map((d) => [d.id, d]));
   const seen = new Set<string>();
-  const out: PathDeck[] = [];
+  const out: PathModule[] = [];
   for (const id of course.path) {
     if (seen.has(id)) continue;
     seen.add(id);
-    const deck = byId.get(id);
-    if (!deck) continue;
+    const module = byId.get(id);
+    if (!module) continue;
     if (opts.published && !isLiveIn(course, id)) continue;
-    out.push(deck);
+    out.push(module);
   }
   return out;
 }
@@ -94,13 +94,13 @@ export function pathUnits(
  * published in this course. Empty set when `deckId` is not on this course's
  * path.
  */
-export function drawsFrom(course: PathCourse | null | undefined, decks: PathDeck[], deckId: string): Set<string> {
-  const units = pathUnits(course, decks);
-  const at = units.findIndex((u) => u.id === deckId);
+export function drawsFrom(course: PathCourse | null | undefined, modules: PathModule[], moduleId: string): Set<string> {
+  const units = pathUnits(course, modules);
+  const at = units.findIndex((u) => u.id === moduleId);
   if (at < 0) return new Set();
   const out = new Set<string>();
   for (let i = 0; i < at; i++) if (isLiveIn(course, units[i].id)) out.add(units[i].id);
-  out.add(deckId);
+  out.add(moduleId);
   return out;
 }
 
@@ -133,8 +133,8 @@ export interface PathRow {
  */
 export function pathRows(
   course: PathCourse | null | undefined,
-  decks: PathDeck[],
-  finishedNow: (deckId: string) => boolean,
+  modules: PathModule[],
+  finishedNow: (moduleId: string) => boolean,
   reached: string[],
 ): { rows: PathRow[]; reached: string[] } {
   const stored = Array.isArray(reached) ? reached.filter((x) => typeof x === "string") : [];
@@ -144,7 +144,7 @@ export function pathRows(
   const rows: PathRow[] = [];
   let allBefore = true;
   let current = false;
-  pathUnits(course, decks, { published: true }).forEach((u, i) => {
+  pathUnits(course, modules, { published: true }).forEach((u, i) => {
     const done = !!finishedNow(u.id);
     const isReached = had.has(u.id) || i === 0 || allBefore;
     if (isReached && !had.has(u.id)) {
@@ -216,9 +216,9 @@ export function reachesFurther(
  * path unit that is not in `openUnits`. A card in no deck is never held —
  * a name borrowed by a sentence, say, which the sentence introduces itself.
  */
-export function cardHeld(deckIds: string[], isUnit: (deckId: string) => boolean, openUnits: Set<string>): boolean {
-  if (!deckIds || !deckIds.length) return false;
-  return deckIds.every((d) => isUnit(d) && !openUnits.has(d));
+export function cardHeld(moduleIds: string[], isUnit: (moduleId: string) => boolean, openUnits: Set<string>): boolean {
+  if (!moduleIds || !moduleIds.length) return false;
+  return moduleIds.every((d) => isUnit(d) && !openUnits.has(d));
 }
 
 /**
@@ -343,7 +343,7 @@ export function unitProblems(input: { cards: Held[]; counting: Held[]; lang: Lan
 
   /* 5. Every word used (R9). Cards the quality score does not ask to be in
      sentences — names, cards never asked on their own — are not checked. */
-  const q = deckQuality(cards, { lang, pool: counting, known: counting });
+  const q = moduleQuality(cards, { lang, pool: counting, known: counting });
   for (const w of q.words) {
     if (!w.forms.some((f) => f.met > 0)) problems.push({ kind: "word-unused", cardId: w.id });
   }
@@ -351,9 +351,9 @@ export function unitProblems(input: { cards: Held[]; counting: Held[]; lang: Lan
 }
 
 /** The number parts held, in deck.parts, by any of these decks. */
-export function heldParts(decks: { id: string; parts?: string[] }[], ids: Set<string>): Set<string> {
+export function heldParts(modules: { id: string; parts?: string[] }[], ids: Set<string>): Set<string> {
   const out = new Set<string>();
-  for (const d of decks || []) if (d && ids.has(d.id)) for (const p of d.parts || []) out.add(String(p));
+  for (const d of modules || []) if (d && ids.has(d.id)) for (const p of d.parts || []) out.add(String(p));
   return out;
 }
 
@@ -378,13 +378,13 @@ export function heldFillers<T extends Held>(fillers: T[], parts: Set<string>): T
  */
 export function countingCards<T extends Held>(o: {
   course: PathCourse;
-  decks: (PathDeck & { parts?: string[] })[];
+  modules: (PathModule & { parts?: string[] })[];
   unitId: string;
   cards: T[];
-  deckIdsOf: (card: T) => string[];
+  moduleIdsOf: (card: T) => string[];
   fillers?: T[];
 }): T[] {
-  const from = drawsFrom(o.course, o.decks, o.unitId);
+  const from = drawsFrom(o.course, o.modules, o.unitId);
   const out: T[] = [];
   const seen = new Set<string>();
   const add = (c: T) => {
@@ -398,9 +398,9 @@ export function countingCards<T extends Held>(o: {
     /* A number value is never asked on its own either, but it counts only
        through the part it comes from — below. */
     if (isFillerOf(c)) continue;
-    if (neverAskedAlone(c) || o.deckIdsOf(c).some((d) => from.has(d))) add(c);
+    if (neverAskedAlone(c) || o.moduleIdsOf(c).some((d) => from.has(d))) add(c);
   }
-  for (const f of heldFillers(o.fillers || [], heldParts(o.decks, from))) add(f);
+  for (const f of heldFillers(o.fillers || [], heldParts(o.modules, from))) add(f);
   return out;
 }
 

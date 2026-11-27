@@ -62,21 +62,36 @@ await post("attach-deck", teacher.key, { courseId: course.id, deckId: family.id 
 await post("attach-deck", teacher.key, { courseId: course.id, deckId: hanoi.id });
 
 const material = async () => (await raw("/api/courses?action=my-material", { key: student.key })).json;
-const sentDeck = async (/** @type {string} */ id) => (await material()).decks.find((/** @type {any} */ d) => d.id === id);
+const sentModule = async (/** @type {string} */ id) => (await material()).decks.find((/** @type {any} */ d) => d.id === id);
 /* The material's cards come bundled by deck. */
 const sentCard = async (/** @type {string} */ id) =>
   (await material()).cards.flatMap((/** @type {any} */ b) => b.cards).find((/** @type {any} */ c) => c.id === id);
 const SET = { wording: { question: "Who is this person to you?" }, lists: [hanoi.id], named: [], order: "after" };
 
+/* Personal sets are off in a space until the App admin switches them on
+   (0.683): only they may, and only a new set is refused while off. */
+test("a space offers no personal sets until the App admin switches them on", async () => {
+  const card = async () => (await raw("/api/courses?action=whoami", { key: teacher.key })).json.user.org;
+  assert.equal((await card()).sets, false, "off by default");
+  const refused = await post("save-set", teacher.key, { deckId: family.id, set: SET });
+  assert.equal(refused.status, 403, refused.text);
+  assert.equal(refused.json.error, "sets-off");
+  const notTheirs = await post("admin-update-org", teacher.key, { id: "main", sets: true });
+  assert.equal(notTheirs.status, 403, "a teacher cannot switch them on");
+  const on = await post("admin-update-org", owner.key, { id: "main", sets: true });
+  assert.equal(on.status, 200, on.text);
+  assert.equal((await card()).sets, true);
+});
+
 test("a teacher saves a set on a deck, and a student of the course receives it", async () => {
   const r = await post("save-set", teacher.key, { deckId: family.id, set: SET });
   assert.equal(r.status, 200, r.text);
   assert.deepEqual(r.json.deck.set.lists, [hanoi.id]);
-  const d = await sentDeck(family.id);
+  const d = await sentModule(family.id);
   assert.equal(d.set.order, "after");
   assert.deepEqual(d.set.lists, [hanoi.id]);
   assert.equal(d.set.wording.none, "I don't know this person", "with the default where nothing was written");
-  assert.equal((await sentDeck(hanoi.id)).set, undefined);
+  assert.equal((await sentModule(hanoi.id)).set, undefined);
 });
 
 test("saving it again moves the material's version", async () => {
@@ -104,7 +119,7 @@ test("it survives a change of the deck's title and cards", async () => {
   await post("save-set", teacher.key, { deckId: family.id, set: SET });
   await post("rename-deck", teacher.key, { deckId: family.id, title: "My family" });
   await post("save-card", teacher.key, { card: { id: "", lang: "ar-PS", forms: [{ ar: "لان", en: "Lan", lat: "lan" }] }, decks: [family.id], publish: true });
-  const d = await sentDeck(family.id);
+  const d = await sentModule(family.id);
   assert.equal(d.title, "My family");
   assert.deepEqual(d.set.lists, [hanoi.id]);
   assert.equal(d.cardCount, 1);
@@ -113,7 +128,7 @@ test("it survives a change of the deck's title and cards", async () => {
 test("null makes it an ordinary deck again", async () => {
   const r = await post("save-set", teacher.key, { deckId: family.id, set: null });
   assert.equal(r.status, 200, r.text);
-  assert.equal((await sentDeck(family.id)).set, undefined);
+  assert.equal((await sentModule(family.id)).set, undefined);
 });
 
 const A = "a".repeat(64);
@@ -145,4 +160,20 @@ test("a name is cut at forty characters, and a form with no names carries none",
   const card = await sentCard(r.json.card.id);
   assert.equal(card.forms[0].voices[A].length, 40);
   assert.equal("voices" in card.forms[1], false);
+});
+
+test("switched off, a set is hidden from its teacher and its students, and comes back as it was", async () => {
+  await post("save-set", teacher.key, { deckId: family.id, set: SET });
+  const modulesOf = async (/** @type {string} */ key) => (await raw("/api/courses?action=my-decks", { key })).json.decks.map((/** @type {any} */ d) => d.id);
+  await post("admin-update-org", owner.key, { id: "main", sets: false });
+  assert.equal(await sentModule(family.id), undefined, "a student is not sent it");
+  assert.ok(await sentModule(hanoi.id), "its word list is an ordinary deck, and still sent");
+  assert.ok(!(await modulesOf(teacher.key)).includes(family.id), "its teacher does not see it");
+  assert.ok((await modulesOf(teacher.key)).includes(hanoi.id));
+  const changed = await post("save-set", teacher.key, { deckId: family.id, set: { ...SET, order: "before" } });
+  assert.equal(changed.status, 403, "nor can it be changed");
+  await post("admin-update-org", owner.key, { id: "main", sets: true });
+  assert.ok((await modulesOf(teacher.key)).includes(family.id), "back for its teacher");
+  const back = await sentModule(family.id);
+  assert.deepEqual(back && back.set.lists, [hanoi.id], "and for its students, as it was");
 });

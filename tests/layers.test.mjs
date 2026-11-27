@@ -541,14 +541,38 @@ test("the selected tab has a stroke, in a colour that exists in both themes", ()
   /* The outline is what says which tab is current; a shade of fill alone
      does not. It is its own token — a dark grey in both themes — rather
      than the page's ink, which is near-white in the dark theme and would
-     read as a highlight rather than an outline. */
+     read as a highlight rather than an outline. 0.699 made it green; the
+     owner preferred this and 0.700 put it back. */
   const on = rule(".at-tab2.on");
   assert.match(on, /border-color:\s*var\(--tab-stroke\)/, "the selected tab does not stroke with --tab-stroke");
+  assert.match(on, /background:\s*var\(--raised\)/, "the selected tab is not raised");
+  assert.match(on, /(^|[^-])color:\s*var\(--text\)/, "the selected tab's name is not in the page's text colour");
   const definitions = [...css.matchAll(/--tab-stroke\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
   assert.ok(definitions.length >= 2, `--tab-stroke is defined ${definitions.length} time(s); it needs the dark and the light theme`);
   assert.ok(definitions.every((v) => /^#[0-9a-fA-F]{6}$/.test(v)), `--tab-stroke should be a plain colour: ${definitions.join(", ")}`);
   /* And the base tab still draws a border, or the colour has nothing to colour. */
   assert.match(rule(".at-tab2"), /border:\s*2px solid/, "the tab has no border for the stroke to take");
+  /* 0.699 (the owner's 2a, 3a): ordinary lettering, as the bar's names are; the track's edge is everyone's 2px. */
+  assert.match(rule(".at-tab2"), /text-transform:\s*none/, "the tab names are capitals again");
+  assert.match(rule(".at-nav2"), /border:\s*2px solid/, "the track's edge is thinner than everything around it");
+});
+
+test("tabs inside a page are one full-width track, and views are switched by tabs", () => {
+  /* 0.685 (the owner's 1a): every set of tabs in a page is the track the
+     card screen had, its parts sharing the width equally; the card screen
+     only pins it. */
+  assert.match(rule(".at-nav2"), /display:\s*grid/);
+  assert.match(rule(".at-nav2"), /grid-auto-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.doesNotMatch(rule(".at-tab2"), /border-radius:\s*999px/, "a tab in a page is still a pill");
+  assert.doesNotMatch(css, /\.at-cardtabs \.at-tab2/, "the card screen draws its tabs its own way again");
+  /* (2a) What changes what a page lists is tabs, not a Segmented. */
+  const src = (/** @type {string} */ f) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  for (const [f, label] of [["review-sheet.tsx", "Which sentences"], ["review-sheet.tsx", "Which blank"], ["spaces.tsx", "Which reports"]]) {
+    const at = src(f).indexOf(`label="${label}"`);
+    assert.ok(at > 0, `${label} is gone from ${f}`);
+    const opener = src(f).lastIndexOf("<", at);
+    assert.match(src(f).slice(opener, at), /^<Tabs\b/, `${label} is not drawn as tabs`);
+  }
 });
 
 test("what is not the answer opens on a tap", () => {

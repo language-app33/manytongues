@@ -148,3 +148,15 @@ test("migrateOnStart reports a throwing migration rather than throwing", async (
     console.error = quiet;
   }
 });
+
+test("retireOnStart reports a throwing clean-up rather than throwing (0.719)", async () => {
+  const { retireOnStart } = await import("../server/index.js");
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    assert.equal(await retireOnStart({ retire: async () => { throw new Error("boom"); } }), false);
+    assert.equal(await retireOnStart({ retire: async () => 0 }), true);
+  } finally {
+    console.error = quiet;
+  }
+});

@@ -26,7 +26,7 @@ Math.random = () => {
 const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { buildSession, installIndexes, cardStandings, partsOf, climbOf, towardsLearnt, workloadOf } = await import(path.join(built, "ArabicTrainer.js"));
-const { generate, fileIntoDecks, componentId, isRangeSkill, steeredAsk } = await import(
+const { generate, fileIntoModules, componentId, isRangeSkill, steeredAsk } = await import(
   path.join(here, "..", "src", "numbers", "generate.ts")
 );
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
@@ -46,7 +46,7 @@ const settings = { language: "ar-PS" };
 
 const generated = generate({ ...SET, now: 1750000000000 });
 /* Every part in one deck, the way a teacher's deck brings them. */
-const filed = fileIntoDecks(generated.items, SET, [
+const filed = fileIntoModules(generated.items, SET, [
   { title: "Numbers", parts: generated.items.filter(isRangeSkill).map((/** @type {any} */ it) => it.range.id) },
 ]);
 const PART = "numbers:20-99";
@@ -111,7 +111,7 @@ test("dealt in a session, every question on the part brings in the word still to
   installIndexes(items, settings);
   let asked = 0;
   for (let i = 0; i < 6; i += 1) {
-    const got = buildSession({ items, settings, inDeck: () => true, systems: SETS, practice: true, includeAll: true });
+    const got = buildSession({ items, settings, inModule: () => true, systems: SETS, practice: true, includeAll: true });
     for (const ex of got.exercises) {
       if (ex.id !== partId || !ex.ask) continue;
       asked += 1;
@@ -126,7 +126,7 @@ test("a word not yet cleared is never asked inside a number", () => {
   installIndexes(items, settings);
   let asked = 0;
   for (let i = 0; i < 6; i += 1) {
-    const got = buildSession({ items, settings, inDeck: () => true, systems: SETS, practice: true, includeAll: true });
+    const got = buildSession({ items, settings, inModule: () => true, systems: SETS, practice: true, includeAll: true });
     for (const ex of got.exercises) {
       if (ex.id !== partId || !ex.ask) continue;
       asked += 1;

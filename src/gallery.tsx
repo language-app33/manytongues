@@ -37,6 +37,7 @@ import {
   Field,
   FilterBar,
   FilterMenu,
+  MoreMenu,
   Help,
   Icon,
   IconButton,
@@ -147,7 +148,7 @@ const PLACES: Record<string, [string, string]> = {
   ManualSessionSheet: [LEARN, "Building a session by hand"],
   FocusedTrainingSheet: [LEARN, "Focused training · behind the dumbbell on Home: weak spots, not seen lately, building a session, prep mode, and the sessions you kept"],
   TrainingChoice: [LEARN, "Focused training · one of its choices, with its icon, its name and a line saying what it is"],
-  SheetAction: [LEARN, "Focused training · one row of a saved session's panel: Start, Edit, Pin to Home, Delete"],
+  SheetAction: [PARTS, "One row of a three-dots panel: a saved session's Start or Delete, a module's Export"],
   SavedTiles: [LEARN, "Focused training · the sessions you kept, with what each is, how much of it is learnt (or for a Catch up how much is due), and a panel to start, edit, pin to Home or delete it; and on Home, the pinned ones"],
   HomeCard: [LEARN, "Home · the card under the progress ring: a shape in the logo's style and a fact about how language varies, with its source"],
   BrandMark: [LEARN, "The app's logo: on its tile in light mode, its loops alone in dark mode"],
@@ -159,10 +160,10 @@ const PLACES: Record<string, [string, string]> = {
   TenseLadder: [LEARN, "Opening a verb from a tile · where each of its tenses is"],
   ProgressTab: [LEARN, "The Progress tab"],
   Lately: [LEARN, "The Progress tab · what moved today and this week"],
-  DeckScreen: [LEARN, "The Progress tab · one deck, with when it could be learnt"],
+  ModuleScreen: [LEARN, "The Progress tab · one module, with when it could be learnt"],
   UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
   PathHomeLine: [LEARN, "Home · a course's current unit"],
-  PrepScreen: [LEARN, "Focused training · Set a goal (Prep mode until 0.681), getting decks learnt by a date"],
+  PrepScreen: [LEARN, "Focused training · Set a goal (Prep mode until 0.681), getting modules learnt by a date"],
   PrepLine: [LEARN, "The home screen · how long is left to prep, and whether your pace gets you there"],
   ReviewItem: [LEARN, "The Progress tab · one card"],
   StudentCourses: [LEARN, "The Courses tab"],
@@ -174,13 +175,13 @@ const PLACES: Record<string, [string, string]> = {
 
   /* Teaching */
   TeachSpace: [TEACH, "The Teaching space"],
-  CoursesPage: [TEACH, "The Courses tab"],
+  TodoSection: [TEACH, "Teaching\u2019s Home \u00b7 To do, what is waiting on you"],
+  CoursesPage: [TEACH, "Teaching\u2019s Home, under To do, and a learner\u2019s Courses"],
   CourseSettings: [TEACH, "Course settings"],
-  NewDeck: [TEACH, "Making a new deck"],
-  NumbersFrom: [TEACH, "A deck's screen · whose numbers it uses"],
-  ExportScreen: [TEACH, "Exporting cards or decks"],
-  ImportScreen: [TEACH, "Importing cards or decks"],
-  LockMark: [TEACH, "A locked deck's padlock"],
+  NewModule: [TEACH, "Making a new module"],
+  ExportScreen: [TEACH, "Exporting cards or modules"],
+  ImportScreen: [TEACH, "Importing cards or modules"],
+  LockMark: [TEACH, "A locked module's padlock"],
   CardEditor: [TEACH, "Editing a card"],
   WordEditor: [TEACH, "Editing a card · a word or phrase"],
   VerbEditor: [TEACH, "Editing a card · a verb"],
@@ -201,7 +202,8 @@ const PLACES: Record<string, [string, string]> = {
   CastBlock: [TEACH, "Editing a card · who is who in a scene"],
   SentencePicker: [TEACH, "Editing a card · picking a sentence card as a line"],
   CapitalsBlock: [TEACH, "Editing a card · the tick for whether its English keeps its capital letters in a sentence"],
-  BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its decks"],
+  BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its modules"],
+  DescriptionBlock: [TEACH, "Editing a card · Basic or Advanced · the word's description in the language itself, and its English"],
   MeaningsBlock: [TEACH, "Editing a card · Advanced · the other cards with the same word or meaning, the clue, and adding another"],
   CarryAsk: [TEACH, "Editing a card · whether a spelling fix goes onto the other cards with the same word"],
   FormBlock: [TEACH, "Editing a card · one form"],
@@ -217,13 +219,13 @@ const PLACES: Record<string, [string, string]> = {
   IdBox: [TEACH, "Editing a card · the ID it answers to"],
   TagList: [TEACH, "Editing a card · its tags"],
   TagSheet: [TEACH, "Editing a card · the sheet custom tags are chosen in"],
-  PickSheet: [TEACH, "Editing a card · the sheet a subtype or a card's decks are chosen in"],
+  PickSheet: [TEACH, "Editing a card · the sheet a subtype or a card's modules are chosen in"],
   RenameAsk: [TEACH, "Editing a card · renaming an ID or a tag"],
   StripAsk: [TEACH, "Editing a card · taking a tag off every card"],
   RecordingOverlays: [TEACH, "Editing a card · recording a form"],
-  DeckSwitch: [TEACH, "Editing a card · which decks it is in"],
-  DeckPickScreen: [TEACH, "Putting cards in decks · a card being written, or selected cards"],
-  Nudge: [TEACH, "An empty part of a deck, course or card, inviting you to fill it"],
+  ModuleSwitch: [TEACH, "Editing a card · which modules it is in"],
+  ModulePickScreen: [TEACH, "Putting cards in modules · a card being written, or selected cards"],
+  Nudge: [TEACH, "An empty part of a module, course or card, inviting you to fill it"],
   ChoiceSwitch: [TEACH, "Editing a card · its subtype, and a built session's mode"],
   BlankNameBox: [TEACH, "Editing a card · naming a blank nobody has named yet"],
   VerbTable: [TEACH, "Filling in a verb's forms"],
@@ -237,10 +239,11 @@ const PLACES: Record<string, [string, string]> = {
   ImageScreen: [TEACH, "Editing a card · adding a picture"],
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
-  DeckQuality: [TEACH, "A deck · its quality, and what would raise it"],
+  ModuleQuality: [TEACH, "A module · its quality, and what would raise it"],
   PathSection: [TEACH, "A course · its path of units"],
   PracticeSection: [TEACH, "A course · which exercises its students are asked"],
-  SetSection: [TEACH, "A deck · Personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
+  CourseWordSets: [TEACH, "A course · whose numbers and pronouns its students get"],
+  SetSection: [TEACH, "A personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
   UnitChecklist: [TEACH, "A unit · what it needs before it is published"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],
@@ -261,7 +264,7 @@ const PLACES: Record<string, [string, string]> = {
   GrammarToggles: [TEACH, "Editing a card · what is true of the whole word, as toggles"],
   TwoWordsBlock: [TEACH, "A language's number system · choosing one word before a noun where two were written"],
   CountedSection: [TEACH, "A language's number system · the noun cards a part counts with"],
-  PartDecks: [TEACH, "A language's number system · the decks that hold a part"],
+  PartModules: [TEACH, "A language's number system · the modules that hold a part"],
   PartTags: [TEACH, "A language's number system · the tags a part fills blanks under"],
   TimesTab: [TEACH, "A language's number system · telling the time"],
   PeriodsSection: [TEACH, "A language's number system · the parts of the day"],
@@ -276,6 +279,7 @@ const PLACES: Record<string, [string, string]> = {
   WrittenOutScreen: [TEACH, "A language's number system · one number written out by hand"],
   TryItScreen: [TEACH, "A language's number system · checking a number"],
   InContext: [TEACH, "The In context tab"],
+  ModulesOrCards: [TEACH, "Material and My space · Modules or Cards, and which side you are in"],
   MeaningSplits: [TEACH, "The Cards tab · cards with more than one meaning, to split or keep"],
   TryExercises: [TEACH, "A card · trying an exercise on it"],
   CodeBox: [TEACH, "A code to hand out"],
@@ -292,7 +296,7 @@ const PLACES: Record<string, [string, string]> = {
   useConfirm: [ADMIN, "Admin · the question asked before something is done"],
   InviteLink: [ADMIN, "The People tab · the space's invitation link"],
   FormerMembers: [ADMIN, "The People tab · Former members"],
-  OthersWork: [TEACH, "Deleting a deck or card someone else made"],
+  OthersWork: [TEACH, "Deleting a module or card someone else made"],
   LeaveSpace: [LEARN, "Settings · leaving your space"],
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
   SpaceExtras: [ADMIN, "The Spaces tab · a space's storage and export"],
@@ -324,6 +328,7 @@ const PLACES: Record<string, [string, string]> = {
   SearchBox: [PARTS, "A search field, with a cross to clear it"],
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
+  MoreMenu: [PARTS, "Three dots, opening a menu of actions"],
   ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],
   Tabs: [PARTS, "A row of tabs"],
   Screen: [PARTS, "A full screen"],
@@ -818,7 +823,7 @@ export function ComponentGallery() {
       <Row
         name="FilterMenu"
         what="One filter, narrow enough to sit beside a search box."
-        note="Goes in ItemList's tools slot, where it takes the width of an icon until it is pressed. FilterBar is the answer when a list wants several pickers at once; this is the answer when it wants one and the choices are a list rather than a few — every teacher who has made a deck, say, which Segmented would wrap into four rows. `quiet` is the value that means everything, and the button lights while anything else is picked."
+        note="Goes in ItemList's narrow slot, at the end of the search row, where it takes the width of an icon until it is pressed; pressed, it opens the app's one panel (the sheet MoreMenu opens), a row per choice with the chosen one ticked. FilterBar is the answer when a list wants several pickers at once; this is the answer when it wants one and the choices are a list rather than a few — every teacher who has made a deck, say, which Segmented would wrap into four rows. `quiet` is the value that means everything, and the button lights while anything else is picked."
       >
         <V label="press it">
           <FilterMenu
@@ -827,9 +832,26 @@ export function ComponentGallery() {
             value={maker}
             onChange={setMaker}
             options={[
-              { value: "", label: "Anyone", note: "12" },
-              { value: "sara", label: "Sara", note: "7" },
-              { value: "omar", label: "Omar Haddad", note: "5" },
+              { value: "", label: "Anyone", note: "12 modules" },
+              { value: "sara", label: "Sara", note: "7 modules" },
+              { value: "omar", label: "Omar Haddad", note: "5 modules" },
+            ]}
+          />
+        </V>
+      </Row>
+
+      <Row
+        name="MoreMenu"
+        what="Three dots that open the app's one context menu: a sheet of actions, named for what it acts on."
+        note="For the less used actions on a tile or a list — a module's Export and Delete, a list's Import — out of the way of the one it is for. The sheet is the one a saved session's dots open: up from the foot of a phone, in the middle of a wide screen, a SheetAction per row. title heads it; items is [{ label, icon, danger, note, disabled, onClick }]; anything falsy is left out. Its clicks stop at it, so a tile it sits on does not open too."
+      >
+        <V label="press it">
+          <MoreMenu
+            label="More for this module"
+            title="Lesson 1"
+            items={[
+              { label: "Export", icon: "download", onClick: () => {} },
+              { label: "Delete", icon: "delete", danger: true, onClick: () => {} },
             ]}
           />
         </V>
@@ -993,8 +1015,8 @@ export function ComponentGallery() {
 
       <Row name="Empty" what="The nothing-here state.">
         <V label="title + children + action" wide>
-          <Empty title="No decks yet" action={<Button size="sm" icon="add">New deck</Button>}>
-            A deck is a set of cards you hand to a course.
+          <Empty title="No modules yet" action={<Button size="sm" icon="add">New module</Button>}>
+            A module is something you hand a course to learn from.
           </Empty>
         </V>
       </Row>
@@ -1055,14 +1077,14 @@ export function ComponentGallery() {
 
       <Row name="CardReadout" what="A card and everything it holds, read-only — see card-facts.ts, which is what it draws. `reader` is who is looking: a teacher sees which decks carry it and what other cards call it, a student the card itself. Falls back to the default language pack when lang is left off.">
         <V label="card + lang" wide>
-          <CardReadout card={{ ...SAMPLE_CARD, decks: ["d1"] }} decks={[{ id: "d1", title: "Lesson 1" }]} />
+          <CardReadout card={{ ...SAMPLE_CARD, decks: ["d1"] }} modules={[{ id: "d1", title: "Lesson 1" }]} />
         </V>
       </Row>
 
       <Row
         name="ItemList"
-        what="The standard list frame: New button, search and the view button on one row; Select and the menus on the next; bulk actions, empty state, paging at 120."
-        note="match is (item, lowercasedQuery) => boolean. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — small grid, large grid, list, table — with { key, columns, row(item) } saying what a line and a table row show; key is where the list remembers its view."
+        what="The standard list frame: New, its three dots and the view button on one row; the search box, then Select and the menus as icons, on the next; bulk actions, empty state, paging at 120."
+        note="match is (item, lowercasedQuery) => boolean. more is the three dots' items, [{ label, icon, danger, onClick }] — Import, where a list has it. tools is the screen's own button after them; narrow a FilterMenu at the end of the search row. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — grid or table — with { key, columns, row(item) } saying what a table row shows; key is where the list remembers its view."
       >
         <V label="items + renderItem" wide>
           <ItemList
@@ -1075,8 +1097,9 @@ export function ComponentGallery() {
             views={{
               key: "gallery",
               columns: [{ key: "title", label: "Title" }],
-              row: (d) => ({ word: d.title, meaning: null, cells: { title: d.title } }),
+              row: (d) => ({ cells: { title: d.title } }),
             }}
+            more={[{ label: "Import", icon: "upload", onClick: () => {} }]}
             menus={[
               {
                 key: "sort",
@@ -1103,7 +1126,7 @@ export function ComponentGallery() {
               },
             ]}
             renderItem={(d) => <Tile title={d.title} meta="12 cards" />}
-            empty={<Empty title="No decks">Nothing here yet.</Empty>}
+            empty={<Empty title="No modules">Nothing here yet.</Empty>}
           />
         </V>
       </Row>

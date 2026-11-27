@@ -8,6 +8,605 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.719 — 27 November 2026
+
+**My space is gone, and what was in it is deleted.** Teaching no longer
+has a My space tab for anyone: the bar is Home, Material and You. Every
+module and card still in a teacher's My space, in every school, is deleted
+when this release goes live, and again at each later update, so anything a
+phone on an older version still makes there goes too. Nothing in Material
+is touched.
+
+**Trade-off:** this cannot be undone. A teacher who kept drafts in My space
+loses them, along with their own practice on them.
+
+## 0.718 — 27 November 2026
+
+**The card table fits a desktop page, and its three dots have no border.**
+In the card table, a card's modules wrap onto two lines rather than
+widening the table, so even with a long sentence in the first column the
+whole table, Status included, fits the page on a desktop. The three dots
+at the end of each row have no border, as on the tiles.
+
+On a phone the table still scrolls sideways: only Card and Meaning fit.
+
+## 0.717 — 27 November 2026
+
+**Card tiles and the card table, tidied.**
+
+- On a teacher's card tile, the three dots are in the top right corner,
+  with no border, rather than on a line of their own at the foot.
+- The table's first column is headed **Card** rather than Word, since a
+  sentence or a scene is in it as often as a word. What it shows is cut
+  after 20 characters, with "…", so a long sentence no longer makes the
+  column wide; hover over it to read the whole thing. The same goes for a
+  learner's table.
+
+## 0.716 — 27 November 2026
+
+**The card status panel no longer opens with a "Now: …" line.** Under
+"Card status" it repeated the status the card already has, which the panel
+shows anyway with a tick beside it. The line is gone; the choices are the
+same as before.
+
+## 0.715 — 27 November 2026
+
+**A module's tile is tidier: its score on the left, who can see it right
+under its name.** In Teaching › Material › Modules (and in My space, while
+you still have one):
+
+- The quality score's ring sits left of the module's name instead of out
+  on the right beside the three dots, so the scores of a list stand in one
+  column you can run your eye down. A module with no score yet keeps the
+  ring's room empty, so every name in the list starts in the same place.
+- The thin rule across the foot of the tile is gone, and the line saying
+  who can see it ("Available to students in the course …", "Not in a course
+  yet") sits straight under the name.
+- When a module is a unit, has cards to review or is a personal set, that
+  is said on the same line, first: "Unit · Available to students in the
+  course Arabic 101".
+
+The rule is gone from every tile that had one, too: courses, the modules
+list in Admin, and the rest.
+
+## 0.714 — 27 November 2026
+
+**The card lists are simpler.**
+
+- **Two views instead of four**, in every card list: Teaching › Material ›
+  Cards, inside a module, and a learner's own cards. The view button now
+  switches between a grid and a table. The large grid and the one-line-per-card list are gone;
+  a list left on either opens at the nearest of the two (the large grid at
+  the grid, the list at the table).
+- **A teacher's card tile is just the card.** Its Edit and Delete buttons (Edit and Remove
+  inside a module) are behind three dots, as on a module's tile. Tapping
+  the card still opens it. The date is off the tile; Sort still orders by
+  it.
+- **A teacher's table has five columns:** Word, Meaning, Kind, Modules and Status,
+  so it fits a desktop and reads on a phone. Status is last, and also says
+  when a recording is missing. Transliteration, subtype, recording, review
+  and the two dates are no longer columns; Filter and Sort still reach
+  them.
+- **The line "A card is one thing to learn…" is gone from above the list.**
+  With no cards yet, the empty list still says what a card is.
+
+Trade-off: editing or deleting from the list is one more tap.
+
+## 0.713 — 27 November 2026
+
+**Numbers and pronouns belong to the school, one set per language.**
+Teaching › Material › Word sets now shows one Numbers and one Pronouns for
+each language. Any teacher of the school can open and correct them, and
+every course uses them. There is no longer a list of sets by teacher, no
+Share step for numbers written in Material, and no "Numbers from / Pronouns
+from" choice on a course's page. Where two teachers had each written a set,
+the one written first is now the school's.
+
+**Trade-off:** in a course that had chosen the other teacher's pronouns,
+students now get the school's pronoun cards, so their progress on the old
+pronoun cards does not carry over. The other teacher's set is not deleted.
+
+To check by hand: in a school where two teachers wrote pronouns, open a
+course as a student and check each pronoun comes once.
+
+## 0.712 — 27 November 2026
+
+**My space is being retired from Teaching.** Teachers now make everything in
+Material. If you have nothing in My space, its tab is gone and the bar is
+Home, Material and You. If you still have modules or cards there, the tab
+stays so you can move, copy, export or delete them, but nothing new can be
+made in it; the tab disappears once it is empty. Nothing is deleted or moved
+for you. Material's first line now says what it actually lists: your
+modules and those of the courses you teach. Trade-off: there is no longer a
+private place to draft. A card that is a Draft is still hidden from
+students, and a module in no course is still seen and changed only by the
+person who made it and administrators.
+
+## 0.711 — 27 November 2026
+
+**Cards and modules say who made them and who last changed them.** A card's
+page and a module's page now carry one line, for example "Made by Tala ·
+last changed by Rana, Nov 26". Who may change what has not moved: the person
+who made it, an administrator, and any teacher of a course it is in. When
+someone else tries, the message now says exactly that. Cards and modules
+changed before this release show the date of the last change but not who
+made the change.
+
+## 0.710 — 27 November 2026
+
+**New module is one step.** In Teaching › Material, New module now goes
+straight to naming a deck. It no longer asks "Deck or Unit?" with a warning
+that the choice can't be changed. Units are made where they are used: open a
+course, then Path, then New unit. Where personal sets are switched on, "New
+personal set" is in the three-dot menu beside New module.
+
+## 0.709 — 27 November 2026
+
+**A module's quality score waits until there is something to score.** A
+new module of plain words no longer shows a score. The score appears, on the
+module's tile and on its page, once the module has at least one sentence or
+one recording. A low score is now shown in a neutral colour, never red. The
+line above the score now says why it favours sentences: "Words stick better
+when students meet them in sentences." The scoring rules themselves have not
+changed. Trade-off: a teacher with a words-only module sees no tips until
+they add a first recording or sentence.
+
+## 0.708 — 27 November 2026
+
+**A course's Exercises tab fits on one screen.** It now shows the four
+choices (With translation, Little translation, No translation, Custom) and
+one line saying what the chosen one does. The long list of individual
+switches appears only when Custom is chosen. Nothing about what students
+are asked has changed. Trade-off: to switch a single exercise off, a teacher
+now chooses Custom first; switches set earlier still apply, and the tab says
+how many are off.
+
+## 0.707 — 27 November 2026
+
+**A course lists its people by name.** The People tab now shows each
+teacher's and student's name, with their handle beneath it. It used to show
+handles only.
+
+**A course's modules come first.** On the Course tab, Modules now sits
+directly under the course's name, above the join code and the path.
+
+## 0.706 — 27 November 2026
+
+**A teacher's first screen is Teaching.** Signing in on a new device as
+someone who teaches a course now opens Teaching straight away. It used to
+open Learning the first time, with "Ask your teacher for a course code".
+Learning is still one tap away on the switch at the top.
+
+To check by hand: a teacher's very first sign-in from a real invitation, on
+a phone.
+
+## 0.705 — 27 November 2026
+
+**Progress shows three groups.** The seven tiles of "The ladder" are now
+three: Learning, Almost there and Learnt, under one bar that shows the share
+of each. Tap a group to see its cards. The four levels are still shown on
+each card's own page. Trade-off: a student no longer sees at a glance how
+many cards sit on each level.
+
+To check by hand: the three groups and the bar on a small phone screen.
+
+## 0.704 — 27 November 2026
+
+**A student's card page is shorter.** Tapping a card now shows the word, how
+it sounds, what it means, and one line of progress with a four-step bar. The
+sections written for teachers ("What it is", "Reference") are no longer
+shown to students. The explanation of levels now matches how the app works:
+answer right twice in a row to move up a level. "High priority" is now
+called "Practise this first" on this page and is explained in one sentence.
+Teachers' screens are unchanged.
+
+## 0.703 — 27 November 2026
+
+**The line at the end of a session is in plain words.** A session with no
+mistakes now says "All correct. These words will come back less often now."
+in place of "Clean run. Every gap just got longer." The other end-of-session
+lines are reworded the same way.
+
+## 0.702 — 27 November 2026
+
+**A card's words no longer look like headings when you are only reading
+it.** Opened without Edit, a card showed its name, its word and its English
+in the same dark, bold, large type as the headings above them, so "This
+card" over "house" read as two headings in a row. The words are now a
+little smaller and at an ordinary weight; the headings are as they were.
+
+- Editing a card is unchanged: there the words were already in boxes and
+  smaller than the headings.
+- A module's own screen was checked and did not have the problem.
+
+To check by hand: on a phone, that the words still read comfortably at the
+new size, the Arabic above all.
+
+## 0.701 — 27 November 2026
+
+**A module's tile no longer counts the cards that don't reach students.**
+In Teaching › Material › Modules, the red "1 not reaching students" line is
+off the tile. Open the module and it is still there, with the reasons: how
+many are drafts, waiting for review, or need their number words written.
+To do on Home still says it for each course too.
+
+## 0.700 — 27 November 2026
+
+**The current tab is grey again.** The green look from 0.699 is undone: the
+tab you are on is back to a raised grey box with a dark grey outline, its
+name in the ordinary text colour and its icon in green. The rest of 0.699
+stays: names in ordinary lettering at the size of the bar's, and the track's
+edge as thick as everything around it.
+
+## 0.699 — 27 November 2026
+
+**Tabs inside a page now look like the rest of the app.** The tabs at the
+top of a page or a card — Modules / Cards / Word sets in Material, Basic /
+Exercises on a card, and every other set — mark the one you are on in green,
+as the bar at the foot of the window and the rest of the app mark what is
+chosen, rather than with a grey box and a dark grey outline.
+
+- The current tab has a green outline and a green name on a faint green
+  tint. It is still lighter than a Settings switch's solid green, so a tab
+  and a setting don't look like the same control.
+- Tab names are written in ordinary lettering at the size of the bar's
+  names, instead of small spaced capitals. On a narrow phone with four tabs
+  they shrink to fit.
+- The track around the tabs has the same edge as every card, button and box
+  near it.
+
+## 0.698 — 27 November 2026
+
+**Signing up asks for less.** The screen after you choose your name now
+shows your sign-in key, one Copy button and one line about keeping it safe.
+The sign-in link and your handle are no longer repeated there; both are in
+Settings. The tick-box is gone: the button works straight away.
+
+To check by hand: on a phone, that the password manager still offers to
+save the key when the button is pressed.
+
+## 0.697 — 27 November 2026
+
+**A word can have a description, in the language itself.** A word or phrase
+card has a new Description box: on the Basic tab of a basic card, and on the
+Advanced tab of an advanced one (ticking "Build an advanced card" carries it
+across). Write a few words saying what the word is, without the word and
+without English: المكان اللي بنعيش فيه for بيت. Underneath, an optional
+English translation of the description. Sentences and scenes don't have one.
+
+- If the description uses the word itself, a line under it says it gives the
+  answer away. It can still be saved.
+- On a card with more than one form, such as a verb's table or a noun's
+  plural, the description is kept but not used in exercises, and the editor
+  says so.
+- Changing a description is a change like any other: students keep the
+  published card until the change is published.
+
+**Two new exercises use it.** *Description → choose*: the description is
+shown and the student picks the word out of four. It stands with the other
+"which word is it" exercises, on the second level. *Description → Arabic*
+(or Vietnamese): the student writes the word, at the top level beside
+English → Arabic. In both, the ? button shows the description's English, if
+there is one and the course shows English, and taking it costs nothing. In
+a course set to No translation, a description counts as teaching the word,
+so a word with one is still asked.
+
+To check on a phone: how a long description wraps above the four choices,
+and with the keyboard open on the writing exercise.
+
+## 0.696 — 27 November 2026
+
+**One teacher's word set per course.** When two teachers had each written
+the pronouns (or the numbers) and both sets reached one course, its
+students were sent two of every pronoun, or two words for every number.
+Now each course uses one teacher's set of each kind.
+
+- **Choose on the course.** A course's page has a new **Word sets**
+  section with **Numbers from** and **Pronouns from**. Any teacher of the
+  course picks whose set its students get, whichever modules hold it.
+- **Until someone chooses**, a course uses the set that was written first
+  among those reaching it. Where more than one teacher's set reaches it,
+  the section says so and names whose students are getting.
+- **Material lists every teacher's shared sets.** Teaching › Material ›
+  Word sets shows your own sets first, then **Shared by other
+  teachers**, one tile each, such as "Pronouns · Rana". Any teacher can
+  open a shared set and edit it; a pronoun added to someone else's set
+  stays part of their set.
+- **Share from My space.** Teaching › My space › Word sets has
+  **Share with** *your space* under each set. Pronouns go in as a copy,
+  and sharing again brings that copy up to date. Numbers are not copied:
+  they stay one set, so an edit made in the space changes your own numbers
+  too. Pronouns written in Material are the space's already. Numbers used
+  by a module of the space count as shared.
+- **"Numbers from" has left the module's screen.** Whose numbers a module
+  uses is now the course's choice.
+
+**Trade-offs:** switching a course to another teacher's pronouns gives its
+students new pronoun cards, so their progress on the old ones does not
+carry over. A module used by two courses takes the choice of the first of
+them that a student is in.
+
+To check by hand: on a phone, with two teachers whose pronouns are both on
+one course, open the course as a student and check each pronoun comes
+once; then choose the other teacher on the course page and check the
+student gets theirs after a refresh.
+
+## 0.695 — 27 November 2026
+
+**To do helps you get a course started.** In Teaching › Home:
+
+- **A course with no modules** shows "*Arabic 101* has no modules yet.
+  Create one so your students have something to practise." **Create a
+  module** opens the new-module screen, and the module you save is put in
+  that course, in the course's language.
+- **A course whose modules have no cards** shows "*Lesson 1* in
+  *Arabic 101* has no cards yet. Add some so your students have something
+  to practise." **Add cards** opens the module, where you can make a new
+  card, add ones you already have, or import.
+- These come first in To do and count towards the number on Home.
+- **To do is hidden until you have a course** to teach.
+
+## 0.694 — 27 November 2026
+
+**Courses opens again for students.** Learning › You › Courses showed
+"Something broke" (reading 'filter') for anyone in a course, since 0.687
+renamed decks to modules in the code: the Courses screen was still being
+handed its modules under the old name and got none. It now gets them, and
+each course counts its modules again. The type check now covers the props
+of every screen that loads on demand, so a rename missed on one side
+fails the build instead of the screen; it found one more such slip, in
+claiming super admin from Settings, which is mended too.
+
+## 0.693 — 27 November 2026
+
+**Teaching opens on Home, with To do at the top.** The first tab in
+Teaching is called Home (it was Courses). Above your courses, **To do**
+lists everything waiting on you, each with a button that takes you
+straight to it:
+
+- recordings that are missing, so students can't hear a card;
+- sentence cards waiting for you to review their sentences;
+- imported cards students won't see until you publish them;
+- courses with cards that don't reach students yet, and why;
+- cards with more than one meaning on them.
+
+The number of things waiting shows on Home's button in the bar, so you
+can see it from Material or My space too. When nothing is waiting, To do
+says "You're all caught up. Your students have everything they need.",
+under a small drawing of a cup of tea in the logo's colours.
+
+To do is about what students get, so it covers the space's material,
+not My space.
+
+**Fewer banners.** Missing recordings and imported cards waiting for
+review are no longer bands across the top of every Teaching screen, and
+the lines about sentences waiting for review and cards with more than one
+meaning are no longer above the Cards list. They are all in To do. The
+Review filter on Cards still finds the sentences waiting.
+
+**A course has three tabs: Course, People and Exercises.** In
+Teaching › Home, open a course:
+
+- **Course** has its name, language, student code, path and modules;
+- **People** has its teachers and students;
+- **Exercises** has how much English, and which exercises students are
+  asked.
+
+The tabs look like the ones in Material. Each course opens on Course.
+
+**Two lines are gone.** "Open a course to see its modules, its people and
+its student code." in Teaching, and "Open a course to see its modules." on
+a learner's Courses.
+
+Trade-off: a teacher who has just imported cards no longer sees a banner
+on the Cards tab; the count on Home's button says it instead.
+
+## 0.692 — 27 November 2026
+
+**Admin › Modules tiles use the three dots too.** Each module's Delete
+button there has moved behind three dots that open the same panel as in
+Material, headed with the module's name. Delete still asks first.
+
+## 0.691 — 26 November 2026
+
+**A card's status and "Filter by who made it" open the same panel too.**
+The status button on a card (Published, Draft, Ready for review…) and the
+"Filter by who made it" button in Admin › Modules now open the panel the
+three dots open, instead of a small list hanging from the button. The
+current choice is edged in colour and ticked. Unpublish and Discard changes
+are in red and still ask first. Each person in the filter shows how many
+modules they made. The menu behind your initials is unchanged.
+
+## 0.690 — 26 November 2026
+
+**Three dots open the same panel everywhere.** The three dots on a module's
+tile and beside New in a list now open the panel a saved session's dots
+open on Focused training: up from the bottom of the screen on a phone, in
+the middle of a wide one, headed with the module's name (or the list's), and
+a large row for each action. They used to open a small menu hanging from the
+dots, which on a phone could run under the bar at the foot of the screen.
+Tap the cross, tap outside the panel or press Escape to close it.
+
+## 0.689 — 26 November 2026
+
+**Module tiles are simpler.** In Teaching › Material › Modules and
+My space › Modules:
+
+- A module's quality is now a number in a ring that fills as far round as
+  the score goes, in the score's colour, on the right of the tile. A module
+  with nothing to score yet shows an empty ring with a dash.
+- Export, Delete and, in My space, Copy and Move to the space are in a menu
+  behind three dots beside the ring. The dots don't open the module, and
+  Delete still asks first.
+- The language and the number of cards are no longer on the tile. Whether
+  it is a unit, what is waiting for review, cards reaching no students and
+  missing recordings are still said under the title.
+
+**Lists have their search on a line of its own.** Everywhere a list can be
+searched, the search box has its own row, with Select, Sort and Filter after
+it as icons (hold or hover to see their names; Sort and Filter still show a
+count while they narrow the list). Import moved into a menu behind three dots
+beside New. While a list is empty, its welcome panel keeps its own Import
+button.
+
+**Word sets have their own tab.** Material and My space now have three
+tabs: Modules, Cards and Word sets. The Word sets tab lists numbers and
+pronouns where the Cards tab used to have a row leading to them. It is left
+out where no language you teach has a word set.
+
+**The line describing Material and My space is above the tabs,** and says
+more plainly who sees what:
+
+- Material: "Shared with all of *your space*'s teachers. Students see a
+  module once it's in a course."
+- My space: "Only you can see these. When one is ready, copy or move it to
+  *your space*."
+
+Trade-off: Export, Delete and Import each take one more tap.
+
+## 0.688 — 26 November 2026
+
+**A unit can be placed and published from its own screen, in every course
+it is on.** In Teaching › Material › Modules, open a unit and you'll find,
+for each course whose path holds it:
+
+- its place, such as "Unit 2 of 5 · Published", and "Open for the class"
+  when it is;
+- **Move earlier** and **Move later**, to change its place on that path;
+- **Open for the class** (or **Close for the class**) once it is
+  published there;
+- that course's checklist and **Publish unit**, as before.
+
+Before, the unit's screen showed only one course, and moving or opening a
+unit could only be done from the course's page. The course page's Path
+section is unchanged.
+
+**Units are labelled in the Modules list.** A unit's tile now starts with
+"Unit", so it can be told apart from a deck at a glance. Its place on each
+path is on its own screen, not in the list.
+
+**Trade-off:** there is still no single screen in Material that shows a
+whole path in order; for that, open the course.
+
+To check by hand: on a phone, open a unit that is on two courses' paths
+and check each course has its own place, buttons and checklist; move it
+and check the course's Path section shows the new order.
+
+## 0.687 — 26 November 2026
+
+**Nothing changes for people using the app.** Inside the code, decks,
+units and personal sets are now called modules too, to match what the
+screens have said since 0.686. Saved work, backups and anything waiting
+to be sent from a phone keep their old names behind the scenes, so
+nothing stored had to be converted and nothing needs checking by hand.
+
+## 0.686 — 26 November 2026
+
+**Decks, units and personal sets are now called modules.** A module is
+anything a teacher gives a course to learn from: a deck of cards, a unit on
+a course's path, or a personal set. The word is used wherever the app means
+any of the three:
+
+- **Teaching:** the Decks tab under Material and under My space is now
+  **Modules**, and so is the one in Admin. The button is **New module**,
+  and it asks "What kind of module?": **Deck** (which used to be called
+  "Regular deck"), **Unit**, and **Personal set** where personal sets are
+  switched on for the space. A
+  course's screen lists its **Modules** beside its Path. A card says which
+  modules it is in, and the card filter and card list use the same word.
+  Importing, exporting, backups, handing over a space and the warnings
+  about locked or deleted material all say "module" too.
+- **On a module's own screen, the app names its kind.** A unit's screen
+  says "This unit", "Edit unit" and "Delete unit". A personal set's says
+  "This personal set" and "Personal set name". A deck's screen still says
+  "Deck". The quality score is "Deck quality", "Unit quality" or
+  "Personal set quality" to match, and just "Quality" in a list.
+- **Students:** Progress shows **Modules**, Set a goal asks for **Modules to
+  target**, Build a session offers **Choose modules**, and the help text
+  explains what a module is.
+
+Nothing about how anything works has changed: the same decks, units and
+sets, in the same courses, with the same cards and progress.
+
+To check by hand: on a phone, the search box under Material › Modules is
+narrower than its words, so it reads "Search module" with the last letter
+cut off, as it would for any longer word.
+
+## 0.685 — 26 November 2026
+
+**Every set of tabs inside a page now looks and works the same.** They all
+take the look the card screen's tabs had: one full-width bar shared
+equally, the current tab raised. That covers Decks / Cards in Material and
+My space, All / By space in Super admin's People, the sentence review on a
+card, choosing a blank in Narrow a blank, and Card reports / Feedback in
+Super admin's Reports. The last three are now real tabs, so a screen
+reader calls them tabs rather than switches. The sentence review keeps the
+count under each tab's name; no other tabs gained one.
+
+**Admin's Flags tab is now called Reports,** the same name Super admin uses,
+and the search box on the reports list says "Search reports".
+
+**Trade-off:** tabs in a page now look closer to the settings switches
+around them; the raised tab, its outline and the icons are what set them
+apart.
+
+On the narrowest phones the tab names get a little smaller rather than
+breaking in the middle of a word.
+
+Still to check by hand: on a real phone, the sentence review's four tabs
+and the card screen's tabs, in light and dark.
+
+## 0.684 — 26 November 2026
+
+**Switching personal sets off now hides the ones already made.** While
+Personal sets is off for a space, its existing sets disappear for teachers
+and students: they're not in the teacher's decks, and students aren't sent
+them or asked about them. The word lists a set uses are ordinary decks and
+stay. Nothing is deleted. Switch it back on and the sets return as they
+were, with each student's answers and practice.
+
+**Trade-off:** every space started with Personal sets off in 0.683, so any
+space that already had sets has them hidden now, until you switch it on.
+And a student's practice on a hidden set is kept for 180 days, as it is for
+any card taken out of a course; a set left off for longer comes back
+without it.
+
+Still to check by hand: in a space that has a personal set, switch it off
+and on and see it go and come back, for a teacher and a student.
+
+## 0.683 — 26 November 2026
+
+**Personal sets are off in every space until you switch them on.** In
+Super admin → Spaces, each space now has a Features section with Personal
+sets, Off or On. Only the super admin can change it. While it's off,
+teachers in that space aren't offered Personal set when they make a new
+deck; they see Regular deck and Unit only.
+
+**Trade-off:** this starts off everywhere, including spaces where teachers
+have already made personal sets. Those sets keep working for students, and
+teachers can still edit them or turn them back into ordinary decks; only
+making a new one needs the switch on.
+
+**The New deck sheet is spaced properly.** Regular deck, Unit and Personal
+set had no gap between them; they're now spaced like every other list of
+tiles.
+
+Still to check by hand: the new switch in Super admin → Spaces on a real
+phone, and that a teacher sees Personal set appear after it's switched on
+(they may need to reload the app).
+
+## 0.682 — 26 November 2026
+
+**Import sits in the empty box.** In Teaching › Material, when there are no
+decks yet, Import is now an icon-only button beside New deck, in the "No
+decks yet" box, instead of standing alone above it. The same goes for
+Cards with no cards yet, beside New card, and for a deck with no cards on
+Manage cards, beside New card and Add existing cards. Once there is
+something in the list, Import goes back to its usual place beside search.
+
+Still to check by hand: the three empty screens on a real phone, in light
+and dark.
+
 ## 0.681 — 26 November 2026
 
 **Prep mode is now Set a goal, and Focused training's buttons are two pairs.**

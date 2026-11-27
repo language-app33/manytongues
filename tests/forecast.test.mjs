@@ -42,7 +42,7 @@ const {
   prepStart,
   prepDaysLeft,
   prepStatus,
-  prepDeckOf,
+  prepModuleOf,
   buildSession,
   NEW_PER_DAY,
   climbOf,
@@ -60,10 +60,10 @@ const settings = { language: "ar-PS" };
 const DAY = 86400000;
 const FROM = new Date(2026, 9, 1, 9, 0, 0).getTime();
 
-/** @param {number} i @param {string} deck */
-const word = (i, deck) => ({
+/** @param {number} i @param {string} module */
+const word = (i, module) => ({
   id: `w${i}`,
-  tags: [deck],
+  tags: [module],
   created: 1,
   lang: "ar-PS",
   kind: "word",
@@ -72,9 +72,9 @@ const word = (i, deck) => ({
 
 /* Sixty words, twelve of them the deck. */
 const collection = Array.from({ length: 60 }, (_, i) => word(i + 1, i < 12 ? "deck" : "other"));
-const deckOf = (/** @type {any} */ it) => (it.tags || []).includes("deck");
+const moduleOf = (/** @type {any} */ it) => (it.tags || []).includes("deck");
 
-const deck = () => collection.filter(deckOf);
+const module = () => collection.filter(moduleOf);
 const learntState = {
   phase: "review", step: 0, ease: 2.5, interval: 60, due: FROM + 30 * DAY, reps: 8, right: 8, wrong: 0,
   lapses: 0, skips: 0, near: 0, hints: 0, updated: FROM - DAY, hist: [], passes: 2,
@@ -86,8 +86,8 @@ const withStates = (/** @type {any} */ it, /** @type {any} */ state) => ({
 
 test("the work is counted off each card's own ladder", () => {
   installIndexes(collection, settings);
-  const one = workloadOf([deck()[0]], settings, FROM);
-  const all = workloadOf(deck(), settings, FROM);
+  const one = workloadOf([module()[0]], settings, FROM);
+  const all = workloadOf(module(), settings, FROM);
   assert.equal(all.left, 12);
   assert.ok(one.questions > 0, "a card never met needs nothing");
   assert.equal(all.questions, 12 * one.questions, "twelve like cards are twelve times one");
@@ -99,15 +99,15 @@ test("the work is counted off each card's own ladder", () => {
 
 test("a card part way up needs less than one never met", () => {
   installIndexes(collection, settings);
-  const fresh = workloadOf([deck()[0]], settings, FROM);
+  const fresh = workloadOf([module()[0]], settings, FROM);
   const rightOnce = { ...learntState, phase: "learning", interval: 0, passes: 0, hist: [1], due: FROM };
-  const partway = workloadOf([withStates(deck()[0], rightOnce)], settings, FROM);
+  const partway = workloadOf([withStates(module()[0], rightOnce)], settings, FROM);
   assert.ok(partway.questions < fresh.questions, `${partway.questions} against ${fresh.questions}`);
 });
 
 test("a learnt deck needs nothing, and is learnt now", () => {
   installIndexes(collection, settings);
-  const done = deck().map((it) => withStates(it, learntState));
+  const done = module().map((it) => withStates(it, learntState));
   const w = workloadOf(done, settings, FROM);
   assert.deepEqual(w, { left: 0, questions: 0, sessions: 0, earliestDays: 0 });
   assert.equal(learntAtPace(w, 1, FROM), FROM);
@@ -116,14 +116,14 @@ test("a learnt deck needs nothing, and is learnt now", () => {
 
 test("new words come in a session's worth a day at most, so a big deck has a later floor", () => {
   installIndexes(collection, settings);
-  assert.equal(workloadOf(deck(), settings, FROM).earliestDays, LEARN_DAYS + Math.ceil(12 / NEW_PER_DAY) - 1);
+  assert.equal(workloadOf(module(), settings, FROM).earliestDays, LEARN_DAYS + Math.ceil(12 / NEW_PER_DAY) - 1);
   assert.equal(workloadOf(collection.slice(0, 40), settings, FROM).earliestDays, LEARN_DAYS + Math.ceil(40 / NEW_PER_DAY) - 1);
-  assert.equal(workloadOf(deck().slice(0, 5), settings, FROM).earliestDays, LEARN_DAYS);
+  assert.equal(workloadOf(module().slice(0, 5), settings, FROM).earliestDays, LEARN_DAYS);
 });
 
 test("more practice is never a later date, and never earlier than the floor", () => {
   installIndexes(collection, settings);
-  const w = workloadOf(deck(), settings, FROM);
+  const w = workloadOf(module(), settings, FROM);
   const at = (/** @type {number} */ n) => /** @type {number} */ (learntAtPace(w, n, FROM));
   assert.ok(at(1) >= at(3) && at(3) >= at(12) && at(12) >= at(100));
   assert.equal(at(1000), earliestOf(w, FROM).at, "past enough practice, the floor is the date");
@@ -132,7 +132,7 @@ test("more practice is never a later date, and never earlier than the floor", ()
 
 test("being ready by a date: the work spread over the days, or too soon", () => {
   installIndexes(collection, settings);
-  const w = workloadOf(deck(), settings, FROM);
+  const w = workloadOf(module(), settings, FROM);
   const roomy = readyFor(w, FROM + 40 * DAY, FROM);
   assert.equal(roomy.kind, "rate");
   if (roomy.kind === "rate") assert.ok(Math.abs(roomy.rate - w.sessions / 40) < 1e-9);
@@ -271,10 +271,10 @@ test("a prep is active until its day, done once its decks are learnt", () => {
 
 test("a prep session is dealt from the prep's decks alone", () => {
   installIndexes(collection, settings);
-  const built = buildSession({ items: collection, settings, inDeck: prepDeckOf(["deck"]) });
+  const built = buildSession({ items: collection, settings, inModule: prepModuleOf(["deck"]) });
   assert.ok(built.exercises.length > 0, "nothing dealt");
   for (const ex of built.exercises) {
-    assert.ok(deckOf(collection.find((/** @type {any} */ c) => c.id === ex.id)), `${ex.id} is not in the prep's decks`);
+    assert.ok(moduleOf(collection.find((/** @type {any} */ c) => c.id === ex.id)), `${ex.id} is not in the prep's decks`);
   }
 });
 
@@ -314,7 +314,7 @@ test("only a question on a prep card counts towards the prep, whatever session a
   /* The goal is counted off the prep's cards, so today's sessions are
      too: a question on another deck is practice, and fills the log, but
      moves the prep nowhere and so does not fill its count. */
-  const inPrep = prepDeckOf(["Lesson 1", "Lesson 2"]);
+  const inPrep = prepModuleOf(["Lesson 1", "Lesson 2"]);
   const lesson = { id: "a", tags: ["Lesson 2"] };
   const other = { id: "b", tags: ["Holiday words"] };
   assert.equal(inPrep(/** @type {any} */ (lesson)), true);
@@ -373,24 +373,24 @@ const clearedState = { ...learntState, passes: 0 };
 
 test("aiming at cleared: less work, a nearer floor, and a cleared card needs nothing", () => {
   installIndexes(collection, settings);
-  const learnt = workloadOf(deck(), settings, FROM);
-  const cleared = workloadOf(deck(), settings, FROM, "cleared");
+  const learnt = workloadOf(module(), settings, FROM);
+  const cleared = workloadOf(module(), settings, FROM, "cleared");
   assert.equal(cleared.left, 12);
   assert.ok(cleared.questions < learnt.questions, `${cleared.questions} against ${learnt.questions}`);
   assert.equal(cleared.earliestDays, CLEAR_DAYS + Math.ceil(12 / NEW_PER_DAY) - 1);
 
-  const up = deck().map((it) => withStates(it, clearedState));
+  const up = module().map((it) => withStates(it, clearedState));
   assert.equal(workloadOf(up, settings, FROM).left, 12, "cleared is not learnt");
   assert.deepEqual(workloadOf(up, settings, FROM, "cleared"), { left: 0, questions: 0, sessions: 0, earliestDays: 0 });
 });
 
 test("a prep for cleared is done once its decks are cleared, and its ring says so", () => {
-  const up = collection.map((it) => (deckOf(it) ? withStates(it, clearedState) : it));
+  const up = collection.map((it) => (moduleOf(it) ? withStates(it, clearedState) : it));
   installIndexes(up, settings);
   const prep = { name: "Exam", date: "2026-10-20", decks: ["deck"] };
   assert.equal(prepStatus({ ...prep, target: "learnt" }, up, settings, FROM), "active");
   assert.equal(prepStatus({ ...prep, target: "cleared" }, up, settings, FROM), "done");
-  const cards = up.filter(deckOf);
+  const cards = up.filter(moduleOf);
   assert.equal(climbOf(cards, settings, up, "cleared").pct, 100);
   assert.equal(climbOf(cards, settings, up, "cleared").learnt, 12);
   assert.ok(climbOf(cards, settings, up).pct < 100, "cleared is short of learnt");

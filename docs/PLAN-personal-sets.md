@@ -234,7 +234,7 @@ The list choice is written into the record of **every** picture of the set at on
 
 | Action | Who may call it | Body | What it does |
 | --- | --- | --- | --- |
-| `save-set` | Whoever may edit the deck (`canEditDeck`) | `deckId`, and `set` (a set, or null) | Refuses a personal deck and, as `set-deck-parts` does, a locked one. Inside `updateJson`: with null, removes `set`; otherwise stores `readSet(body.set, deck.id)`. Sets `updated`, calls `taught()`, answers with the deck. |
+| `save-set` | Whoever may edit the deck (`canEditModule`) | `deckId`, and `set` (a set, or null) | Refuses a personal deck and, as `set-deck-parts` does, a locked one. Inside `updateJson`: with null, removes `set`; otherwise stores `readSet(body.set, deck.id)`. Sets `updated`, calls `taught()`, answers with the deck. |
 
 1. In `materialVersion`, add `JSON.stringify(d.set)` to the deck's row only when `set` is present, the way `unit` is added. Without this no change reaches a student.
 2. Search for every place a deck is rebuilt field by field (look for `parts` and `unit` being carried). Each must keep `set`.
@@ -282,7 +282,7 @@ Two things must hold, each with a test:
 
 ### Finding the sets
 
-With `useMemo` in `src/ArabicTrainer.tsx`, from `courseDecks` and the items. A deck's cards are found from its `cardIds` and each item's `serverCardId`; the app already builds this map for path units, so reuse it.
+With `useMemo` in `src/ArabicTrainer.tsx`, from `courseModules` and the items. A deck's cards are found from its `cardIds` and each item's `serverCardId`; the app already builds this map for path units, so reuse it.
 
 - A **set** is a held deck with a valid `set`, in a language in play.
 - Its **pictures** are its cards whose lead form has a picture.
@@ -431,7 +431,7 @@ Existing tests near this change that must stay green unchanged: `tests/offers.te
 
 ### Part A: the section on the deck screen
 
-`PracticeSection` in `src/spaces.tsx` is the model: one section on an existing page, with its own draft state, saved through one action. Read it and the place it is used, then read the screen a deck opens into (search for `openDeck` in `src/spaces.tsx`).
+`PracticeSection` in `src/spaces.tsx` is the model: one section on an existing page, with its own draft state, saved through one action. Read it and the place it is used, then read the screen a deck opens into (search for `openModule` in `src/spaces.tsx`).
 
 Add one component, `SetSection`, in `src/spaces.tsx`, shown on the deck screen of any deck that is not personal. Add it to `PLACES` in `src/gallery.tsx`. Everything in it is an existing shared component:
 
@@ -439,7 +439,7 @@ Add one component, `SetSection`, in `src/spaces.tsx`, shown on the deck screen o
 | --- | --- |
 | "Personal set" Off or On. Off hides the rest. Turning it off when it holds settings asks first. | `Segmented`, `ConfirmModal` |
 | The wording: five boxes, each starting at its default. | `Field` |
-| Word lists: the chosen decks, each with its word count and a remove button; "Add a list" opens a picker of the other decks in the same course or courses, leaving out this deck and other sets. | `Tile`, `IconButton`, `DeckPickScreen` (leave out `onCreate`, so it offers no New deck) |
+| Word lists: the chosen decks, each with its word count and a remove button; "Add a list" opens a picker of the other decks in the same course or courses, leaving out this deck and other sets. | `Tile`, `IconButton`, `ModulePickScreen` (leave out `onCreate`, so it offers no New deck) |
 | Said with the name: the words of each chosen list, by list. | `CheckList` |
 | What is asked: the three kinds, and before or after the name, with a live example from the first picture and first word. | `CheckList`, `Segmented` |
 | Warnings from `setGaps`, worded plainly, never blocking a save. | `Notice` |
@@ -462,7 +462,7 @@ This is on every card, not only in sets.
 
 ### Part C: what still needs recording
 
-Nothing to build. The deck check in `src/deck-quality.ts` already counts and lists a deck's cards with no recording, and the deck screen already shows it. Confirm with a test that a set's deck and its list decks are scored as any deck is.
+Nothing to build. The deck check in `src/module-quality.ts` already counts and lists a deck's cards with no recording, and the deck screen already shows it. Confirm with a test that a set's deck and its list decks are scored as any deck is.
 
 ### Part D: a teacher trying it out
 

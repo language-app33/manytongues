@@ -351,7 +351,24 @@
 .at-quality { font-weight:700; white-space:nowrap; }
 .at-quality.good, .at-qualityscore.good b { color: var(--jade); }
 .at-quality.fair, .at-qualityscore.fair b { color: var(--brass); }
-.at-quality.poor, .at-qualityscore.poor b { color: var(--rose); }
+/* A low score is never red (0.709): neutral, as the ring's track is. */
+.at-quality.poor, .at-qualityscore.poor b { color: var(--text); }
+/* QualityRing (0.689): a module's score on its tile, the number in a ring
+   filled from the top, clockwise, as far as the score goes. */
+.at-qring { position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:44px; flex:0 0 auto; }
+.at-qring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.at-qringtrack, .at-qringfill { fill:none; stroke-width:4; }
+.at-qringtrack { stroke: var(--line); }
+.at-qringfill { stroke-linecap:round; }
+.at-qring.good .at-qringfill { stroke: var(--jade); }
+.at-qring.fair .at-qringfill { stroke: var(--brass); }
+.at-qring.poor .at-qringfill { stroke: var(--muted); }
+.at-qringnum { position:relative; font-family: var(--ui); font-size:14px; font-weight:800;
+  letter-spacing:-.02em; line-height:1; color: var(--ink); }
+.at-qring.good .at-qringnum { color: var(--jade); }
+.at-qring.fair .at-qringnum { color: var(--brass); }
+.at-qring.poor .at-qringnum { color: var(--muted); }
 .at-qualityscore { margin:0 0 6px; display:flex; align-items:baseline; gap:6px; }
 .at-qualityscore b { font-size: var(--fs-stat); font-weight:800; line-height:1.1; letter-spacing:-.02em; }
 .at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }
@@ -362,7 +379,7 @@
 .at-qualitybar > span { position:absolute; top:0; bottom:0; left:0; border-radius:999px; }
 .at-qualitybar > .now.good { background: var(--jade); }
 .at-qualitybar > .now.fair { background: var(--brass); }
-.at-qualitybar > .now.poor { background: var(--rose); }
+.at-qualitybar > .now.poor { background: var(--muted); }
 .at-qualitybar > .then { background: var(--jade-soft); border-radius:0 999px 999px 0; opacity:.7; }
 .at-qualityreach { margin:12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
 /* Each suggestion a card of its own: what to add, what it is worth, and
@@ -897,7 +914,7 @@
 /* Waiting, struck, approved, all — the tabs over a card's sentences, where
    the tally of the four used to sit. */
 .at-reviewtabs { margin:14px 0 4px; }
-.at-reviewtabn { font-size:1.15em; letter-spacing:0; }
+.at-reviewtabs > [role="tablist"] { margin:0; }
 .at-reviewmarks { display:flex; gap:6px; flex:0 0 auto; margin-left:auto; }
 /* The tick that selects a sentence, beside its number. */
 .at-reviewpick { width:20px; height:20px; flex:0 0 auto; margin:0; align-self:center; cursor:pointer;
@@ -910,10 +927,6 @@
 .at-reviewmark.no.on { background: var(--rose); border-color: var(--rose); color:#fff; }
 .at-reviewmark:focus-visible { outline:2px solid var(--brass); outline-offset:2px; }
 .at-narrowlist { max-height: 50vh; overflow:auto; margin-top:10px; }
-.at-reviewbanner { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-  margin:0 0 12px; padding:10px 12px; border-radius: var(--r-sm);
-  border:1px solid var(--tag-line); background: var(--tag-bg); }
-.at-reviewbanner > span { flex:1 1 12em; min-width:0; font-size: var(--fs-sm); font-weight:600; }
 .at-reportlist { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
 .at-report { padding:12px; border:1px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
   display:flex; flex-direction:column; gap:4px; min-width:0; }
@@ -924,17 +937,13 @@
 .at-reportnote { font-size: var(--fs-sm); color: var(--text-soft); }
 .at-reportwho { font-size: var(--fs-xs); color: var(--muted); }
 /* A card's status, beside Edit on its screen: the app's menu button (see
-   .at-menubtn) and its menu (see .at-pickmenu), hung from the button's
-   right edge, since the button sits at the end of the card's top line —
-   so the menu opens back across the screen. Edged in where the card
-   stands. See StatusMenu; Popover keeps it on the screen wherever the
-   button goes next. */
+   .at-menubtn), opening the app's one panel of choices (0.690, see
+   StatusMenu). Edged in where the card stands. */
 .at-statusmenu { position:relative; display:inline-flex; }
 .at-statusbtn.published { border-color: var(--jade); }
 .at-statusbtn.published { color: var(--jade); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { color: var(--brass); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { border-color: var(--brass); }
-.at-statuspick { left:auto; right:0; top:calc(100% + 6px); }
 /* At the start of a line or a table row: the badge's words, smaller, and
    on two lines rather than one long one. */
 .at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;

@@ -30,6 +30,9 @@ export interface OrgCard {
   name: string;
   logo: string;
   colour: string;
+  /** Whether its teachers may make personal sets (0.683): the App admin's
+      choice, off unless switched on. Absent from an older server: off. */
+  sets?: boolean;
   /** Whether this account runs it (0.610). Only on whoami's list of yours. */
   runs?: boolean;
 }
@@ -372,43 +375,49 @@ export const setCoursePractice = (courseId: string, practice: { mode: string; of
 /* A space's invitation, followed while signed in: adds the space to this
    account (memberships). */
 export const joinSpace = (code: string) => call("join-space", { body: { code } });
-export const courseDecks = (courseId: string) => call("course-decks", { params: { course: courseId } });
+export const courseModules = (courseId: string) => call("course-decks", { params: { course: courseId } });
 /* Everything a student holds in one request. Pass the version from the last
    answer and the server replies { unchanged: true } when nothing moved. */
 export const myMaterial = (version?: string) =>
   call("my-material", { params: version ? { version } : {} });
 
 /* ---- decks and cards ---- */
-export const myDecks = () => call("my-decks");
-export const createDeck = (title: string, description: string, lang: LangId, personal = false) =>
+export const myModules = () => call("my-decks");
+export const createModule = (title: string, description: string, lang: LangId, personal = false) =>
   call("create-deck", { body: { title, description, lang, ...(personal ? { personal: true } : {}) } });
 /* ---- My space (0.545) ---- */
-export const setDeckPractise = (deckId: string, practise: boolean) =>
-  call("set-deck-practise", { body: { deckId, practise } });
-export const copyToSpace = (deckId: string, move = false, courses: string[] = []): Promise<{ ok: true; deck: any }> =>
-  call("copy-to-space", { body: { deckId, move, courses } });
-export const cardToSpace = (cardId: string, deckId: string, move = false) =>
-  call("card-to-space", { body: { cardId, deckId, move } });
-export const renameDeck = (deckId: string, title: string) => call("rename-deck", { body: { deckId, title } });
-export const deleteDeck = (deckId: string) => call("delete-deck", { body: { deckId } });
+export const setModulePractise = (moduleId: string, practise: boolean) =>
+  call("set-deck-practise", { body: { deckId: moduleId, practise } });
+export const copyToSpace = (moduleId: string, move = false, courses: string[] = []): Promise<{ ok: true; deck: any }> =>
+  call("copy-to-space", { body: { deckId: moduleId, move, courses } });
+export const cardToSpace = (cardId: string, moduleId: string, move = false) =>
+  call("card-to-space", { body: { cardId, deckId: moduleId, move } });
+export const renameModule = (moduleId: string, title: string) => call("rename-deck", { body: { deckId: moduleId, title } });
+export const deleteModule = (moduleId: string) => call("delete-deck", { body: { deckId: moduleId } });
 /* A locked deck keeps the cards it has: nothing added, nothing taken out. */
-export const lockDeck = (deckId: string, locked: boolean) => call("lock-deck", { body: { deckId, locked } });
+export const lockModule = (moduleId: string, locked: boolean) => call("lock-deck", { body: { deckId: moduleId, locked } });
 /* Which parts of the teacher's numbers a deck holds, by range id; the
    whole list each time. */
-export const setDeckParts = (deckId: string, parts: string[]) =>
-  call("set-deck-parts", { body: { deckId, parts } });
+export const setModuleParts = (moduleId: string, parts: string[]) =>
+  call("set-deck-parts", { body: { deckId: moduleId, parts } });
 /* Whether a deck is a personal set, and how: the whole set each time, or
    null for an ordinary deck again (0.629). See src/sets.ts. */
-export const saveSet = (deckId: string, set: SetConfig | null) => call("save-set", { body: { deckId, set } });
+export const saveSet = (moduleId: string, set: SetConfig | null) => call("save-set", { body: { deckId: moduleId, set } });
 export const myCards = () => call("my-cards");
-/** Who a deck may take its numbers from, owner first (0.541). */
-export const numberSources = (deckId: string): Promise<{
-  ok: true;
-  sources: { handle: string; displayName: string; numbers: boolean; times: boolean }[];
-  chosen: string;
-}> => call("number-sources", { params: { deck: deckId } });
-export const setDeckNumbers = (deckId: string, from: string) =>
-  call("set-deck-numbers", { body: { deckId, from } });
+/* Word sets shared with a space, and whose a course uses (0.696). A
+   course uses one teacher's set of each kind: the one chosen on it, or the
+   earliest written of those reaching it — see wordSetPick on the server. */
+export type WordSetKind = "numbers" | "pronouns";
+export type SharedPronouns = { owner: string; name: string; lang: string; cards: Card[] };
+export type SharedNumbers = { owner: string; name: string; lang: string; numbers: unknown; times: unknown };
+/** The school's set of each kind, by language (0.713): the owner's handle. */
+export type SchoolSets = { numbers: Record<string, string>; pronouns: Record<string, string> };
+export const spaceWordSets = (): Promise<{ ok: true; pronouns: SharedPronouns[]; numbers: SharedNumbers[]; school?: SchoolSets }> =>
+  call("space-word-sets");
+/* A teacher's own set into the space's Material: pronouns as a copy, which
+   sharing again brings up to date; numbers by marking them shared. */
+export const shareWordSet = (kind: WordSetKind, lang: LangId): Promise<{ ok: true; made?: number; updated?: number }> =>
+  call("share-word-set", { body: { kind, lang } });
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
 /**
@@ -432,11 +441,13 @@ export type SaveExtra = {
   decksWere?: string[];
   /* Save and publish: what this save writes goes out to students too. */
   publish?: boolean;
+  /** A new pronoun written into another teacher's shared set (0.696), which stays theirs. */
+  forOwner?: string;
 };
 /* `org` is the space the save was made in, for one queued offline and sent
    from wherever the app is by then (0.580). */
-export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}, org?: string) =>
-  call("save-card", { body: { card, decks, ...extra }, ...(org ? { org } : {}) });
+export const saveCard = (card: Partial<Card>, modules: string[], extra: SaveExtra = {}, org?: string) =>
+  call("save-card", { body: { card, decks: modules, ...extra }, ...(org ? { org } : {}) });
 /* A card's status, or its unpublished changes' — see card-status. */
 export const cardStatus = (
   cardId: string,
@@ -455,22 +466,22 @@ export const dismissReports = (flagIds: string[]): Promise<{ ok: true; deleted: 
   call("dismiss-reports", { body: { flagIds } });
 export const deleteCard = (cardId: string) => call("delete-card", { body: { cardId } });
 export const deleteCards = (cardIds: string[]) => call("delete-cards", { body: { cardIds } });
-export const deckCards = (deckId: string) => call("deck-cards", { params: { deck: deckId } });
-export const attachDeck = (deckId: string, courseId: string) =>
-  call("attach-deck", { body: { deckId, courseId } });
-export const detachDeck = (deckId: string, courseId: string) =>
-  call("detach-deck", { body: { deckId, courseId } });
+export const moduleCards = (moduleId: string) => call("deck-cards", { params: { deck: moduleId } });
+export const attachModule = (moduleId: string, courseId: string) =>
+  call("attach-deck", { body: { deckId: moduleId, courseId } });
+export const detachModule = (moduleId: string, courseId: string) =>
+  call("detach-deck", { body: { deckId: moduleId, courseId } });
 
 /* ---- a course's path (0.616): units, in order, per course ---- */
 export const createUnit = (courseId: string, title: string) =>
   call("create-unit", { body: { courseId, title } });
-export const moveUnit = (courseId: string, deckId: string, to: number) =>
-  call("move-unit", { body: { courseId, deckId, to } });
+export const moveUnit = (courseId: string, moduleId: string, to: number) =>
+  call("move-unit", { body: { courseId, deckId: moduleId, to } });
 /** Refused with "unit-not-ready" and the server's `problems` on the error's `data`. */
-export const publishUnit = (courseId: string, deckId: string) =>
-  call("publish-unit", { body: { courseId, deckId } });
-export const openUnit = (courseId: string, deckId: string, open: boolean) =>
-  call("open-unit", { body: { courseId, deckId, open } });
+export const publishUnit = (courseId: string, moduleId: string) =>
+  call("publish-unit", { body: { courseId, deckId: moduleId } });
+export const openUnit = (courseId: string, moduleId: string, open: boolean) =>
+  call("open-unit", { body: { courseId, deckId: moduleId, open } });
 
 /* ---- clips ---- */
 /* ---- a language's numbers, and its clock ----
@@ -483,10 +494,12 @@ export const openUnit = (courseId: string, deckId: string, open: boolean) =>
    carries the document that is there — see `stale-system` in explain. */
 export const mySystems = (): Promise<{ ok: true; systems: any[]; signed?: Record<string, number | null> }> =>
   call("my-systems");
+/* `owner` saves a set another teacher shared with the space (0.696). */
 export const saveSystem = (
   kind: "numbers" | "times",
   system: unknown,
-): Promise<{ ok: true; system: any }> => call("save-system", { body: { kind, system } });
+  owner?: string,
+): Promise<{ ok: true; system: any }> => call("save-system", { body: { kind, system, ...(owner ? { owner } : {}) } });
 export const deleteSystem = (kind: "numbers" | "times", languageId: LangId) =>
   call("delete-system", { body: { kind, languageId } });
 
@@ -541,8 +554,8 @@ export const deleteAccount = () => call("delete-account", { body: {} });
 
 /* A teacher's export: the plan for what they asked for, then its records
    chunk by chunk, the way a backup is fetched. */
-export const exportPlan = (cardIds: string[], deckIds: string[], media: boolean) =>
-  call("export-plan", { body: { cardIds, deckIds, media } });
+export const exportPlan = (cardIds: string[], moduleIds: string[], media: boolean) =>
+  call("export-plan", { body: { cardIds, deckIds: moduleIds, media } });
 export const exportChunk = (keys: string[]) => call("export-chunk", { body: { keys } });
 
 /* ---- admin ---- */
@@ -562,7 +575,7 @@ export const adminOrgs = (): Promise<{ ok: true; orgs: OrgRow[] }> => call("admi
 export const createOrg = (name: string, slug: string, adminName: string, logo = "", colour = "", selfAdmin = false):
   Promise<{ ok: true; org: OrgRow; admin: User; key: string }> =>
   call("admin-create-org", { body: { name, slug, adminName, logo, colour, selfAdmin } });
-export const updateOrg = (id: string, change: { name?: string; slug?: string; logo?: string; colour?: string }) =>
+export const updateOrg = (id: string, change: { name?: string; slug?: string; logo?: string; colour?: string; sets?: boolean }) =>
   call("admin-update-org", { body: { id, ...change } });
 export const orgAdmins = (id: string, change: { add?: string; remove?: string }) =>
   call("admin-org-admins", { body: { id, ...change } });
@@ -740,14 +753,15 @@ export function explain(err: unknown): string {
       "not-reportable": "That's your own card. You can change it in My space.",
       "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
       "personal-set": "A deck in My space can't be a personal set. Copy it to the space first.",
-      "personal-card": "A card in My space can't go in a deck of the space. Copy its deck to the space first.",
+      "sets-off": "Personal sets aren't switched on in this space.",
+      "personal-card": "A card in My space can't go in a module of the space. Copy its deck to the space first.",
       "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",
       "not-allowed": "That administrator key isn't right.",
-      "not-yours": "That deck belongs to another teacher.",
+      "not-yours": "Only the person who made this, an administrator, or a teacher of a course it is in can change it.",
       "not-teaching": "You aren't teaching that course.",
-      "no-deck": "That deck no longer exists.",
-      "deck-locked": "That deck is locked. Unlock it in its settings first.",
+      "no-deck": "That module no longer exists.",
+      "deck-locked": "That module is locked. Unlock it in its settings first.",
       "unit-draft": "This unit isn't published in this course yet",
       "unit-not-ready": "This unit isn't ready to publish yet. The checklist says what is missing.",
       "not-on-path": "That unit is no longer on this course's path.",

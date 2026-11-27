@@ -10,7 +10,7 @@ reproduced by running the real code, not by reading it.
 > people using the app; the `DECISIONS.md` entry *Words with several
 > answers, in sentences* says how. The tests in
 > `tests/several-answers.test.mjs` fail on findings 4 and 5 if they are
-> put back, and a test in `tests/deck-quality.test.mjs` does the same for
+> put back, and a test in `tests/module-quality.test.mjs` does the same for
 > finding 6. The open question about cards with no word type is still
 > open.
 
@@ -225,14 +225,14 @@ teacher never picked a word type.
   `drill: written.some(partAsked)`. `SceneEditor` draws no `FormBlock` or
   `NothingAsked`, so a scene's lead form is never `ask: false`. The server
   stores `drill: card.drill !== false` (`server/api/courses.js`). The rule
-  is `practised` in `src/deck-quality.ts`, and the test is "a conversation
+  is `practised` in `src/module-quality.ts`, and the test is "a conversation
   switched off is no sentences and no conversation".
 - Several answers read whole (finding 4): `buildContextIndex` and
   `wordsOffered` (via `bestWordIn` with `unit.ar`) in `src/context-index.ts`;
   `textOf` in `src/context-links.ts` (`pairsIn`, `unknownWords`, `bare`);
   `contextCoverage` in `src/languages.ts`; `sentenceWords` in
   `src/sentence-words.ts`; `usesIn` in the learner's add screen in
-  `src/ArabicTrainer.tsx`; and the own-slot credit in `deckQuality`, which
+  `src/ArabicTrainer.tsx`; and the own-slot credit in `moduleQuality`, which
   calls `findWordSpan(s.ar, f.ar)`. The splitter to reuse is `splitForms`
   in `src/languages.ts`, as `answersIn` in the score does.
 - Word type ignored (finding 5): `guessKind(lead)` in `wordsOffered` and
@@ -240,7 +240,7 @@ teacher never picked a word type.
   `kindOf` in `src/languages.ts` is the reading that puts `category` first.
 - Recordings (finding 6): `packAnswers` in `src/answers.ts` stores a form's
   `clips` as the union of its answers' clips; `recorded` in
-  `src/deck-quality.ts` reads the form.
+  `src/module-quality.ts` reads the form.
 - The probes are small scripts that build the cards described and call
   `buildContextIndex`, `wordsOffered`, `linkReport`, `sentenceWords` and
   `contextCoverage` directly. Each finding above states the results.

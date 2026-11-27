@@ -161,7 +161,7 @@ which already renders signed out. Half a day for the second, with the first
 folded in.*
 
 **2. Course material and the spaces are held in memory only.** *Verified.*
-`myCourses`, `courseDecks` and `coursesKnown` start empty and are filled
+`myCourses`, `courseModules` and `coursesKnown` start empty and are filled
 only by `my-material`. The teaching and admin spaces remember their last
 contents in a module-level object (`spaceHeld` in `shared.tsx`), which a
 reload empties. `materialVersion` is a ref, per launch by design, so the
@@ -185,8 +185,8 @@ against a stored document and a dead server and asserts the courses are
 shown.*
 
 **3. Teacher actions are online-only, without a draft or a queue.**
-Every write in the teaching space — `saveCard`, `deleteCard`, `createDeck`,
-`attachDeck`, `putClip` and the rest — is a direct request that throws on
+Every write in the teaching space — `saveCard`, `deleteCard`, `createModule`,
+`attachModule`, `putClip` and the rest — is a direct request that throws on
 failure, and the space shows `explain(e)`. A recording made in the editor is
 uploaded rather than stored on the device, so a teacher who records offline
 loses the take. Nothing is kept for later.

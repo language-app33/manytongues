@@ -22,7 +22,7 @@ const card = (x) => ({ en: "", uses: [], ...x });
 
 /* A word, a phrase that uses it and says so, and a phrase that uses it and
    does not. */
-const deck = () => [
+const module = () => [
   card({ id: "w-door", ar: "باب", en: "door" }),
   card({ id: "w-book", ar: "كتاب", en: "book" }),
   card({ id: "p-shut", ar: "سكّر الباب من فضلك", en: "close the door please", uses: ["w-door"] }),
@@ -30,7 +30,7 @@ const deck = () => [
 ];
 
 test("a phrase that uses a word and does not say so is a link to confirm", () => {
-  const { toConfirm, confirmed } = linkReport(deck(), ar);
+  const { toConfirm, confirmed } = linkReport(module(), ar);
   assert.deepEqual(
     toConfirm.map((p) => [p.container.id, p.word.id]),
     [["p-took", "w-book"]],
@@ -47,7 +47,7 @@ test("a word carrying a pronoun still counts as the word", () => {
   /* كتابها is her book. Before the matcher learned to peel what is stuck
      on the end, a phrase using a word in the ordinary way — with somebody
      owning it — taught that word to nobody. */
-  const found = pairsIn(deck(), ar).find((p) => p.word.id === "w-book");
+  const found = pairsIn(module(), ar).find((p) => p.word.id === "w-book");
   assert.ok(found, "كتابها was not recognised as كتاب");
   assert.equal(found.at, 1, "and the gap-fill needs to know which word to blank");
   assert.equal(found.len, 1);
@@ -67,7 +67,7 @@ test("a word of two syllables is found inside a sentence", () => {
 });
 
 test("a word nothing contains is bare, which is not the same as unlinked", () => {
-  const cards = deck().concat([card({ id: "w-sun", ar: "شمس", en: "sun" })]);
+  const cards = module().concat([card({ id: "w-sun", ar: "شمس", en: "sun" })]);
   const { bare, toConfirm } = linkReport(cards, ar);
   assert.deepEqual(bare.map((w) => w.id), ["w-sun"]);
   /* The distinction the screen is built on: one of these is a tick away
@@ -139,14 +139,14 @@ test("the most used word is offered first", () => {
 test("a language that cannot find a word inside a phrase reports nothing", () => {
   /* Rather than reporting emptiness, which reads as "you have no work to
      do" instead of "this cannot be measured here". */
-  const report = linkReport(deck(), /** @type {any} */ ({ id: "xx", name: "Nowhere" }));
+  const report = linkReport(module(), /** @type {any} */ ({ id: "xx", name: "Nowhere" }));
   assert.equal(report.supported, false);
   assert.deepEqual(report.toConfirm, []);
   assert.equal(report.coverage, null);
 });
 
 test("the coverage number counts words that could be taught in context", () => {
-  const coverage = linkReport(deck(), ar).coverage || { words: 0, covered: 0, links: 0 };
+  const coverage = linkReport(module(), ar).coverage || { words: 0, covered: 0, links: 0 };
   assert.equal(coverage.words, 2, "two cards short enough to turn up inside another");
   assert.equal(coverage.covered, 1, "one of them is taught inside a phrase today");
   assert.equal(coverage.links, 1);
@@ -211,7 +211,7 @@ test("a turn is offered as itself: which card, which line, and who says it", () 
   assert.equal(pair.container.id, "d-shop#1", "two turns of one scene are two rows");
   /* An ordinary phrase says the same three things, so the screen has one
      shape of row rather than two. */
-  const [plain] = linkReport(deck(), ar).toConfirm;
+  const [plain] = linkReport(module(), ar).toConfirm;
   assert.equal(plain.container.cardId, "p-took");
   assert.equal(plain.container.line, null);
   assert.equal(plain.container.who, "");

@@ -76,7 +76,7 @@ Found by reading the code at 0.623, not by running old builds. Re-check each aga
 - **"Clue" is taken.** A card's `clue` is a few English words that tell apart two cards sharing a word or a meaning. Leave it alone. The new thing is called **Description**.
 - **Tags** exist on cards (`tags`); sentence blanks find their words through them.
 - **A course record has no settings** beyond its title, language, decks, codes and path. Settings sync whole, last writer wins, except `pathReached`.
-- **Deck quality** (`src/deck-quality.ts`): 55 points for words met in sentences, 10 for sentences well made, and 5 each for recordings, pictures, pronunciation, reviewed, no repeats, not too long, a scene. It reads the deck and nothing about students or courses.
+- **Deck quality** (`src/module-quality.ts`): 55 points for words met in sentences, 10 for sentences well made, and 5 each for recordings, pictures, pronunciation, reviewed, no repeats, not too long, a scene. It reads the deck and nothing about students or courses.
 - **Units**: a course's path of units in order (`src/path.ts`); ordinary decks have no order.
 - The teacher's card editor has three tabs: Basic, Advanced (only while "Build an advanced card" is ticked) and Exercises. The Exercises tab lists what is practised and the exercises to try. A card's tags are of two kinds: default tags, which follow from the kind of card, and custom tags, which a teacher picks in the "Custom tags" sheet.
 
@@ -374,7 +374,7 @@ When the last stage you can do is pushed, write to the owner, in the plain terms
 - `README.md`: the three rules that shape a session; deck quality; "A course's path".
 - `DECISIONS.md`: "The session mix"; "A card past its lower levels is asked its top (0.453)"; "A deck's quality (0.461)"; "Units: a course's path"; "One card per meaning"; the entries on cleared, learnt and passes.
 - `docs/AUDIT-what-teachers-can-make.md`, for what a teacher can and cannot save.
-- Code: `src/scheduler.ts`, `src/grade.ts`, `src/session-mix.ts`, `src/session-layout.ts`, `src/languages.ts` (`EX`, `TYPES`, `exOf`), `src/deck-quality.ts`, `src/path.ts`, `src/sentence-words.ts`, `src/card-editor.tsx`, and in `src/ArabicTrainer.tsx`: `laddered`, `openPastPattern`, `atItsTop`, `availableTypes`, `pickableTypes`, `mixCardsOf`, `buildSession`, `quietUnits`, `cardStandings`, `workloadOf`.
+- Code: `src/scheduler.ts`, `src/grade.ts`, `src/session-mix.ts`, `src/session-layout.ts`, `src/languages.ts` (`EX`, `TYPES`, `exOf`), `src/module-quality.ts`, `src/path.ts`, `src/sentence-words.ts`, `src/card-editor.tsx`, and in `src/ArabicTrainer.tsx`: `laddered`, `openPastPattern`, `atItsTop`, `availableTypes`, `pickableTypes`, `mixCardsOf`, `buildSession`, `quietUnits`, `cardStandings`, `workloadOf`.
 
 ## Progress
 

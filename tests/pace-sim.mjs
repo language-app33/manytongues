@@ -254,7 +254,7 @@ function sitDown(
   Math.random = seeded(at / 60000);
   let built;
   try {
-    built = buildSession({ items, settings, inDeck: () => true, budget, perDay });
+    built = buildSession({ items, settings, inModule: () => true, budget, perDay });
   } finally {
     Date.now = wall;
     Math.random = dice;

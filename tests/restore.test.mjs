@@ -116,13 +116,13 @@ async function classroom(/** @type {string} */ tag, /** @type {string | undefine
   const teacher = await made("teacher", "teacher");
   const student = await made("student", "student");
   const other = await made("student", "other");
-  const deck = (await api("create-deck", { key: teacher.key, org, body: { title: `Deck ${tag}`, lang: "ar-PS" } })).json.deck;
-  assert.equal((await api("attach-deck", { key: teacher.key, org, body: { deckId: deck.id, courseId: course.id } })).status, 200);
-  const saved = await api("save-card", { key: teacher.key, org, body: { card: card(`word-${tag}`), decks: [deck.id] } });
+  const module = (await api("create-deck", { key: teacher.key, org, body: { title: `Deck ${tag}`, lang: "ar-PS" } })).json.deck;
+  assert.equal((await api("attach-deck", { key: teacher.key, org, body: { deckId: module.id, courseId: course.id } })).status, 200);
+  const saved = await api("save-card", { key: teacher.key, org, body: { card: card(`word-${tag}`), decks: [module.id] } });
   assert.equal(saved.status, 200, saved.text);
-  const second = await api("save-card", { key: teacher.key, org, body: { card: card(`more-${tag}`), decks: [deck.id] } });
+  const second = await api("save-card", { key: teacher.key, org, body: { card: card(`more-${tag}`), decks: [module.id] } });
   assert.equal(second.status, 200, second.text);
-  return { course, teacher, student, other, deck, card: saved.json.card, card2: second.json.card };
+  return { course, teacher, student, other, deck: module, card: saved.json.card, card2: second.json.card };
 }
 
 /** A whole file, as the app builds one: records in plan order, the indexes beside. */
@@ -208,9 +208,9 @@ const roomB = await classroom("b", B);
 const home = await classroom("home", undefined);
 const joined = await api("join-course", { key: home.teacher.key, org: B, body: { code: (await raw(`course:${roomB.course.id}`)).teacherCode } });
 assert.equal(joined.status, 200, joined.text);
-const visitorDeck = (await api("create-deck", { key: home.teacher.key, org: B, body: { title: "Mine in B", lang: "ar-PS", personal: true } })).json.deck;
+const visitorModule = (await api("create-deck", { key: home.teacher.key, org: B, body: { title: "Mine in B", lang: "ar-PS", personal: true } })).json.deck;
 const visitorCard = (await api("save-card", { key: home.teacher.key, org: B, body: { card: card("mine-b"), decks: [], personal: true } })).json.card;
-const mainOnlyDeck = (await api("create-deck", { key: home.teacher.key, body: { title: "Mine in Main", lang: "ar-PS", personal: true } })).json.deck;
+const mainOnlyModule = (await api("create-deck", { key: home.teacher.key, body: { title: "Mine in Main", lang: "ar-PS", personal: true } })).json.deck;
 /* The visiting teacher has practised, with one recording of their own. */
 const visitorToken = sha(home.teacher.key);
 assert.equal((await sync(visitorToken, { method: "POST", body: { data: { items: [{ id: "p1", updated: 1, forms: [{ ar: "x", recs: [{ id: "rec1" }] }] }] } } })).status, 200);
@@ -225,9 +225,9 @@ test("a space's file says whose it is, and holds its members' My space and pract
   assert.equal(fileB.manifest.scope.kind, "space");
   assert.equal(fileB.manifest.scope.space, B);
   assert.equal(fileB.manifest.scope.slug, "bee-hive");
-  assert.ok(planned.includes(`deck:${visitorDeck.id}`), "the visitor's My space deck made in B");
+  assert.ok(planned.includes(`deck:${visitorModule.id}`), "the visitor's My space deck made in B");
   assert.ok(planned.includes(`card:${visitorCard.id}`), "and card");
-  assert.ok(!planned.includes(`deck:${mainOnlyDeck.id}`), "but not their My space in Main");
+  assert.ok(!planned.includes(`deck:${mainOnlyModule.id}`), "but not their My space in Main");
   assert.ok(planned.includes(`progress:${home.teacher.handle}`), "the whole practice document of a member whose first space is Main");
   assert.ok(planned.includes(`paudio:${home.teacher.handle}:rec1`), "with its recording");
   assert.equal(JSON.parse(fileB.records[`progress:${home.teacher.handle}`]).items[0].id, "p1");
@@ -353,8 +353,8 @@ test("a restored course leaves off who is not in the space; an existing one is u
 test("a card edited since keeps its edit; a deck gets back the card it lost", async () => {
   const edited = { ...(await raw(`card:${roomB.card.id}`)), forms: [{ ar: "edited", en: "edited", lat: "edited" }] };
   await store.set(`card:${roomB.card.id}`, JSON.stringify(edited));
-  const deck = await raw(`deck:${roomB.deck.id}`);
-  await store.set(`deck:${roomB.deck.id}`, JSON.stringify({ ...deck, cardIds: deck.cardIds.filter((/** @type {string} */ x) => x !== roomB.card2.id) }));
+  const module = await raw(`deck:${roomB.deck.id}`);
+  await store.set(`deck:${roomB.deck.id}`, JSON.stringify({ ...module, cardIds: module.cardIds.filter((/** @type {string} */ x) => x !== roomB.card2.id) }));
   await store.delete(`card:${roomB.card2.id}`);
   const later = (await api("create-deck", { key: roomB.teacher.key, org: B, body: { title: "Made after", lang: "ar-PS" } })).json.deck;
 
@@ -364,7 +364,7 @@ test("a card edited since keeps its edit; a deck gets back the card it lost", as
   assert.ok(await raw(`card:${roomB.card2.id}`), "the deleted card is back");
   const after = await raw(`deck:${roomB.deck.id}`);
   assert.ok(after.cardIds.includes(roomB.card2.id), "and in its deck again");
-  assert.ok(after.version > deck.version, "which moved, so devices fetch it");
+  assert.ok(after.version > module.version, "which moved, so devices fetch it");
   assert.ok(await raw(`deck:${later.id}`), "a deck made after the file is still there");
 });
 

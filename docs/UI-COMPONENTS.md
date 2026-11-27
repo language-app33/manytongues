@@ -62,11 +62,18 @@ A titled block. Replaces the hand-built eyebrow-plus-lede opener.
 
 `title, count, lede, action, children, className`
 
-### `Tabs` — 1 use (inside `SpaceFrame`; the trainer uses it directly too)
+### `Tabs`
 `tabs` is an array of `[key, label, iconName]`. Handles `role="tab"`,
 `aria-selected` and `aria-current` so you don't have to.
 
-`tabs, value, onChange, label="Section"`
+`tabs, value, onChange, label="Section", dots, counts, dock`
+
+With `dock` the strip goes to the bar at the foot of the window (a space's
+sections). Without it, it is the one full-width track every page's tabs
+share (0.685): equal parts, an icon over each name, the current one raised.
+`counts` puts a number under a tab's name, only where it helps choose
+(the sentence review). Anything that changes what a page lists is `Tabs`;
+`Segmented` is for a setting.
 
 ---
 
@@ -123,8 +130,9 @@ browser's own clear button is hidden so there is only ever one cross.
 `value, onChange(next), className` (on the input), `boxClassName` (on the
 wrapper), `style`, plus anything an `<input>` takes.
 
-### `Segmented` — 17 uses
-Pick one from a few. Reports `aria-pressed`.
+### `Segmented`
+Pick one from a few: a setting, or a filter. Reports `aria-pressed`. Not for
+switching between views of a page — that is `Tabs`.
 
 ```jsx
 <Segmented
@@ -149,6 +157,29 @@ Pick several. `options, chosen, onToggle, empty`
 
 `chosen` is an array of ids, and `onToggle` is called `(id, wasOn)` — the
 second argument saves the caller working out which way the tick just went.
+
+### `MoreMenu` — 3 uses
+Three dots that open the app's one context menu (0.689; a sheet since
+0.690): the less used things done with a tile or a list — a module's Export
+and Delete, a list's Import — out of the way of the one it is for.
+`label, title, lede, items, ghost=true`
+
+The panel is a `PickSheet` of `SheetAction` rows, the same one a saved
+session's dots open on Focused training: up from the foot of a phone, in the
+middle of a wide screen, headed by `title`. **Any new menu of actions on a
+thing is one of these**, not a list hanging from a button. `items` is
+`[{ label, icon, danger, note, disabled, onClick }]`; anything falsy is left
+out, so an action only some things have is written in place with `&&`. Its
+clicks stop at it, so a tile it sits on does not open as well.
+
+### `SheetAction`
+One row of that panel: its icon in a round well, its name, and a line under
+it where it cannot be done and why. `icon, label, note, danger, disabled,
+on, onClick`
+
+`on` marks the choice that holds now, edged and ticked, where the panel
+chooses one of a few rather than acting (0.691): a card's status
+(`StatusMenu`) and `FilterMenu` open the same `PickSheet` of these rows.
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
 The panel a list's Sort or Filter button opens onto. `groups, note`
@@ -187,10 +218,13 @@ and paging at 120 items.
 
 `noun, plural, items, itemKey, match, groups, groupOf, size="large"|"small",
 views, onNew, renderItem, selected, onSelectedChange, bulkActions, tools,
-menus, filters, count, empty, busy`
+more, narrow, menus, filters, count, empty, busy`
 
-The controls are **two rows**: New, the search box, `tools` and the view
-button on the first; Select and the `menus` on the second. Whichever menu is
+The controls are **two rows** (0.689): New, the three dots holding `more`
+(Import, where a list has it), `tools` (the screen's own main button) and,
+at the far end, the view button on the first; the search box on a line of
+its own on the second, with Select, the `menus` and `narrow` after it as
+icons. Either row is left out when it would hold nothing. Whichever menu is
 open renders under them, then `filters`, then the tiles.
 
 `menus` is `[{ key, label, icon, busy, content }]` — one open at a time, so
@@ -232,7 +266,7 @@ One card tile for both the learner's and the teacher's lists.
 `card, lang, showLat, meta, actions, onClick, className`
 
 `meta` is the one line of small print, and the caller decides what it says.
-It replaced a `deckTitles` prop, which this file and the gallery both went
+It replaced a `moduleTitles` prop, which this file and the gallery both went
 on advertising for a while afterwards.
 
 A card carrying a `name` is listed under it: the name is the headline, drawn
@@ -274,7 +308,7 @@ offers goes in as children.
 
 ### `ReportList` — spaces.tsx
 Learners' reports about cards (0.580): `ItemList` with search, Copy and Clear
-for what is ticked, and Open card, Copy and Clear on each. Admin's Flags tab
+for what is ticked, and Open card, Copy and Clear on each. Admin's Reports tab
 and Super admin's Reports, a list per space.
 
 ### `usePicture(hash)` — the hook
@@ -369,7 +403,7 @@ its play buttons resolve to "missing" rather than fetching.
 - **`FLAG_KINDS` / `flagTitle(kind)` / `FLAG_NOTE_MAX`** — the four things a
   learner can say about a question — three complaints, and "too easy",
   which moves the form up its ladder on the device and is never sent —
-  each with a `title` and the `what` line under it. The trainer renders the list; Admin → Flags names
+  each with a `title` and the `what` line under it. The trainer renders the list; Admin → Reports names
   what came back with `flagTitle`. Not components, but they live here for
   the same reason: two copies would be two vocabularies for one thing.
 - **`languageName(languages, id)`** / **`LanguageTag`** — one place that knows

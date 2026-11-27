@@ -341,7 +341,7 @@ export function sharedWith(
 export function anotherMeaningOf(card: Card): Card {
   const {
     id: _id, ref: _ref, clue: _clue, name: _name, review: _review, fills: _fills, uses: _uses,
-    decks: _decks, inDecks: _inDecks, rev: _rev, created: _created, updated: _updated,
+    decks: _modules, inDecks: _inModules, rev: _rev, created: _created, updated: _updated,
     splitFrom: _splitFrom, together: _together,
     ...rest
   } = card;

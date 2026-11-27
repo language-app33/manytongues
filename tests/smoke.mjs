@@ -122,7 +122,7 @@ const reported = [];
 /* The decks made through the UI, so a walk can check what was actually
    asked for rather than only what the screen then showed. */
 /** @type {any[]} */
-const madeDecks = [];
+const madeModules = [];
 /* `data` is the wire document: JSON as the sync endpoint stores it, which
    the checks below navigate field by field. */
 /** @type {Map<string, { etag: string, data: any }>} */
@@ -287,6 +287,10 @@ let teachesTwo = false;
 /* A course with a path (0.616): two units, the first published, served
    to the teacher's screens only while a walk below sets it. */
 let withPath = false;
+/** The path's order as the stub server holds it, and the moves asked of it (0.688). */
+let pathOrder = ["u1", "u2"];
+/** @type {any[]} */
+const movedUnits = [];
 /* And a learner's course with a path: two published units. */
 let studentPath = false;
 /* And a learner's course with a personal set (0.630): a deck of three
@@ -319,7 +323,7 @@ let materialSystems = [];
    teacher's numbers reaches a learner only through a deck that holds it,
    so a walk that meets numbers has to be sent one. */
 /** @type {any[]} */
-let materialDecks = [];
+let materialModules = [];
 /* What the deck screen's Numbers and pronouns asked the server to keep. */
 /** @type {any[]} */
 const savedParts = [];
@@ -330,9 +334,11 @@ const savedSets = [];
 /** @type {any[]} */
 const madeUnits = [];
 let teacherSets = false;
+/* A module of the teacher's own in My space (0.712), where a walk asks. */
+let teacherPersonal = false;
 /* What the deck screen's Lock asked the server to do. */
 /** @type {any[]} */
-const lockedDecks = [];
+const lockedModules = [];
 /* The accounts the first screen asked to have made, so a walk of it can
    check what was sent rather than only what the screen then showed. */
 /** @type {any[]} */
@@ -440,7 +446,7 @@ const fakeFetch = async (input, opts = {}) => {
         });
       }
       if (studentSets) {
-        const deck = (/** @type {string} */ id, /** @type {string} */ title, /** @type {any[]} */ cards, /** @type {number} */ at, extra = {}) => ({
+        const module = (/** @type {string} */ id, /** @type {string} */ title, /** @type {any[]} */ cards, /** @type {number} */ at, extra = {}) => ({
           id, title, owner: "t-1", cardIds: cards.map((c) => c.id), cardCount: cards.length, courseId: "c1", courseTitle: "Vietnamese 1",
           courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: at }], version: 1, ...extra,
         });
@@ -448,12 +454,12 @@ const fakeFetch = async (input, opts = {}) => {
           ok: true, version: "v-sets", teaches: false,
           courses: [{ id: "c1", org: "main", title: "Vietnamese 1", language: "ar-PS", decks: ["dFam", "dNorth", "dSouth"], role: "student", studying: true, teaching: false }],
           decks: [
-            deck("dFam", "Our family", SET_PICTURES, 1, { set: {
+            module("dFam", "Our family", SET_PICTURES, 1, { set: {
               wording: { question: "Who is she to you?", none: "Not someone I know", askName: "Who is this?", askWord: "What do you call her?", askBoth: "Name and word" },
               lists: ["dNorth", "dSouth"], named: [], asks: { name: true, word: true, both: true }, order: "before",
             } }),
-            deck("dNorth", "Hanoi", SET_NORTH, 2),
-            deck("dSouth", "Saigon", SET_SOUTH, 3),
+            module("dNorth", "Hanoi", SET_NORTH, 2),
+            module("dSouth", "Saigon", SET_SOUTH, 3),
           ],
           cards: [{ deckId: "dFam", cards: SET_PICTURES }, { deckId: "dNorth", cards: SET_NORTH }, { deckId: "dSouth", cards: SET_SOUTH }],
           systems: [],
@@ -475,7 +481,7 @@ const fakeFetch = async (input, opts = {}) => {
       if (materialQuiet) {
         return json({
           ok: true, version: "v-quiet", teaches: true,
-          courses: [], decks: materialDecks, cards: [], systems: materialSystems,
+          courses: [], decks: materialModules, cards: [], systems: materialSystems,
         });
       }
       const version = "v-abc";
@@ -513,14 +519,27 @@ const fakeFetch = async (input, opts = {}) => {
        course hands out, which is what makes them worth trying an exercise
        on: one has a recording and one does not, and one is a phrase that
        teaches the other. */
+    /* A course's exercises chosen (0.708): saved as asked, and handed back. */
+    if (action === "set-course-practice") {
+      const body = JSON.parse(opts.body || "{}");
+      return json({ ok: true, course: { id: body.courseId, practice: body.practice } });
+    }
     if (action === "my-courses" && withPath) {
       return json({
         ok: true,
         courses: [
-          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 },
+          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: pathOrder.slice(), pathLive: { u1: 1 },
             students: [], teachers: [account.handle], role: "teacher" },
         ],
       });
+    }
+    if (action === "move-unit" && withPath) {
+      const body = JSON.parse(opts.body || "{}");
+      movedUnits.push(body);
+      const rest = pathOrder.filter((x) => x !== body.deckId);
+      rest.splice(body.to, 0, body.deckId);
+      pathOrder = rest;
+      return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { u1: 1 }, opened: [] } });
     }
     if (action === "my-decks" && withPath) {
       return json({
@@ -552,6 +571,9 @@ const fakeFetch = async (input, opts = {}) => {
               set: { wording: { question: "Who is this person to you?", none: "I don't know this person", askName: "Who is this?", askWord: "What do you call this person?", askBoth: "Their name, with what you call them" },
                 lists: [], named: [], asks: { name: true, word: true, both: true }, order: "before" } },
           ] : []),
+          ...(teacherPersonal ? [
+            { id: "dp1", title: "My draft", owner: account.handle, lang: "ar-PS", personal: true, cardIds: [], cardCount: 0, courses: [] },
+          ] : []),
         ],
       });
     }
@@ -581,11 +603,16 @@ const fakeFetch = async (input, opts = {}) => {
     /* Which parts of the numbers a deck holds, as the screen saved them. */
     if (action === "lock-deck") {
       const body = JSON.parse(opts.body || "{}");
-      lockedDecks.push(body);
+      lockedModules.push(body);
       return json({ ok: true });
     }
-    /* Whose numbers a deck uses (0.541): nobody here has any. */
-    if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
+    /* Word sets shared with the space, and whose a course uses (0.696):
+       nobody here has shared any. */
+    if (action === "space-word-sets") return json({ ok: true, pronouns: [], numbers: [] });
+    if (action === "course-word-sets") {
+      const none = { options: [], using: "", chosen: false, reaching: [] };
+      return json({ ok: true, sets: { numbers: none, pronouns: none } });
+    }
     if (action === "create-unit" && teacherSets) {
       const body = JSON.parse(opts.body || "{}");
       madeUnits.push(body);
@@ -605,11 +632,11 @@ const fakeFetch = async (input, opts = {}) => {
     }
     if (action === "create-deck") {
       const body = JSON.parse(opts.body || "{}");
-      madeDecks.push(body);
+      madeModules.push(body);
       return json({
         ok: true,
         deck: {
-          id: `made${madeDecks.length}`,
+          id: `made${madeModules.length}`,
           title: body.title,
           owner: account.handle,
           lang: body.lang || "ar-PS",
@@ -764,6 +791,12 @@ const dayLater = (s) =>
 /* ---- what the device held before this build: a signed-in account and a
    document from an older build carrying its own private sync key ---- */
 localStorage.setItem("arabic-account", JSON.stringify(account));
+/* And it has been opened before, in Learning: a device with no answer yet
+   about whether its person teaches moves to Teaching when the first answer
+   says so (0.706), and the walks below start in Learning. The walk of a
+   teacher's very first sign-in clears this itself. */
+localStorage.setItem("arabic-trainer-teaches:", "0");
+localStorage.setItem("arabic-trainer-teaches:main", "0");
 const legacyKey = "raven-saffron-thistle-velvet-9f9f";
 localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
   version: 3, items: [], tombstones: {}, log: {}, settings: { language: "ar-PS" },
@@ -1372,10 +1405,10 @@ const sessionMode = async (/** @type {RegExp} */ want) => {
   await sleep(80);
   return !!row;
 };
-const sessionDeck = async (/** @type {RegExp} */ want) => {
-  clickNamed(/^(Choose decks|Another deck)$/);
+const sessionModule = async (/** @type {RegExp} */ want) => {
+  clickNamed(/^(Choose modules|Another module)$/);
   await sleep(80);
-  const sheet = document.querySelector('[role="dialog"][aria-label="Decks"]');
+  const sheet = document.querySelector('[role="dialog"][aria-label="Modules"]');
   const row = sheet ? [...sheet.querySelectorAll(".at-deckpick")].find((b) => want.test(b.textContent || "")) : null;
   click(row);
   await sleep(60);
@@ -1431,18 +1464,18 @@ if (/Build a session/.test(document.body.textContent)) {
   click(startBtn());
   await sleep(80);
   check("tapping it says what is missing, and only that",
-    wants() === "Choose a mode.|Choose at least one deck or card.", wants());
+    wants() === "Choose a mode.|Choose at least one module or card.", wants());
   check("and starts nothing", !document.querySelector(".at-instruction"));
 
   check("a mode is chosen from the subtype's kind of sheet", await sessionMode(/Regular/));
   check("and reads as chosen", /Regular/.test(sessionModeSaid()), sessionModeSaid());
-  check("and its line goes", wants() === "Choose at least one deck or card.", wants());
+  check("and its line goes", wants() === "Choose at least one module or card.", wants());
 
   /* Introductions rather than Everything: the walks further down need the
      climbed cards untouched, and a hand-built session asks a card every
      exercise it has open whether it is due or not — so the one deck none
      of them is in is the one to practise here. */
-  check("a deck is chosen from the sheet a card's decks are chosen in", await sessionDeck(/Introductions/));
+  check("a deck is chosen from the sheet a card's decks are chosen in", await sessionModule(/Introductions/));
   check("and stands as a pill", sessionPills().some((p) => /Introductions/.test(p)), sessionPills().join("|"));
   check("so nothing is wanted any more", !off() && !wants(), wants());
 
@@ -2371,6 +2404,26 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(40);
 }
 
+/* ---- Courses, from the student's menu (0.694) ----
+   It broke with "reading 'filter'" once the code said module: Learning
+   still handed the screen its modules under the old name, and the screen
+   got none. A course tile counting its modules is the proof it got them. */
+{
+  const before = errors.length;
+  if (!document.querySelector(".at-cmenu")) click(document.querySelector(".at-cornerbtn"));
+  await sleep(60);
+  click([...document.querySelectorAll(".at-cmenu button, .at-cmenu [role=menuitem]")]
+    .find((b) => /^Courses$/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const tile = [...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || ""));
+  const said = tile ? (tile.textContent || "").replace(/\s+/g, " ") : document.body.textContent.slice(0, 160).replace(/\s+/g, " ");
+  check("the student's Courses opens from the menu and counts each course's modules",
+    !!tile && /[1-9]\d* modules?/.test(said) && !/Something broke/.test(document.body.textContent || ""), said);
+  check("and nothing threw opening it", errors.length === before, errors.slice(before, before + 3).join(" | "));
+  click(document.querySelector(".at-screen .at-back, [aria-label='Back']"));
+  await sleep(200);
+}
+
 /* ---- the card tiles, in the student's list ----
    They carried the language, the decks the card was in, how many forms it
    had and how many recordings — four facts in a tile you scan past. Now:
@@ -2469,7 +2522,7 @@ if (/Build a session/.test(document.body.textContent)) {
      card to look at the card. */
   const readout = open ? (open.textContent || "") : "";
   check("and it stops at the card, without the shelf it came off",
-    !!open && !/Where it lives/i.test(readout) && !/In no deck/i.test(readout),
+    !!open && !/Where it lives/i.test(readout) && !/In no module/i.test(readout),
     readout.replace(/\s+/g, " ").slice(0, 120) || "(nothing open)");
   click([...document.querySelectorAll("button")].find((b) => /^(Back|Done|Close)$/i.test(b.textContent || "") || b.getAttribute("aria-label") === "Back"));
   await sleep(250);
@@ -2483,10 +2536,9 @@ if (/Build a session/.test(document.body.textContent)) {
      They were plain text, so the only way to find out which cards were
      still new was to read every deck. */
   const counts = /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll("button.at-rung")]);
-  /* Every card, then one per level of the ladder, then the ones that have
-     been all the way up, then the ones that have stuck. They used to be
-     the four maturities. */
-  check("every count at the top is a button", counts.length === 7, `${counts.length} tiles`);
+  /* Three groups since 0.705: Learning, Almost there, Learnt. They used
+     to be seven tiles, every card and then one per level. */
+  check("every count at the top is a button", counts.length === 3, `${counts.length} tiles`);
   const live = counts.find((b) => !b.disabled);
   check("a count with cards behind it can be pressed", !!live,
     counts.map((b) => `${(b.textContent || "").replace(/\s+/g, " ")}${b.disabled ? " (off)" : ""}`).join(" · "));
@@ -2500,9 +2552,8 @@ if (/Build a session/.test(document.body.textContent)) {
      spread over every level, so one card's 40% and another's would be
      forty per cent of different climbs. The bars belong under a level,
      where they measure the same thing on every tile. */
-  check("but the list of every card carries no bars, which would compare different climbs",
-    !/All cards/.test((live || {}).textContent || "") ||
-      ![...shown].some((t) => t.querySelector(".at-minibar")),
+  check("but the list carries no bars, which would compare different climbs",
+    ![...shown].some((t) => t.querySelector(".at-minibar")),
     `${[...shown].filter((t) => t.querySelector(".at-minibar")).length} of ${shown.length} barred`);
   /* On a screen of its own, titled by the tile that opened it. They used
      to open as a strip under the grid, which put a list of any length
@@ -2529,7 +2580,7 @@ if (/Build a session/.test(document.body.textContent)) {
     document.querySelectorAll(".at-cardgrid .at-minicard").length === 0,
     `${document.querySelectorAll(".at-cardgrid .at-minicard").length} still up`);
   check("which brings the tiles back",
-    document.querySelectorAll("button.at-rung").length === 7,
+    document.querySelectorAll("button.at-rung").length === 3,
     `${document.querySelectorAll("button.at-rung").length} tiles`);
 
   /* ---- the tiles say what a level asks, not what number it is ----
@@ -2538,21 +2589,12 @@ if (/Build a session/.test(document.body.textContent)) {
      read, on the screen whose job is saying where you are. */
   {
     const named = counts.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
-    check("every tile says what its level asks, in words",
-      counts.length === 7 && named.every((t) => /[A-Za-z]{3}/.test(t)) &&
-        !named.some((t) => /^\d+\s*Level \d+$/.test(t)),
-      named.join(" · "));
-    check("in the same words a card's own screen uses",
-      named.some((t) => /What it means/.test(t)) && named.some((t) => /Learnt/.test(t)),
-      named.join(" · "));
-    /* Cleared stands between the top level and Learnt, which is the whole
-       reason it exists: a card worked all the way up tonight used to be
-       filed under "write it from its meaning" beside cards that had only
-       just reached that rung. */
-    check("and a card up its whole ladder is counted apart from one still on the top rung",
-      named.findIndex((t) => /Cleared/.test(t)) ===
-        named.findIndex((t) => /Learnt/.test(t)) - 1 &&
-        named.some((t) => /Cleared/.test(t)),
+    const labels = counts.map((b) => ((b.querySelector(".at-rungname") || {}).textContent || "").trim());
+    check("the three groups are Learning, Almost there and Learnt, in that order",
+      labels.join("|") === "Learning|Almost there|Learnt", labels.join(" · "));
+    check("and each says what it means in words, with a number",
+      counts.length === 3 && named.every((t) => /^\d+/.test(t) && /[A-Za-z]{3}.*[A-Za-z]{3}/.test(t)) &&
+        !named.some((t) => /Level \d/.test(t)),
       named.join(" · "));
     check("and each carries a drawing of what it asks",
       counts.every((b) => !!b.querySelector("svg")),
@@ -2573,7 +2615,7 @@ if (/Build a session/.test(document.body.textContent)) {
      own screen and nowhere in the list, which left a card coming back
      tonight looking exactly like one coming back in a month. */
   {
-    const top = counts.filter((b) => /Cleared|Learnt/.test(b.textContent || ""));
+    const top = counts.filter((b) => /Almost there|Learnt/.test(b.textContent || ""));
     check("both tiles at the top of the ladder are there to open", top.length === 2,
       counts.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim()).join(" · "));
     const openable = top.filter((b) => !b.disabled);
@@ -2583,12 +2625,12 @@ if (/Build a session/.test(document.body.textContent)) {
     check("and at least one of them has cards behind it", openable.length > 0,
       top.map((b) => `${(b.textContent || "").replace(/\s+/g, " ").trim()}${b.disabled ? " (off)" : ""}`).join(" · "));
     for (const tile of openable) {
-      const name = (tile.textContent || "").replace(/\s+/g, " ").trim().replace(/^\d+\s*/, "");
+      const name = ((tile.querySelector(".at-rungname") || {}).textContent || "").trim();
       click(tile);
       await sleep(300);
       const cards = [...document.querySelectorAll(".at-cardgrid .at-minicard")];
       const said = cards.map((t) => ((t.querySelector(".at-minimeta") || {}).textContent || "").trim());
-      const isCleared = /Cleared/.test(name);
+      const isCleared = /Almost there/.test(name);
       /* Under Cleared, which of the reviews still to make is next — "First
          review in 3d" — because that is what the card is waiting on. Under
          Learnt there is nothing left to count, so it is simply the next
@@ -2631,17 +2673,17 @@ if (/Build a session/.test(document.body.textContent)) {
      percentage rather than a count, because a deck of thirty and a deck of
      three hundred are not comparable by how many cards are left. */
   {
-    const decks = [...document.querySelectorAll(".at-deckstat")];
-    check("each deck being studied has a tile of its own", decks.length > 0,
-      `${decks.length} decks`);
-    const said = decks.map((d) => (d.textContent || "").replace(/\s+/g, " ").trim());
+    const modules = [...document.querySelectorAll(".at-deckstat")];
+    check("each deck being studied has a tile of its own", modules.length > 0,
+      `${modules.length} decks`);
+    const said = modules.map((d) => (d.textContent || "").replace(/\s+/g, " ").trim());
     /* A card in two decks is in both, and a deck reaches this side of the
        app as a tag on a card — so a card kept under the first deck that
        carried it had left every other deck it is in. The book is in Lesson
        1 and in Review; without both tiles here, one of them is counting a
        card it holds as somebody else's. */
     const named = (/** @type {string} */ name) =>
-      decks.find((d) => new RegExp(`^${name}`).test((d.textContent || "").trim()));
+      modules.find((d) => new RegExp(`^${name}`).test((d.textContent || "").trim()));
     check("a deck holding a card that is also in another deck still counts it",
       !!named("Review"), said.join(" · ") || "(no deck tiles)");
     check("and the deck it was already in counts it too",
@@ -2669,20 +2711,20 @@ if (/Build a session/.test(document.body.textContent)) {
     const pctOf = (/** @type {Element} */ d) =>
       ((d.querySelector("b") || {}).textContent || "").trim();
     check("saying how much of it is learnt, as a percentage",
-      decks.every((d) => /^\d+%$/.test(pctOf(d))),
-      decks.map(pctOf).join(" · "));
+      modules.every((d) => /^\d+%$/.test(pctOf(d))),
+      modules.map(pctOf).join(" · "));
     check("and drawn as a bar of the same width as the number",
-      decks.every((d) => {
+      modules.every((d) => {
         const bar = /** @type {any} */ (d.querySelector(".at-deckbar > span"));
         return !!bar && bar.style.width === pctOf(d);
       }),
-      decks.map((d) => {
+      modules.map((d) => {
         const bar = /** @type {any} */ (d.querySelector(".at-deckbar > span"));
         return bar ? bar.style.width : "no bar";
       }).join(" · "));
     /* The bar is the number again, so a screen reader is told once. */
     check("the bar is drawing, and not read out twice",
-      decks.every((d) => {
+      modules.every((d) => {
         const bar = d.querySelector(".at-deckbar");
         return !!bar && bar.getAttribute("aria-hidden") === "true";
       }));
@@ -2692,7 +2734,7 @@ if (/Build a session/.test(document.body.textContent)) {
        is behind you for good. It said "learnt" while the two were the same
        number. */
     check("and beside it, how many of its cards are finished outright",
-      decks.every((d) => /\d+ of \d+ cards? fully learnt/.test((d.textContent || "").replace(/\s+/g, " "))),
+      modules.every((d) => /\d+ of \d+ cards? fully learnt/.test((d.textContent || "").replace(/\s+/g, " "))),
       said.join(" · "));
 
     /* ---- and a deck opens on a screen of its own ----
@@ -2705,8 +2747,8 @@ if (/Build a session/.test(document.body.textContent)) {
     if (lesson) {
       click(lesson);
       await sleep(250);
-      const deckScreen = () => [...document.querySelectorAll(".at-screen.over")].pop();
-      const text = () => ((deckScreen() || {}).textContent || "").replace(/\s+/g, " ");
+      const moduleScreen = () => [...document.querySelectorAll(".at-screen.over")].pop();
+      const text = () => ((moduleScreen() || {}).textContent || "").replace(/\s+/g, " ");
       check("on a screen named after the deck", /Lesson 1/.test(text()), text().slice(0, 80));
       check("saying how many of its cards are learnt", /\d+ of 7 cards fully learnt/.test(text()),
         (text().match(/\d+ of \d+ cards? fully learnt/) || ["(none)"])[0]);
@@ -2723,10 +2765,10 @@ if (/Build a session/.test(document.body.textContent)) {
           /more than two years away, however much you practise/.test(text()),
         (text().match(/Earliest possible.{0,120}/) || ["(no earliest line)"])[0]);
       check("with every card listed, least advanced first",
-        (deckScreen() || document).querySelectorAll(".at-cardtile, [class*=cardtile]").length > 0 ||
+        (moduleScreen() || document).querySelectorAll(".at-cardtile, [class*=cardtile]").length > 0 ||
           /Not started|Learnt|Cleared/.test(text()),
         text().slice(0, 200));
-      click([...((deckScreen() || document).querySelectorAll("button"))]
+      click([...((moduleScreen() || document).querySelectorAll("button"))]
         .find((b) => b.getAttribute("aria-label") === "Back"));
       await sleep(250);
     }
@@ -2742,9 +2784,9 @@ if (/Build a session/.test(document.body.textContent)) {
      the number underneath, so it is the number that names it here rather
      than the whole of its text. */
   const levelTile = counts.find(
-    (b) => !b.disabled && /Level \d/.test((b.textContent || "").replace(/\s+/g, " ")),
+    (b) => !b.disabled && /^Learning$/.test(((b.querySelector(".at-rungname") || {}).textContent || "").trim()),
   );
-  check("a level has cards behind it", !!levelTile,
+  check("Learning has cards behind it", !!levelTile,
     counts.map((b) => (b.textContent || "").replace(/\s+/g, " ")).join(" · "));
   click(levelTile);
   await sleep(300);
@@ -2760,40 +2802,15 @@ if (/Build a session/.test(document.body.textContent)) {
   check("and each heading is a status, with how many are in it",
     heads.length > 0 && headed.every((h) => /^(Paused|Learning|Not started)\s*\d+$/.test(h)),
     headed.join(" · ") || "no headings");
-  /* ---- and each of them says how far it has got on that level ----
-     The headings say which of three states a card is in, which is the
-     difference between started and not. This is the difference between a
-     card nearly through the level and one that has just begun, and those
-     look identical under "Learning" without it. */
+  /* ---- and each of them says where it is (0.705) ----
+     Learning holds all four levels, so a percentage of one level would
+     compare different climbs: each card says its level instead. */
   {
     const tiles = [...document.querySelectorAll(".at-cardgrid .at-minicard")];
-    const pctOf = (/** @type {Element} */ t) =>
-      ((t.querySelector(".at-minibar b") || {}).textContent || "").trim();
-    check("every card under a level says how far it has got on it, as a percentage",
-      tiles.length > 0 && tiles.every((t) => /^\d+%$/.test(pctOf(t))),
-      tiles.map(pctOf).map((p) => p || "(none)").join(" · ") || "no tiles");
-    /* Read off the bar itself rather than the tile's text, the way the
-       deck bars are: a number beside a word runs into it. */
-    check("and the bar beside it is drawn to the width of that number",
-      tiles.every((t) => {
-        const fill = /** @type {any} */ (t.querySelector(".at-minibarrail > span"));
-        return !!fill && fill.style.width === pctOf(t);
-      }),
-      tiles.map((t) => {
-        const fill = /** @type {any} */ (t.querySelector(".at-minibarrail > span"));
-        return fill ? fill.style.width : "no bar";
-      }).join(" · "));
-    /* The bar is the number again, so a screen reader is told once. */
-    check("the bar is drawing, and not read out twice",
-      tiles.every((t) => {
-        const rail = t.querySelector(".at-minibarrail");
-        return !!rail && rail.getAttribute("aria-hidden") === "true";
-      }));
-    /* And it is never full: a card whose level is done has moved up and is
-       under the next tile along. */
-    check("and none of them is full, because a finished level is the next tile",
-      tiles.every((t) => Number(pctOf(t).replace("%", "")) < 100),
-      tiles.map(pctOf).join(" · "));
+    const metaOf = (/** @type {Element} */ t) => ((t.querySelector(".at-minimeta") || {}).textContent || "").trim();
+    check("every card under Learning says where it is, and carries no bar",
+      tiles.length > 0 && tiles.every((t) => !!metaOf(t) && !t.querySelector(".at-minibar")),
+      tiles.map(metaOf).map((p) => p || "(none)").join(" · ") || "no tiles");
   }
 
   /* The counts are of the whole run, so they add up to the number on the
@@ -2858,7 +2875,7 @@ if (/Build a session/.test(document.body.textContent)) {
     await sleep(80);
     /* The decks as a card's editor chooses them: a button opening a sheet,
        and the chosen ones as pills. */
-    click(buttonNamed(/^Choose decks$/));
+    click(buttonNamed(/^Choose modules$/));
     await sleep(80);
     const lessonPick = [...document.querySelectorAll(".at-decksheet button.at-deckpick")]
       .find((b) => /Lesson 1/.test(b.textContent || ""));
@@ -3000,9 +3017,9 @@ if (/Build a session/.test(document.body.textContent)) {
 {
   click(buttonNamed(/^Progress$/));
   await sleep(400);
-  /* The first tile is "Cards" — every card that is anywhere on the ladder. */
+  /* Every card in view, as the line under "Your cards" counts them (0.705). */
   const cardCount = () =>
-    Number(((document.querySelector("button.at-rung") || {}).textContent || "").trim().match(/^\d+/));
+    Number(((document.body.textContent || "").match(/How well you know your (\d+) cards/) || [])[1]);
   const both = cardCount();
   /* The languages are in the sheet behind where you are, at the top of
      the page (0.601). */
@@ -3894,7 +3911,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Regular/);
-  check("the scene's own deck is there to practise from", await sessionDeck(/Scenes/), sessionPills().join("|"));
+  check("the scene's own deck is there to practise from", await sessionModule(/Scenes/), sessionPills().join("|"));
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(60);
   clickNamed(/^(Start|Choose a length)$/);
@@ -4086,6 +4103,9 @@ check("no console errors during the session", errors.length === 0, errors.slice(
       !!keep && !!done && keep.parentElement === done.parentElement &&
         !!(keep.compareDocumentPosition(done) & 4) && /primary/.test(keep.className) && !/primary/.test(done.className),
       `keep:${!!keep} done:${!!done} ${keep ? keep.className : ""}`);
+    /* The line above is in plain words (0.703). */
+    check("the end of a session does not talk about gaps",
+      !/Every gap/.test(document.body.textContent || ""), (document.body.textContent || "").slice(0, 200));
     if (keep) {
       click(keep);
       await sleep(300);
@@ -4185,7 +4205,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Regular/);
-  await sessionDeck(/Introductions/);
+  await sessionModule(/Introductions/);
   const groups = [...document.querySelectorAll(".at-lengthgroup")];
   const minutesGroup = groups.find((g) => /Minutes/.test(g.textContent || ""));
   click(minutesGroup && [...minutesGroup.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "2"));
@@ -4295,7 +4315,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   for (const id of ids) {
     click(must(document.querySelector(`.at-cardgrid .at-minicard[data-card="${id}"]`), `the tile of ${id}`));
     await sleep(350);
-    click(must(buttonNamed(on ? /^Mark as high priority$/ : /High priority — tap to clear/), `the priority button on ${id}`));
+    click(must(buttonNamed(on ? /^Practise this first$/ : /Practising first — tap to stop/), `the priority button on ${id}`));
     await sleep(300);
     backOut();
     await sleep(350);
@@ -4315,7 +4335,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Ultimate/);
-  await sessionDeck(/Lesson 1/);
+  await sessionModule(/Lesson 1/);
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
@@ -4619,7 +4639,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Ultimate/);
-  check("the deck the frame is in can be practised on its own", await sessionDeck(/Introductions/),
+  check("the deck the frame is in can be practised on its own", await sessionModule(/Introductions/),
     sessionPills().join(" | "));
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
@@ -4709,13 +4729,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(firstTile);
   await sleep(350);
 
-  const markBtn = buttonNamed(/^Mark as high priority$/);
+  const markBtn = buttonNamed(/^Practise this first$/);
   check("a learner can mark a card high priority from their own card list", !!markBtn,
     (document.body.textContent || "").slice(-160).replace(/\s+/g, " "));
   click(markBtn);
   await sleep(300);
   check("and the button then says how to take it off",
-    !!buttonNamed(/High priority — tap to clear/),
+    !!buttonNamed(/Practising first — tap to stop/),
     (document.body.textContent || "").slice(-120).replace(/\s+/g, " "));
 
   backOut();
@@ -4766,7 +4786,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(400);
   click(must(document.querySelector(".at-cardgrid .at-minipri"), "the marked tile").closest(".at-minicard"));
   await sleep(350);
-  click(must(buttonNamed(/High priority — tap to clear/), "the button that clears it"));
+  click(must(buttonNamed(/Practising first — tap to stop/), "the button that clears it"));
   await sleep(300);
   backOut();
   await sleep(350);
@@ -4849,7 +4869,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const teachRead = [...document.querySelectorAll(".at-screen.cardform")].pop();
   check("a teacher's card opens in the card editor, locked, decks and all",
     !!teachRead && !!teachRead.querySelector("fieldset.at-cardlock[disabled]") &&
-      /Decks/.test(teachRead.textContent || "") && !document.querySelector(".at-readout"),
+      /Modules/.test(teachRead.textContent || "") && !document.querySelector(".at-readout"),
     teachRead ? (teachRead.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no card screen)");
   /* And where it stands with students, beside Edit: the app's own menu
      button, the height of the buttons beside it, opening the app's own
@@ -4863,10 +4883,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
-  check("and it opens the app's menu of what can be done from there",
-    statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
-  if (statusBtn) click(statusBtn);
+  /* In the app's one panel since 0.690: a row per choice, the one that
+     holds now ticked. */
+  const statusLines = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
+    .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
+  check("and it opens the app's panel of what can be done from there, the status now ticked",
+    statusLines.join(" | ") === "Published ✓ | Unpublish", statusLines.join(" | ") || "(no panel)");
+  click(document.querySelector('.at-statussheet [aria-label="Close"]'));
   await sleep(100);
   /* On the title's own line since 0.484, as icons, each named out loud,
      with Export by the "This card" heading rather than among them. */
@@ -5434,28 +5457,28 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and ticking one raises the bulk actions", !!document.querySelector(".at-bulkfloat"),
     (document.body.textContent || "").slice(-80));
-  clickNamed(/^Add to a deck$/);
+  clickNamed(/^Add to a module$/);
   await sleep(300);
   check("the deck screen offers to make one on the spot", !!buttonNamed(/^New deck$/),
     [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
   clickNamed(/^New deck$/);
   await sleep(200);
-  const deckName = [...document.querySelectorAll(".at-formblock")]
+  const moduleName = [...document.querySelectorAll(".at-formblock")]
     .find((d) => /New deck/.test(d.textContent || ""));
-  const deckInput = deckName && deckName.querySelector("input");
-  if (deckInput) {
+  const moduleInput = moduleName && moduleName.querySelector("input");
+  if (moduleInput) {
     const setInput = must(
       Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"),
       "the input's value descriptor"
     ).set;
-    must(setInput, "the input's value setter").call(deckInput, "Week 3 · Verbs");
-    deckInput.dispatchEvent(new w.Event("input", { bubbles: true }));
+    must(setInput, "the input's value setter").call(moduleInput, "Week 3 · Verbs");
+    moduleInput.dispatchEvent(new w.Event("input", { bubbles: true }));
     await sleep(80);
     clickNamed(/^Create$/);
     await sleep(400);
     check("making one takes the language from the cards going into it",
-      madeDecks.length === 1 && madeDecks[0].lang === "ar-PS",
-      JSON.stringify(madeDecks[0] || null));
+      madeModules.length === 1 && madeModules[0].lang === "ar-PS",
+      JSON.stringify(madeModules[0] || null));
     const rows = [...document.querySelectorAll(".at-tickrow")];
     const made = rows.find((r) => /Week 3/.test(r.textContent || ""));
     check("the new deck joins the list", !!made,
@@ -5849,12 +5872,12 @@ const openPronounTables = async () => {
     const named = () => [...document.querySelectorAll(".at-formblock .at-formnum")]
       .map((n) => (n.textContent || "").trim());
     check("and the decks are a section of their own, under the kind of card",
-      named().indexOf("Decks") === named().indexOf("This card") + 1 &&
+      named().indexOf("Modules") === named().indexOf("This card") + 1 &&
         !!addBtn() && !!addBtn().closest(".at-formblock") &&
-        /^Decks$/.test(((addBtn().closest(".at-formblock").querySelector(".at-formnum") || {}).textContent || "").trim()),
+        /^Modules$/.test(((addBtn().closest(".at-formblock").querySelector(".at-formnum") || {}).textContent || "").trim()),
       named().join(" | "));
     check("and says it is in none yet, as the offer to put it in one",
-      !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
+      !pills().length && /add this card to a module/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
     /* The same screen selected cards are put in decks from (0.594): the
        decks to tick, with New deck at the top, so a card written for a
@@ -5875,7 +5898,7 @@ const openPronounTables = async () => {
     check("pressing it opens the screen selected cards are put in decks from",
       !!pickScreen() && tickRows().length > 0 && !!inScreen(/^New deck$/),
       `${tickRows().length} decks · ${pickScreen() ? "screen" : "no screen"}`);
-    const firstDeck = ((tickRows()[0] && tickRows()[0].querySelector("b")) || {}).textContent || "";
+    const firstModule = ((tickRows()[0] && tickRows()[0].querySelector("b")) || {}).textContent || "";
     click(tickRows()[0] && tickRows()[0].querySelector("input"));
     await sleep(150);
     /* Ticks are a draft until Done: Cancel leaves the card as it was. */
@@ -5891,15 +5914,15 @@ const openPronounTables = async () => {
     click(inScreen(/^Done$/));
     await sleep(200);
     check("Done stands the ticked deck in the section as a deck of its own",
-      !pickScreen() && pills().length === 1 && pills()[0] === firstDeck.trim(),
+      !pickScreen() && pills().length === 1 && pills()[0] === firstModule.trim(),
       pills().join(" | ") || "(no decks named)");
 
     /* ---- a deck made on the spot, from the card ---- */
     click(addBtn());
     await sleep(250);
     check("and it opens with the card's decks already ticked",
-      tickRows().some((r) => (r.textContent || "").includes(firstDeck.trim()) && !!r.querySelector("input:checked")));
-    const madeBefore = madeDecks.length;
+      tickRows().some((r) => (r.textContent || "").includes(firstModule.trim()) && !!r.querySelector("input:checked")));
+    const madeBefore = madeModules.length;
     click(inScreen(/^New deck$/));
     await sleep(150);
     const nameBox = /** @type {any} */ ((pickScreen() || document.createElement("div")).querySelector(".at-formblock input"));
@@ -5914,9 +5937,9 @@ const openPronounTables = async () => {
       await sleep(400);
     }
     check("Create makes the deck in the card's language",
-      madeDecks.length === madeBefore + 1 && madeDecks[madeDecks.length - 1].title === "Week 4 · Food" &&
-        madeDecks[madeDecks.length - 1].lang === "ar-PS",
-      JSON.stringify(madeDecks[madeDecks.length - 1] || null));
+      madeModules.length === madeBefore + 1 && madeModules[madeModules.length - 1].title === "Week 4 · Food" &&
+        madeModules[madeModules.length - 1].lang === "ar-PS",
+      JSON.stringify(madeModules[madeModules.length - 1] || null));
     const madeRow = tickRows().find((r) => /Week 4/.test(r.textContent || ""));
     check("and it joins the list already ticked, which is why it was made",
       !!madeRow && !!madeRow.querySelector("input:checked"),
@@ -5936,7 +5959,7 @@ const openPronounTables = async () => {
     click(drop());
     await sleep(200);
     check("and pressing it leaves the card in no deck, offering one again",
-      !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
+      !pills().length && /add this card to a module/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
   }
 
@@ -8407,8 +8430,8 @@ const openPronounTables = async () => {
 
 /* ---- a language's pronouns, written once ----
 
-   The Pronouns screen, a word set (0.569): reached from the Word sets row
-   above the Cards tab's list, through the screen that lists every set.
+   The Pronouns screen, a word set (0.569): reached from the Word sets tab
+   beside Modules and Cards (0.689), which lists every set.
    One row per column of the verb table. Filled in and saved, each row goes
    up as a card of the Pronoun kind that says which column it is. */
 {
@@ -8417,23 +8440,25 @@ const openPronounTables = async () => {
   check("the Cards tab no longer has an icon each for Numbers and Pronouns",
     !frameButtons(frame).some((b) => /^(Numbers|Pronouns)$/.test(b.getAttribute("aria-label") || "")),
     frameButtons(frame).map((b) => b.getAttribute("aria-label")).filter(Boolean).join(" | "));
-  const setsRow = /** @type {any} */ ([...frame.querySelectorAll("button.at-openrow")]
-    .find((b) => /^Word sets/.test((b.textContent || "").trim())) || null);
-  check("but one Word sets row above the cards, saying what it holds",
-    !!setsRow && /Numbers and pronouns, written once for the language/.test(setsRow.textContent || ""),
-    setsRow ? (setsRow.textContent || "").trim() : "(no row)");
-  click(setsRow);
+  check("nor a Word sets row above the cards, now that they have a tab",
+    ![...frame.querySelectorAll("button.at-openrow")].some((b) => /^Word sets/.test((b.textContent || "").trim())));
+  const innerTab = (/** @type {string} */ name) => /** @type {any} */ ([...(document.querySelector(".at-screen.bare") || document)
+    .querySelectorAll('[role="tab"]')].find((b) => (b.textContent || "").trim() === name) || null);
+  check("but Word sets is a tab beside Modules and Cards",
+    !!innerTab("Modules") && !!innerTab("Cards") && !!innerTab("Word sets"),
+    [...frame.querySelectorAll('[role="tab"]')].map((b) => (b.textContent || "").trim()).join(" | "));
+  click(innerTab("Word sets"));
   await sleep(400);
-  const setsScreen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
-    .find((sc) => ((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Word sets") || null);
+  const setsScreen = () => /** @type {any} */ (innerTab("Word sets") && innerTab("Word sets").getAttribute("aria-selected") === "true"
+    ? document.querySelector(".at-screen.bare") : null);
   const setTile = (/** @type {string} */ name) => /** @type {any} */ (setsScreen()
     ? [...setsScreen().querySelectorAll("button.at-openrow")].find((b) => ((b.querySelector(".at-decktitle") || {}).textContent || "").trim() === name) || null
     : null);
-  check("which opens a screen listing each set",
+  check("which lists each set",
     !!setTile("Numbers") && !!setTile("Pronouns"),
     setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
   check("each saying how much of it is written and how many decks hold it",
-    /^0 of 9 pronouns written · in no deck yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
+    /^0 of 9 pronouns written · in no module yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
       / ranges? written · in /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
     `${((setTile("Pronouns") || {}).textContent || "")} | ${((setTile("Numbers") || {}).textContent || "")}`);
   click(setTile("Pronouns"));
@@ -8481,14 +8506,14 @@ const openPronounTables = async () => {
   check("and a reading left as it came is not stored, so it goes on following the English",
     !sent.enIs && !sent.enAsk, JSON.stringify({ enIs: sent.enIs, enAsk: sent.enAsk }));
   check("once one is written, the set can be put in a deck from its own screen",
-    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a deck$/.test((b.textContent || "").trim())),
+    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a module$/.test((b.textContent || "").trim())),
     screen() ? [...screen().querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no screen)");
   click([...(screen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
   check("closing the set goes back to Word sets, which counts what was written",
     !!setsScreen() && /^1 of 9 pronouns written/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
     setsScreen() ? ((setTile("Pronouns") || {}).textContent || "(no tile)") : "(not on Word sets)");
-  click([...(setsScreen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  click(innerTab("Cards"));
   await sleep(300);
 
   /* And on the Cards tab they are one entry, not a tile each: the set is
@@ -8522,11 +8547,20 @@ const openPronounTables = async () => {
 {
   takeSaves = true;
   const frameNow = () => /** @type {any} */ (document.querySelector(".at-screen.bare") || document);
-  const banner = [...frameNow().querySelectorAll(".at-reviewbanner")]
-    .find((b) => /more than one meaning/.test(b.textContent || ""));
-  check("the Cards tab says which cards have more than one meaning on them",
-    !!banner, banner ? (banner.textContent || "").trim() : "(no banner)");
-  click(banner && [...banner.querySelectorAll("button")].find((b) => /^Review$/.test((b.textContent || "").trim())));
+  /* Said in To do on Home since 0.693, not over the Cards list. */
+  check("the Cards list no longer carries a line about cards with more than one meaning",
+    !/more than one meaning on/.test(frameNow().textContent || ""), "(line still there)");
+  const dockTab = (/** @type {RegExp} */ re) => /** @type {any} */ ([...document.querySelectorAll(".at-dock [role=tab]")]
+    .find((b) => re.test((b.textContent || "").trim())) || null);
+  click(dockTab(/^Home/));
+  await sleep(400);
+  const item = /** @type {any} */ (frameNow().querySelector('[data-todo="meanings"]'));
+  check("Home's To do says which cards have more than one meaning on them",
+    !!item && /more than one meaning/.test(item.textContent || ""),
+    item ? (item.textContent || "").trim() : ((frameNow().querySelector('[data-el="todo"]') || {}).textContent || "(no To do)"));
+  check("and Home's button in the bar counts what To do holds",
+    /^Home\d+$/.test(((dockTab(/^Home/) || {}).textContent || "").trim()), ((dockTab(/^Home/) || {}).textContent || "(no tab)").trim());
+  click(item && [...item.querySelectorAll("button")].find((b) => /^Review$/.test((b.textContent || "").trim())));
   await sleep(300);
   const splits = [...document.querySelectorAll(".at-screen")]
     .find((sc) => /^More than one meaning$/.test(((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim()));
@@ -8535,6 +8569,10 @@ const openPronounTables = async () => {
       /Keep as one card/.test(splits.textContent || ""),
     splits ? (splits.textContent || "").slice(0, 160) : "(no screen)");
   click(splits && [...splits.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  await sleep(300);
+  click(dockTab(/^Material$/));
+  await sleep(300);
+  click([...frameNow().querySelectorAll("[role=tab]")].find((b) => /^Cards$/.test((b.textContent || "").trim())) || null);
   await sleep(300);
 
   const tile = [...frameNow().querySelectorAll(".at-minicard")]
@@ -9137,23 +9175,19 @@ const openPronounTables = async () => {
   const tabNamed = (/** @type {RegExp} */ re) =>
     frameButtons(frame).filter((b) => re.test((b.textContent || "").trim())).pop();
   const rows = () => [...frame.querySelectorAll(".at-toolbar")];
-  const subRow = () => frame.querySelector(".at-toolbar-sub");
-  /* The label a button carries, without the count riding inside it: a
-     narrowed Filter reads "Filter1" to textContent, and what is being
-     checked here is the order of the three. */
+  const subRow = () => frame.querySelector(".at-toolbar-search");
+  /* The name each icon carries (0.689: Select, Sort and Filter are icons
+     now, named for a screen reader and on hover), in order — the search
+     box's own clear cross aside. */
   const named = (/** @type {Element | null} */ row) =>
     row
-      ? [...row.querySelectorAll("button")].map((b) =>
-          [...b.childNodes]
-            .filter((n) => !(n.nodeType === 1 && /** @type {any} */ (n).classList.contains("at-filtercount")))
-            .map((n) => n.textContent || "")
-            .join("")
-            .trim()
-        )
+      ? [...row.querySelectorAll("button")]
+          .filter((b) => !b.classList.contains("at-searchclear"))
+          .map((b) => (b.getAttribute("aria-label") || "").trim())
       : [];
   const menuBtn = (/** @type {RegExp} */ re) =>
     /** @type {any} */ (
-      [...frame.querySelectorAll(".at-menubtn")].find((b) => re.test((b.textContent || "").trim())) || {}
+      [...frame.querySelectorAll(".at-menubtn")].find((b) => re.test((b.getAttribute("aria-label") || "").trim())) || {}
     );
   const tiles = () => frame.querySelectorAll(".at-cardgrid .at-minicard").length;
   /* Whatever this finds, it is a DOM node or nothing — the walk asks it for
@@ -9164,17 +9198,29 @@ const openPronounTables = async () => {
   click(tabNamed(/^Cards$/));
   await sleep(500);
 
-  check("the Cards tab's controls are three rows: buttons, search, then Select and the menus",
-    rows().length === 3, `${rows().length} rows`);
+  check("the Cards tab's controls are two rows: buttons, then search with Select and the menus",
+    rows().length === 2, `${rows().length} rows`);
   const top = /** @type {any} */ (rows()[0]);
-  check("the first row is New card and the view button, with no search box in it",
+  check("the first row is New card, its three dots and the view button, with no search box in it",
     !!top && /New card/.test(top.textContent || "") &&
-      !top.querySelector("input.at-search") && !!top.querySelector(".at-viewbtn"),
+      !top.querySelector("input.at-search") && !!top.querySelector(".at-viewbtn") && !!top.querySelector(".at-morebtn"),
     top ? (top.textContent || "").replace(/\s+/g, " ").trim() + ` · ${top.querySelectorAll("input, button").length} controls` : "no row");
+  click(one(".at-morebtn", top));
+  await sleep(150);
+  /* The app's one context menu (0.690): the sheet a saved session's dots
+     open, named for what it acts on, a row per action. */
+  const moreLines = () => [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("and the three dots open a sheet named Cards, holding Import",
+    moreLines().join(" | ") === "Import" &&
+      ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Cards",
+    moreLines().join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+  await sleep(150);
+  check("and its cross closes it", !document.querySelector(".at-moresheet"));
   const searchRow = /** @type {any} */ (rows()[1]);
   check("and the search box is on a line of its own under it",
     !!searchRow && searchRow.classList.contains("at-toolbar-search") &&
-      searchRow.querySelectorAll("input, button").length === 1 &&
+      searchRow.querySelectorAll("input").length === 1 &&
       !!searchRow.querySelector("input.at-search[placeholder='Search cards']"),
     searchRow ? searchRow.className : "no row");
   const sizeName = () => {
@@ -9182,8 +9228,8 @@ const openPronounTables = async () => {
     return btn ? btn.getAttribute("aria-label") || "" : "(no view button)";
   };
   check("and the view button says which view it is in and what pressing it does",
-    /^View: Small grid — press for large grid$/.test(sizeName()), sizeName());
-  check("the row of menus is Select, Sort and Filter, in that order",
+    /^View: Grid — press for table$/.test(sizeName()), sizeName());
+  check("after it, as icons, Select, Sort and Filter, in that order",
     named(subRow()).join(" | ") === "Select | Sort | Filter",
     named(subRow()).join(" | ") || "(no second row)");
 
@@ -9199,7 +9245,7 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and Filter replaces it rather than standing beside it",
     frame.querySelectorAll(".at-listmenu").length === 1 &&
-      sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Decks | Blanks | Review",
+      sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Modules | Blanks | Review",
     `${frame.querySelectorAll(".at-listmenu").length} panels · ${sortLabels().join(" | ")}`);
 
   /* ---- and by kind, with each kind's subtypes under it ----
@@ -9296,15 +9342,15 @@ const openPronounTables = async () => {
      narrows nothing: it is the state the filter is in until the first box is
      ticked, and emptying the list in the meantime would read as a list that
      had lost its cards. */
-  const deckMode = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen decks"] .at-seg')]
+  const moduleMode = (/** @type {RegExp} */ re) =>
+    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .find((b) => re.test((b.textContent || "").trim()));
   check("the filter offers in, not in, or any deck at all",
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen decks"] .at-seg')]
-      .map((b) => (b.textContent || "").trim()).join(" | ") === "Any deck | In these | Not in these | In no deck",
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen decks"] .at-seg')]
+    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+      .map((b) => (b.textContent || "").trim()).join(" | ") === "Any module | In these | Not in these | In no module",
+    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .map((b) => (b.textContent || "").trim()).join(" | ") || "(no deck filter)");
-  click(deckMode(/^Not in these$/));
+  click(moduleMode(/^Not in these$/));
   await sleep(200);
   check("picking a mode with no deck ticked leaves the list alone",
     tiles() === all, `${tiles()} of ${all} still listed`);
@@ -9326,13 +9372,13 @@ const openPronounTables = async () => {
     menuBtn(/^Filter/).textContent || "(no filter button)");
   /* The other way round shows exactly the rest of them: "in" and "not in"
      are two halves of the same cut. */
-  click(deckMode(/^In these$/));
+  click(moduleMode(/^In these$/));
   await sleep(250);
   check("the other way round shows the rest, and the two make the whole",
     tiles() === all - outside, `${tiles()} in, ${outside} out, ${all} in total`);
   /* And the cards in no deck at all, with nothing to tick: fewer than
      every card, and every one of them outside Lesson 1. */
-  click(deckMode(/^In no deck$/));
+  click(moduleMode(/^In no module$/));
   await sleep(250);
   const loose = tiles();
   check("in no deck shows the cards no deck holds, with nothing ticked",
@@ -9347,28 +9393,28 @@ const openPronounTables = async () => {
   check("and clearing them shows every card, with nothing left to clear",
     tiles() === all && !clearAll() && !/\d/.test(menuBtn(/^Filter/).textContent || ""),
     `${tiles()} of ${all}; ${menuBtn(/^Filter/).textContent || ""}`);
-  click(deckMode(/^In these$/));
+  click(moduleMode(/^In these$/));
   await sleep(250);
   click(/** @type {any} */ ([...frame.querySelectorAll(".at-listmenu .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))).querySelector("input"));
   await sleep(250);
   /* ---- and the same controls over one deck ----
      Including the filter still in force, which is the point of one setting
      for both. */
-  click(tabNamed(/^Decks$/));
+  click(tabNamed(/^Modules$/));
   await sleep(500);
-  const deckTile = [...frame.querySelectorAll(".at-deckcard, .at-minicard, .at-tile")]
+  const moduleTile = [...frame.querySelectorAll(".at-deckcard, .at-minicard, .at-tile")]
     .find((t) => /Lesson 1/.test(t.textContent || ""));
-  check("the teacher's decks are there to open", !!deckTile,
+  check("the teacher's decks are there to open", !!moduleTile,
     [...frame.querySelectorAll(".at-deckcard, .at-minicard, .at-tile")]
       .map((t) => (t.textContent || "").slice(0, 14)).join(" | ") || "no decks");
-  click(deckTile);
+  click(moduleTile);
   await sleep(500);
   /* Read-only since 0.523: the deck's cards are sorted and filtered here,
      and selected only on Manage cards. */
   check("an open deck carries the same two rows",
     [...document.querySelectorAll(".at-toolbar")].length >= 2 &&
-      named(document.querySelector(".at-toolbar-sub")).join(" | ") === "Sort | Filter",
-    named(document.querySelector(".at-toolbar-sub")).join(" | ") || "(no second row)");
+      named(document.querySelector(".at-toolbar-search")).join(" | ") === "Sort | Filter",
+    named(document.querySelector(".at-toolbar-search")).join(" | ") || "(no second row)");
   check("and the same filter, still in force",
     !!document.querySelector(".at-menubtn.on"),
     [...document.querySelectorAll(".at-menubtn")].map((b) => (b.textContent || "").trim()).join(" | "));
@@ -9376,65 +9422,65 @@ const openPronounTables = async () => {
      size, Deck quality part of "This deck", Export by that heading, and
      Edit alone on the title line, as on a card being read. */
   {
-    const deckSheet = [...document.querySelectorAll(".at-screen.cardform")]
+    const moduleSheet = [...document.querySelectorAll(".at-screen.cardform")]
       .find((el) => ((el.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Deck");
-    const deckHeads = deckSheet
-      ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
+    const moduleHeads = moduleSheet
+      ? [...moduleSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
     check("an open deck is headed like a card's screen, This deck to Cards",
-      deckHeads.join(" | ") === "This deck | Cards",
-      deckHeads.join(" | ") || "(not laid out like the card editor)");
-    const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
-    const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
+      moduleHeads.join(" | ") === "This deck | Cards",
+      moduleHeads.join(" | ") || "(not laid out like the card editor)");
+    const thisModule = moduleSheet && moduleSheet.querySelector(".at-formblock");
+    const labels = thisModule ? [...thisModule.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
     check("and This deck holds its name, courses and quality",
       labels.join(" | ") === "Deck name | Courses | Deck quality" &&
-        /** @type {any} */ ((thisDeck && thisDeck.querySelector("input")) || {}).value === "Lesson 1",
+        /** @type {any} */ ((thisModule && thisModule.querySelector("input")) || {}).value === "Lesson 1",
       labels.join(" | ") || "(no This deck)");
     check("and Export sits by its “This deck” heading, with Edit floating in the corner and nothing on the title line",
-      !!deckSheet && !!deckSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
-        named(deckSheet.querySelector(".at-screenaction")).length === 0 &&
-        !!deckSheet.querySelector('.at-fab[aria-label="Edit"]'),
-      deckSheet ? [...deckSheet.querySelectorAll(".at-screenaction button")].map((b) => b.getAttribute("aria-label")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
+      !!moduleSheet && !!moduleSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
+        named(moduleSheet.querySelector(".at-screenaction")).length === 0 &&
+        !!moduleSheet.querySelector('.at-fab[aria-label="Edit"]'),
+      moduleSheet ? [...moduleSheet.querySelectorAll(".at-screenaction button")].map((b) => b.getAttribute("aria-label")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
     check("and read, its title cannot be typed into",
-      !!thisDeck && !!thisDeck.querySelector("fieldset:disabled input"),
-      thisDeck ? "the title box is live" : "(no This deck)");
+      !!thisModule && !!thisModule.querySelector("fieldset:disabled input"),
+      thisModule ? "the title box is live" : "(no This deck)");
   }
 
-  /* Four views, in turn: small tiles, bigger tiles — fewer to a row, each
-     with its words set larger, the grid carrying the scale so one variable
-     moves both — a line per card, and a table. */
-  const scale = () => {
-    const g = one(".at-cardgrid", null);
-    return g ? g.style.getPropertyValue("--tile") : "";
-  };
+  /* Two views, in turn (0.714): the grid, and a table of five columns. */
   const sizeBtn = () => one(".at-viewbtn", null);
   const viewIcon = () => {
     const p = one(".at-viewbtn path", null);
     return p ? p.getAttribute("d") || "" : "";
   };
-  check("the tiles start at the size they have always been", !scale(), scale() || "(no scale set)");
+  check("the list starts as a grid of tiles", !!one(".at-cardgrid .at-minicard", null) && !one(".at-cardtable", null));
+  /* A tile is the card and its three dots: Edit and Remove are in them,
+     not two buttons on every tile (0.714). */
+  {
+    const tile = one(".at-cardgrid .at-minicard", null);
+    const acts = tile ? [...tile.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") || "") : [];
+    check("a tile carries three dots, and no Edit or Remove of its own",
+      acts.includes("More for this card") && !acts.includes("Edit") && !acts.some((a) => /^Remove/.test(a)),
+      acts.join(" | ") || "(no tile)");
+    /* In the tile's top corner, not along its foot (0.717). */
+    check("and the dots are in the tile's corner",
+      !!tile && !!tile.querySelector(".at-minicorner .at-morebtn") && !tile.querySelector(".at-miniacts"));
+    check("and no date", !!tile && !/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d/.test(tile.textContent || ""),
+      tile ? (tile.textContent || "").slice(0, 80) : "(no tile)");
+  }
   const smallIcon = viewIcon();
   click(sizeBtn());
   await sleep(200);
-  check("pressing the view button draws them bigger", Number(scale()) > 1, scale() || "(no scale set)");
-  check("and the button now offers the list",
-    /Large grid — press for list/.test(sizeName()), sizeName());
+  check("pressing the view button draws the table", !!one(".at-cardtable", null) && !one(".at-cardgrid .at-minicard", null));
+  check("and the button now offers the grid",
+    /^View: Table — press for grid$/.test(sizeName()), sizeName());
   check("and its icon changes with the view", !!viewIcon() && viewIcon() !== smallIcon, viewIcon().slice(0, 20));
   /* Kept on the device, and per list: the deck's view is not the Cards tab's. */
   check("the view is remembered on the device, for this list",
-    localStorage.getItem("arabic-trainer-view:teacher-deck") === "large",
+    localStorage.getItem("arabic-trainer-view:teacher-deck") === "table",
     String(localStorage.getItem("arabic-trainer-view:teacher-deck")));
-  click(sizeBtn());
-  await sleep(150);
-  const lines = [...document.querySelectorAll(".at-cardline")];
-  check("the list view is a line per card, with no tiles",
-    lines.length > 0 && !one(".at-cardgrid .at-minicard", null),
-    `${lines.length} lines`);
-  click(sizeBtn());
-  await sleep(150);
   const heads = [...document.querySelectorAll(".at-cardtable thead th")].map((th) => (th.textContent || "").trim()).filter(Boolean);
-  check("the table view has a column for everything the teacher compares",
-    heads.join(" | ") === "Status | Word | Transliteration | Meaning | Kind | Subtype | Decks | Recording | Review | Created | Modified",
+  check("the table has five columns, status last",
+    heads.join(" | ") === "Card | Meaning | Kind | Modules | Status",
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));
@@ -9458,9 +9504,9 @@ const openPronounTables = async () => {
   }
   click(sizeBtn());
   await sleep(150);
-  check("and it comes back round to where it started rather than running out",
-    !scale() && localStorage.getItem("arabic-trainer-view:teacher-deck") === "small",
-    `${scale() || "(no scale)"} · stored ${localStorage.getItem("arabic-trainer-view:teacher-deck")}`);
+  check("and it comes back round to the grid",
+    !!one(".at-cardgrid .at-minicard", null) && localStorage.getItem("arabic-trainer-view:teacher-deck") === "small",
+    `stored ${localStorage.getItem("arabic-trainer-view:teacher-deck")}`);
 
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
@@ -9684,8 +9730,8 @@ const openPronounTables = async () => {
   /* The decks in the language, as the teaching space hands them over, and
      what was asked of them: a part ticked on its own screen is the same
      setting a deck's own screen writes. */
-  const deckCalls = /** @type {[string, string, boolean][]} */ ([]);
-  const decks = [
+  const moduleCalls = /** @type {[string, string, boolean][]} */ ([]);
+  const modules = [
     { id: "d1", title: "Lesson 1", parts: [] },
     { id: "d2", title: "Lesson 2", parts: ["numbers:0-10"] },
     { id: "d3", title: "Old lesson", parts: [], locked: true },
@@ -9713,9 +9759,9 @@ const openPronounTables = async () => {
         numbers,
         times: emptyTimeSystem("", "lena", "ar-PS", numbers.id, Date.now(), 1),
         cards: nounCards,
-        decks,
-        onDeckPart: (/** @type {string} */ deckId, /** @type {string} */ rangeId, /** @type {boolean} */ on) => {
-          deckCalls.push([deckId, rangeId, on]);
+        modules,
+        onModulePart: (/** @type {string} */ moduleId, /** @type {string} */ rangeId, /** @type {boolean} */ on) => {
+          moduleCalls.push([moduleId, rangeId, on]);
         },
         /* As the server does: what is stored is what its reader makes of
            the save — a word trimmed, an emptied box gone — and comes back a
@@ -9886,7 +9932,7 @@ const openPronounTables = async () => {
      a call the space saves straight away. */
   const heads = [...up().querySelectorAll(".at-formhead .at-formnum")].map((h) => h.textContent);
   check("the part's sections are headed as a card's are, decks first",
-    up().classList.contains("cardform") && heads[0] === "Decks" && heads.includes("Words"),
+    up().classList.contains("cardform") && heads[0] === "Modules" && heads.includes("Words"),
     heads.join(" | "));
   const pills = [...up().querySelectorAll(".at-deckpill .nm")].map((p) => p.textContent);
   check("the decks that hold the part are pills",
@@ -9902,9 +9948,9 @@ const openPronounTables = async () => {
   click(must(pick("Lesson 1"), "Lesson 1"));
   await sleep(150);
   check("picking a deck asks for the part to be put in it",
-    JSON.stringify(deckCalls[deckCalls.length - 1]) === JSON.stringify(["d1", "numbers:0-9", true]),
-    JSON.stringify(deckCalls));
-  const shut = document.querySelector('.at-sheet[aria-label="Decks"] .at-iconbtn, .at-sheet[aria-label="Decks"] button[aria-label="Close"]');
+    JSON.stringify(moduleCalls[moduleCalls.length - 1]) === JSON.stringify(["d1", "numbers:0-9", true]),
+    JSON.stringify(moduleCalls));
+  const shut = document.querySelector('.at-sheet[aria-label="Modules"] .at-iconbtn, .at-sheet[aria-label="Modules"] button[aria-label="Close"]');
   click(shut);
   await sleep(150);
 
@@ -10163,14 +10209,14 @@ const openPronounTables = async () => {
   materialSystems = [goldenNumbers, goldenTimes];
   /* In a deck, every part of them, as a teacher would put them: numbers
      in no deck reach nobody. */
-  materialDecks = [{
+  materialModules = [{
     id: "dn", title: "Numbers deck", lang: "ar-PS", owner: "t-1", cardIds: [], cardCount: 0,
     courseId: "c1", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 1,
     parts: rangeSkills.map((/** @type {any} */ it) => it.range.id),
   }];
   materialQuiet = true;
   localStorage.setItem("arabic-trainer:material", JSON.stringify({
-    handle: account.handle, courses: [], decks: materialDecks, systems: materialSystems,
+    handle: account.handle, courses: [], decks: materialModules, systems: materialSystems,
     version: "v-numbers", at: Date.now(),
   }));
   /* The document starts empty on purpose: the cards and skills are the
@@ -10301,7 +10347,7 @@ const openPronounTables = async () => {
   host4.remove();
 
   materialSystems = [];
-  materialDecks = [];
+  materialModules = [];
   materialQuiet = false;
   await sleep(200);
 }
@@ -10590,6 +10636,15 @@ const openPronounTables = async () => {
   check("and the key it hands back is put on the screen to be kept",
     /cedar-harbour-quartz-ember-4f2a/.test(host5.textContent || ""),
     (host5.textContent || "").slice(0, 200).replace(/\s+/g, " "));
+  /* The key screen is short (0.698): the key, one Copy, one line; no
+     sign-in link repeated, and no tick-box to get past. */
+  {
+    const text = host5.textContent || "";
+    const carryOn = [...host5.querySelectorAll("button")].find((b) => /^I've saved it, carry on$/.test((b.textContent || "").trim()));
+    check("the key screen asks only to save the key, with the button live straight away",
+      /Save your sign-in key/.test(text) && !/Your private sign-in link/.test(text) && !!carryOn && !carryOn.disabled,
+      text.slice(0, 200).replace(/\s+/g, " "));
+  }
   check("nothing threw on the way in", errors.length === before,
     errors.slice(before, before + 3).join(" | "));
 
@@ -11600,13 +11655,17 @@ const openPronounTables = async () => {
   /* The screen opens on the sentences still waiting, and one marked there
      stays in its place until the tab is changed — then each tab holds only
      its own. */
+  /* Real tabs since 0.685, each its name with its count under it. */
   const tabOf = (/** @type {string} */ name) =>
-    [...up().querySelectorAll(".at-reviewtabs .at-seg")].find((b) =>
+    [...up().querySelectorAll('.at-reviewtabs [role="tablist"][aria-label="Which sentences"] [role="tab"]')].find((b) =>
       (b.firstChild?.textContent || "") === name);
   const listed = () => up().querySelectorAll(".at-reviewlist .at-askedline").length;
   check("the review screen opens on Waiting",
-    tabOf("Waiting")?.getAttribute("aria-pressed") === "true",
-    [...up().querySelectorAll(".at-reviewtabs .at-seg")].map((b) => b.textContent).join(" "));
+    tabOf("Waiting")?.getAttribute("aria-selected") === "true",
+    [...up().querySelectorAll(".at-reviewtabs [role=tab]")].map((b) => b.textContent).join(" "));
+  check("with how many are on each tab, under its name",
+    ["Waiting", "Struck", "Approved", "All"].map((t) => tabOf(t)?.querySelector(".at-tabcount")?.textContent).join(" ") === "1 1 1 3",
+    [...up().querySelectorAll(".at-reviewtabs [role=tab]")].map((b) => b.textContent).join(" "));
   check("and a sentence marked there stays where it was", listed() === 3, `${listed()} rows`);
   /** @type {[string, number][]} */
   const tabs = [["Waiting", 1], ["Struck", 1], ["Approved", 1], ["All", 3]];
@@ -11771,6 +11830,33 @@ const openPronounTables = async () => {
   teachesTwo = false;
 }
 
+/* ---- a teacher's first sign-in on a device opens Teaching (0.706) ----
+   No stored answer yet about whether they teach: the device opens in
+   Learning, and when the first answer says they teach, it moves to
+   Teaching by itself, without the switch being touched. */
+{
+  const before = errors.length;
+  await sleep(1500);
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith("arabic-trainer-teaches:")) localStorage.removeItem(k);
+  }
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(2500);
+  const said = (host.textContent || "").replace(/\s+/g, " ");
+  check("a teacher's first sign-in on a device opens Teaching's Home, not Learning's",
+    !!host.querySelector(".at-screen.bare") && /My courses/.test(said) && !/Join a course to get started/.test(said),
+    said.slice(0, 200));
+  check("and nothing threw on the way", errors.length === before, errors.slice(before, before + 3).join(" | "));
+  r.unmount();
+  host.remove();
+}
+
 /* ---- a number at the top of its ladder ----
 
    A learner whose numbers are up to the top of their ladder, which in
@@ -11794,13 +11880,13 @@ const openPronounTables = async () => {
   const parts = generate({ composer: arComposer, sys: goldenNumbers, timeComposer: arTimeComposer, timeSys: goldenTimes, now: Date.now() })
     .items.filter(isRangeSkill).map((/** @type {any} */ it) => it.range.id);
   materialSystems = [goldenNumbers, goldenTimes];
-  materialDecks = [{
+  materialModules = [{
     id: "dn", title: "Numbers deck", lang: "ar-PS", owner: "t-1", cardIds: [], cardCount: 0,
     courseId: "c1", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 1, parts,
   }];
   materialQuiet = true;
   localStorage.setItem("arabic-trainer:material", JSON.stringify({
-    handle: account.handle, courses: [], decks: materialDecks, systems: materialSystems,
+    handle: account.handle, courses: [], decks: materialModules, systems: materialSystems,
     version: "v-numbers-figures", at: Date.now(),
   }));
   const { LANGUAGES: packs, TYPES: allTypes, levelOf: levelAt } = await import(path.resolve("src/languages.ts"));
@@ -11895,7 +11981,7 @@ const openPronounTables = async () => {
   root5.unmount();
   host5.remove();
   materialSystems = [];
-  materialDecks = [];
+  materialModules = [];
   materialQuiet = false;
 }
 
@@ -11923,13 +12009,13 @@ const openPronounTables = async () => {
   }).items;
   const parts = made.filter(isRangeSkill).map((/** @type {any} */ it) => it.range.id);
   materialSystems = [goldenNumbers, goldenTimes];
-  materialDecks = [{
+  materialModules = [{
     id: "dn", title: "Numbers deck", lang: "ar-PS", owner: "t-1", cardIds: [], cardCount: 0,
     courseId: "c1", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 1, parts,
   }];
   materialQuiet = true;
   localStorage.setItem("arabic-trainer:material", JSON.stringify({
-    handle: account.handle, courses: [], decks: materialDecks, systems: materialSystems,
+    handle: account.handle, courses: [], decks: materialModules, systems: materialSystems,
     version: "v-numbers-numerals", at: Date.now(),
   }));
   const keptOn = (/** @type {string[]} */ types) => Object.fromEntries(types.map((t) => [t, {
@@ -12043,7 +12129,7 @@ const openPronounTables = async () => {
   root6.unmount();
   host6.remove();
   materialSystems = [];
-  materialDecks = [];
+  materialModules = [];
   materialQuiet = false;
 }
 
@@ -12534,7 +12620,7 @@ const openPronounTables = async () => {
     check("and her practice is kept where her key keeps it, not under the link's code",
       remoteDocs.has(/** @type {any} */ (lina).syncToken) && !remoteDocs.has(await digestOf(lina.linkKey)),
       [...remoteDocs.keys()].map((k) => k.slice(0, 8)).join(", ") || "nothing synced");
-    check("without stopping them to tick that the key is saved", !/Keep this somewhere safe/.test(app.host.textContent || ""),
+    check("without stopping them to tick that the key is saved", !/Save your sign-in key/.test(app.host.textContent || ""),
       (app.host.textContent || "").slice(0, 100));
     check("and the key is taken out of the address", window.location.hash === "", window.location.hash);
     app.close();
@@ -13049,7 +13135,7 @@ const openPronounTables = async () => {
   }
   const frame = () => host.querySelector(".at-screen.bare") || host;
   const tab = [...host.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
-    .filter((b) => /^Courses$/.test((b.textContent || "").trim())).pop();
+    .filter((b) => /^Home\d*$/.test((b.textContent || "").trim())).pop();
   click(tab || null);
   await sleep(500);
   const courseTile = [...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || ""));
@@ -13063,33 +13149,216 @@ const openPronounTables = async () => {
     rows.join(" | ") || "no path section");
   check("a published unit can be opened for the class; a draft cannot",
     /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
-  const screenText = ((pathBlock && pathBlock.closest(".at-screen")) || document.body).textContent || "";
-  const decksPart = screenText.slice(screenText.lastIndexOf("Decks"));
-  check("a unit is not among the course's ordinary decks", /Lesson 1/.test(decksPart) && !/Greetings unit|Family unit/.test(decksPart),
-    decksPart.replace(/\s+/g, " ").slice(0, 200));
-  click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);
+  /* The Modules block itself (0.707: it now sits above the path, so the
+     text after the word is no longer only its own). */
+  const modulesBlock = [...(((pathBlock && pathBlock.closest(".at-screen")) || document).querySelectorAll(".at-formblock"))]
+    .find((b) => ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Modules");
+  const modulesPart = (modulesBlock && modulesBlock.textContent) || "";
+  check("a unit is not among the course's ordinary decks", /Lesson 1/.test(modulesPart) && !/Greetings unit|Family unit/.test(modulesPart),
+    modulesPart.replace(/\s+/g, " ").slice(0, 200));
+  /* The Exercises tab (0.708): the four presets and a line; the switches
+     one by one only under Custom. */
+  {
+    const courseScreen = (pathBlock && pathBlock.closest(".at-screen")) || document.body;
+    const tabNamed = (/** @type {string} */ n) => [...courseScreen.querySelectorAll("[role=tab]")]
+      .find((t) => (t.textContent || "").trim() === n);
+    const panel = () => ((courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || {}).textContent || "");
+    click(tabNamed("Exercises") || null);
+    await sleep(300);
+    check("a course's Exercises tab shows the presets, without the switches one by one",
+      /With translation/.test(panel()) && !/Match the pairs/.test(panel()), panel().slice(0, 200));
+    click([...courseScreen.querySelectorAll('[role=tabpanel][aria-label="exercises"] button')]
+      .find((b) => (b.textContent || "").trim() === "Custom") || null);
+    await sleep(500);
+    check("and Custom shows them", /Match the pairs/.test(panel()), panel().slice(0, 200));
+    click(tabNamed("Course") || null);
+    await sleep(300);
+  }
+  /* Found again: the Course tab was drawn afresh. */
+  const pathAgain = [...document.querySelectorAll('[data-el="course-path"]')].pop();
+  click(pathAgain ? pathAgain.querySelector('[data-el="path-unit"] button') : null);
   await sleep(600);
   const unitScreen = [...document.querySelectorAll(".at-screen.cardform")].pop();
   const unitText = unitScreen ? (unitScreen.textContent || "").replace(/\s+/g, " ") : "";
   check("a unit's page is headed with its number and shows its checklist",
     /Unit 1 · Greetings unit/.test(unitText) && /Checklist/.test(unitText) && /Add 5 more sentences with a blank \(0 of 5\)/.test(unitText),
     unitText.slice(0, 300));
+  /* Its place on the path, and moving it, on its own screen (0.688). */
+  const place = unitScreen ? (unitScreen.querySelector('[data-el="unit-place"]') || {}).textContent || "" : "";
+  check("a unit's page says its place on the course's path", /^Unit 1 of 2 · Published$/.test(place), place || "no place line");
+  const acts = unitScreen ? [...unitScreen.querySelectorAll('[data-el="unit-path-actions"] button')] : [];
+  const actNamed = (/** @type {RegExp} */ re) => acts.find((b) => re.test((b.textContent || "").trim()));
+  check("the first unit cannot move earlier, can move later, and can be opened for the class",
+    !!actNamed(/^Move earlier$/) && /** @type {HTMLButtonElement} */ (actNamed(/^Move earlier$/)).disabled
+      && !!actNamed(/^Move later$/) && !/** @type {HTMLButtonElement} */ (actNamed(/^Move later$/)).disabled
+      && !!actNamed(/^Open for the class$/),
+    acts.map((b) => `${(b.textContent || "").trim()}${/** @type {HTMLButtonElement} */ (b).disabled ? " (off)" : ""}`).join(", ") || "no actions");
+  click(actNamed(/^Move later$/) || null);
+  await sleep(800);
+  const placeAfter = (([...document.querySelectorAll(".at-screen.cardform")].pop() || document.body).querySelector('[data-el="unit-place"]') || {}).textContent || "";
+  check("Move later asks the server and the page then says Unit 2 of 2",
+    movedUnits.length === 1 && movedUnits[0].courseId === "c1" && movedUnits[0].deckId === "u1" && movedUnits[0].to === 1 && /^Unit 2 of 2/.test(placeAfter),
+    `${JSON.stringify(movedUnits)} · ${placeAfter}`);
+  /* And in Material's Modules, a unit is labelled one; a deck is not. */
+  /* Back from the unit to its course, and back from the course. */
+  for (let i = 0; i < 2; i++) {
+    click([...document.querySelectorAll(".at-screen.cardform")].pop()?.querySelector('[aria-label="Back"]') || null);
+    await sleep(400);
+  }
+  click([...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => /^Material$/.test((b.textContent || "").trim())).pop() || null);
+  await sleep(400);
+  click([...frame().querySelectorAll("button, [role=tab]")].filter((b) => /^Modules$/.test((b.textContent || "").trim())).pop() || null);
+  await sleep(500);
+  const cardsNow = [...document.querySelectorAll(".at-deckcard")];
+  const tiles = cardsNow.map((t) => (t.textContent || "").replace(/\s+/g, " "));
+  const tileOf = (/** @type {RegExp} */ re) => tiles.find((t) => re.test(t)) || "";
+  /* The label on its own since 0.689, the language and size it led having
+     come off the tile. */
+  const unitLabel = (/** @type {RegExp} */ re) => {
+    const el = cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "")));
+    return ((el && el.querySelector('[data-el="unit-label"]')) || {}).textContent || "";
+  };
+  check("in Material's Modules, a unit is labelled Unit and a deck is not",
+    unitLabel(/Greetings unit/) === "Unit" && unitLabel(/Family unit/) === "Unit" && !!tileOf(/Lesson 1/) && !unitLabel(/Lesson 1/),
+    tiles.join(" | ").slice(0, 300) || "no tiles");
+  /* A module's tile (0.689): its quality as a number in a ring, no
+     language or size under its title, and Export and Delete behind three
+     dots that do not open the module when pressed. */
+  {
+    const lesson = cardsNow.find((t) => /^Lesson 1$/.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
+    const meta = ((lesson && lesson.querySelector(".at-deckmeta")) || {}).textContent || "";
+    check("a module's tile has its quality in a ring, and no language or card count",
+      !!lesson && !!lesson.querySelector(".at-qring") && !/\bcards?\b|Arabic/.test(meta),
+      lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
+    /* 0.715: the ring left of the name, and who can see it on the line
+       straight under the name rather than under a rule at the foot. */
+    check("its ring is left of its name, and who can see it is right under the name",
+      !!lesson && !!lesson.querySelector(".at-deckrow2 > .at-decklead .at-qring") &&
+        !!lesson.querySelector(".at-deckmain > .at-reach") && !lesson.querySelector(":scope > .at-reach"),
+      lesson ? lesson.innerHTML.slice(0, 300) : "(no Lesson 1)");
+    click(lesson ? lesson.querySelector(".at-morebtn") : null);
+    await sleep(150);
+    const lines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+    check("and its three dots open its sheet, with Export and Delete, without opening it",
+      lines.join(" | ") === "Export deck | Delete deck" && !document.querySelector(".at-screen.cardform") &&
+        ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Lesson 1",
+      lines.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+    await sleep(150);
+  }
   withPath = false;
+  pathOrder = ["u1", "u2"];
   r.unmount();
   host.remove();
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
+/* ---- My space is gone from Teaching (0.712, 0.719) ----
+   No teacher has My space in the bar: not one with nothing in it, and
+   not one with a module still there, which the server deletes. */
+{
+  const before = errors.length;
+  /** @param {boolean} personal */
+  const openTeaching = async (personal) => {
+    teacherPersonal = personal;
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(1500);
+    if (!host.querySelector(".at-screen.bare")) {
+      click(host.querySelector('[data-el="where-you-are"]'));
+      await sleep(200);
+      click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+      await sleep(900);
+    }
+    const bar = () => [...document.querySelectorAll(".at-dock [role=tab]")].map((b) => (b.textContent || "").trim());
+    return { host, r, bar };
+  };
+  {
+    const { host, r, bar } = await openTeaching(false);
+    check("a teacher with nothing in My space has no My space in the bar",
+      bar().length > 0 && !bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
+    r.unmount();
+    host.remove();
+  }
+  {
+    const { host, r, bar } = await openTeaching(true);
+    /* My space is gone (0.719): no tab, whatever is left in it. */
+    check("a teacher with a module still in My space has no My space either",
+      bar().length > 0 && !bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
+    r.unmount();
+    host.remove();
+  }
+  teacherPersonal = false;
+  check("and nothing threw on My space", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- personal sets are the App admin's to switch on (0.683) ----
+   A space whose card does not say so offers no New personal set. New
+   module makes a deck in one step (0.710): no sheet asking which kind. */
+{
+  const before = errors.length;
+  const offOrg = { id: "main", slug: "main", name: "Main", logo: "", colour: "", sets: false };
+  whoamiAs = { ...account, org: offOrg };
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account: { ...account, org: offOrg }, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  const tab = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => re.test((b.textContent || "").trim())).pop();
+  click(tab(/^Material$/) || null);
+  await sleep(400);
+  click(tab(/^Modules$/) || null);
+  await sleep(500);
+  click(frame().querySelector('[aria-label="More for these modules"]'));
+  await sleep(200);
+  const moreLines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("with personal sets off in the space, the three dots offer no New personal set",
+    !moreLines.includes("New personal set"), moreLines.join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+  await sleep(200);
+  click(buttonNamed(/^New module$/));
+  await sleep(300);
+  const madeTitle = (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
+  check("and New module goes straight to naming a deck, with no sheet asking what kind",
+    !document.querySelector(".at-sheet .at-openrow") && madeTitle === "Create deck", madeTitle || "no screen");
+  backOut();
+  await sleep(200);
+  whoamiAs = null;
+  r.unmount();
+  host.remove();
+  check("and nothing threw with personal sets off", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
 /* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
-   New deck asks first what kind: a regular deck, a unit or a personal
-   set. A unit asks for its course; a personal set is made as a deck and
-   marked as a set. An ordinary deck has no Personal set section; a set
+   New module makes a deck (0.710); a personal set is made from the three
+   dots, and a unit from a course's path. A personal set is made as a deck
+   and marked as a set. An ordinary deck has no Personal set section; a set
    has one, with no switch: its question changed, two lists added, a word
    ticked, the word after the name, saved. */
 {
   const before = errors.length;
+  /* Personal sets switched on for the space by the App admin (0.683). */
+  const onOrg = { id: "main", slug: "main", name: "Main", logo: "", colour: "", sets: true };
+  whoamiAs = { ...account, org: onOrg };
   localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
-    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account: { ...account, org: onOrg }, items: [],
   }));
   teacherSets = true;
   const host = document.createElement("div");
@@ -13106,21 +13375,20 @@ const openPronounTables = async () => {
   const frame = () => host.querySelector(".at-screen.bare") || host;
   const tab = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
     .filter((b) => re.test((b.textContent || "").trim())).pop();
-  const toDecks = async () => {
+  const toModules = async () => {
     click(tab(/^Material$/) || null);
     await sleep(400);
-    click(tab(/^Decks$/) || null);
+    click(tab(/^Modules$/) || null);
     await sleep(500);
   };
-  await toDecks();
-  const sheetRows = () => [...document.querySelectorAll(".at-sheet .at-openrow")].map((b) => (b.querySelector(".at-decktitle") || b).textContent || "");
-  const openSheet = async () => {
-    click(buttonNamed(/^New deck$/));
-    await sleep(300);
-  };
-  await openSheet();
-  check("New deck asks what kind: a regular deck, a unit or a personal set",
-    sheetRows().join(" | ") === "Regular deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  await toModules();
+  const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
+  click(buttonNamed(/^New module$/));
+  await sleep(300);
+  check("New module goes straight to naming a deck",
+    !document.querySelector(".at-sheet .at-openrow") && screenTitle() === "Create deck", screenTitle() || "no screen");
+  backOut();
+  await sleep(300);
   const setValue = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
   const name = async (/** @type {string} */ v) => {
     const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-screen.cardform .at-formblock input.at-input")].pop() || null);
@@ -13134,35 +13402,46 @@ const openPronounTables = async () => {
     click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
     await sleep(700);
   };
-  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /Personal set/.test(b.textContent || "")) || null);
+  click(frame().querySelector('[aria-label="More for these modules"]'));
+  await sleep(200);
+  click([...document.querySelectorAll(".at-moresheet .at-sheetact")].find((b) => /New personal set/.test(b.textContent || "")) || null);
   await sleep(400);
-  const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
-  check("choosing Personal set opens Create personal set", screenTitle() === "Create personal set", screenTitle());
-  const madeBefore = madeDecks.length;
+  check("New personal set, in the three dots, opens Create personal set", screenTitle() === "Create personal set", screenTitle());
+  const madeBefore = madeModules.length;
   const setsBefore = savedSets.length;
   await name("Grandparents");
   await save();
-  const madeSet = madeDecks[madeDecks.length - 1];
+  const madeSet = madeModules[madeModules.length - 1];
   const markedSet = savedSets[savedSets.length - 1];
   check("saved, it is made as a deck and marked as a personal set",
-    madeDecks.length === madeBefore + 1 && madeSet.title === "Grandparents" && savedSets.length === setsBefore + 1
-      && markedSet.deckId === `made${madeDecks.length}` && !!markedSet.set,
+    madeModules.length === madeBefore + 1 && madeSet.title === "Grandparents" && savedSets.length === setsBefore + 1
+      && markedSet.deckId === `made${madeModules.length}` && !!markedSet.set,
     JSON.stringify({ madeSet, markedSet }));
   backOut();
   await sleep(300);
-  await toDecks();
-  await openSheet();
-  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /^Unit/.test((b.querySelector(".at-decktitle") || b).textContent || "")) || null);
-  await sleep(400);
-  check("choosing Unit asks for its course", screenTitle() === "Create unit" && /Course/.test((([...document.querySelectorAll(".at-screen.cardform")].pop() || {}).textContent) || ""),
-    screenTitle());
-  await name("Family unit 2");
-  await save();
+  /* A unit is made where it is used: a course's path, New unit (0.710). */
+  click(tab(/^Home\d*$/) || null);
+  await sleep(500);
+  click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);
+  await sleep(500);
+  click(buttonNamed(/^New unit$/));
+  await sleep(300);
+  {
+    const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-modal input.at-input, [role=dialog] input.at-input")].pop() || null);
+    if (box) {
+      setValue?.call(box, "Family unit 2");
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(120);
+    }
+    check("a course's path asks a new unit's title", !!box, "no title box");
+    click([...document.querySelectorAll(".at-modal button, [role=dialog] button")].filter((b) => /^New unit$/.test((b.textContent || "").trim())).pop() || null);
+    await sleep(700);
+  }
   const unitMade = madeUnits[madeUnits.length - 1];
   check("and saved, it is made on that course's path", !!unitMade && unitMade.courseId === "c1" && unitMade.title === "Family unit 2", JSON.stringify(unitMade));
   backOut();
   await sleep(300);
-  await toDecks();
+  await toModules();
   const openTile = async (/** @type {RegExp} */ re) => {
     click([...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => re.test(t.textContent || "")) || null);
     await sleep(600);
@@ -13227,6 +13506,7 @@ const openPronounTables = async () => {
   backOut();
   await sleep(300);
   teacherSets = false;
+  whoamiAs = null;
   r.unmount();
   host.remove();
   check("and nothing threw making decks of each kind, or on a set's section", errors.length === before, errors.slice(before, before + 3).join(" | "));

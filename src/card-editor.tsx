@@ -12,7 +12,7 @@
  */
 import React, { createContext, useContext, useState, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbExample, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
+import type { Card, Module, Form, GrammarDim, Item, Lang, VerbExample, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
 import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
@@ -57,6 +57,7 @@ import { agreeingBlanks, combosOf, mainFormOnly, EXAMPLES_CEILING, examplesOf, f
 import type { Value } from "./variables.ts";
 import { liftSubtypeTags } from "./subtype-tags.ts";
 import { basicCard, droppedByBasic, opensAdvanced } from "./basic-card.ts";
+import { DESC, DESC_EN, DESC_MAX, givenAway, storedDescription } from "./description.ts";
 import { subtypeTakesCapitals, tickCapitals } from "./capitals.ts";
 import { readSpan, spanTag } from "./numbers/spans.ts";
 import type { Span } from "./numbers/spans.ts";
@@ -95,8 +96,8 @@ import {
   PickSheet,
   ChoiceSwitch,
   Popover,
-  DeckSwitch,
-  DeckPickScreen,
+  ModuleSwitch,
+  ModulePickScreen,
   Locked,
   Pressable,
   AudioPrompt,
@@ -3688,6 +3689,9 @@ export function initialForms(
       slowClips: word.slowClips || [],
       /* Its pictures — see ImageScreen. Only where it has some. */
       ...(Array.isArray(word.images) && word.images.length ? { images: word.images } : null),
+      /* And its description and that description's English, where it has
+         one (0.697) — read back, or the next save would drop them. */
+      ...storedDescription(word),
       /* Whether the card's own word is asked about. Carried only where it
          is off, which is what the field means everywhere else too. */
       ...(word.ask === false ? { ask: false } : null),
@@ -6850,7 +6854,9 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onSetDecks, onCreateDeck, onExport, onToSpace, onDelete, setOnly = false }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, modules, chosen, onToggleModule, onSetModules, onCreateModule, onExport, onToSpace, onDelete, setOnly = false, made = "" }: {
+  /** "Made by … · last changed by …" (0.711), under the heading; empty while creating. */
+  made?: string;
   /** In personal sets and nothing else: the advanced card is not offered,
       unless the card is one already (0.634). */
   setOnly?: boolean;
@@ -6864,14 +6870,14 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onAdvanced: (on: boolean) => void;
   /** What saving as a basic card would drop — see droppedByBasic. */
   drops: string[];
-  decks: Deck[];
+  modules: Module[];
   chosen: string[];
-  onToggleDeck: (id: string, on: boolean) => void;
+  onToggleModule: (id: string, on: boolean) => void;
   /** Every deck the card is in at once — what Done on the decks screen
       leaves ticked. */
-  onSetDecks: (ids: string[]) => void;
+  onSetModules: (ids: string[]) => void;
   /** Make a deck in the card's language, from the decks screen. */
-  onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
+  onCreateModule?: (title: string) => Promise<Module | null | undefined>;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
   /** A My space card into the space (0.549): copy or move it into a deck. */
@@ -6888,17 +6894,17 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   return (
     <>
     {picking && (
-      <DeckPickScreen
+      <ModulePickScreen
         title="Add this card to…"
-        decks={decks}
+        modules={modules}
         chosen={picking}
         onToggle={(id, on) => setPicking((x) => (x ? (on ? x.filter((y) => y !== id) : x.concat([id])) : x))}
         onCreate={
-          onCreateDeck
+          onCreateModule
             ? async (title) => {
                 /* Made, then ticked: the deck just named is the one this
                    card was about to go in. */
-                const made = await onCreateDeck(title);
+                const made = await onCreateModule(title);
                 if (made) setPicking((x) => (x ? x.concat([made.id]) : x));
                 return made;
               }
@@ -6908,10 +6914,10 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         confirm="Done"
         onCancel={() => setPicking(null)}
         onConfirm={() => {
-          onSetDecks(picking);
+          onSetModules(picking);
           setPicking(null);
         }}
-        empty={`No ${lang.name} decks yet. Make one with New deck, above.`}
+        empty={`No ${lang.name} modules yet. Make a deck with New deck, above.`}
       />
     )}
     <div className="at-formblock">
@@ -6938,6 +6944,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           </span>
         ) : null}
       </div>
+      {made ? <Help>{made}</Help> : null}
       {/* ---- basic or advanced ----
           The one question between a quick card and the whole editor, first
           because the rest of the screen follows from it. Said in no more
@@ -6997,12 +7004,13 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           )}
       </div>
     )}
+    {!advanced && !setOnly && !scene && <DescriptionBlock word={word} lang={lang} alone />}
 
     {/* ---- and where it goes ---- */}
     <div className="at-formblock at-mt5">
       <div className="at-formhead">
-        <span className="at-formnum">Decks</span>
-        <span className="at-formrole">Manage what decks this card belongs to.</span>
+        <span className="at-formnum">Modules</span>
+        <span className="at-formrole">Manage what modules this card belongs to.</span>
       </div>
       {/* In no deck, the list stands in the Nudge panel's dress; built by
           hand rather than with Nudge so the list keeps its place in the
@@ -7016,11 +7024,11 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         )}
         <div className={chosen.length ? "at-deckhold" : "at-nudgebody"}>
           {!chosen.length && (
-            <p className="at-nudgetext">Not in a deck yet, so no students can see it. Add it to a deck to share it.</p>
+            <p className="at-nudgetext">Not in a module yet, so no students can see it. Add it to a module to share it.</p>
           )}
           {chosen.length || !locked ? (
             <div className={chosen.length ? "at-deckhold" : "at-nudgeact"}>
-              <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} onAdd={() => setPicking(chosen.slice())} />
+              <ModuleSwitch modules={modules} chosen={chosen} onToggle={onToggleModule} onAdd={() => setPicking(chosen.slice())} />
             </div>
           ) : null}
         </div>
@@ -10739,6 +10747,63 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
 type CardTab = "overview" | "content" | "exercises" | "settings";
 
 /*
+ * The word's description, in the language itself (0.697) — see
+ * src/description.ts. On the Basic tab of a basic card and the Advanced tab
+ * of an advanced word or phrase; never on a sentence or a scene. Written on
+ * the card's own word, the same form both tabs write, so ticking "Build an
+ * advanced card" carries it over with nothing to copy.
+ */
+function DescriptionBlock({ word, lang, alone, className = "at-formblock at-mt5" }: {
+  word: WordDraft;
+  lang: Lang;
+  /** Whether the card is one form, which is when it is asked. */
+  alone: boolean;
+  className?: string;
+}) {
+  const f: Record<string, any> = word.forms[0] || {};
+  const set = (patch: Record<string, any>) => word.setForm(0, { ...f, ...patch });
+  const desc = String(f[DESC] || "");
+  const shown = givenAway(f, lang);
+  return (
+    <div className={className} data-el="editor-description">
+      <div className="at-formhead">
+        <span className="at-formnum">Description</span>
+        <span className="at-formrole">Students choose and write the word from it.</span>
+      </div>
+      <Field
+        label={`In ${lang.name}`}
+        optional
+        lede={`A few words in ${lang.name} saying what it is, without the word itself — no English.`}
+      >
+        <ScriptInput lang={lang} value={desc} label="Description" onChange={(v) => set({ [DESC]: v.slice(0, DESC_MAX) })} />
+      </Field>
+      {shown && (
+        <p className="at-formneed unmet" data-el="editor-description-gives-away">
+          The description uses the word itself (
+          <bdi lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack }}>{shown}</bdi>
+          ), which gives the answer away.
+        </p>
+      )}
+      {desc.trim() && !alone && (
+        <p className="at-formneed" data-el="editor-description-not-asked">
+          Not used in exercises while the card has more than one form.
+        </p>
+      )}
+      <Field label="In English" optional lede="Students can tap to see it, in courses that show English." className="at-mt3">
+        <input
+          className="at-input"
+          value={String(f[DESC_EN] || "")}
+          maxLength={DESC_MAX}
+          placeholder="For example: where you buy bread"
+          aria-label="Description in English"
+          onChange={(e) => set({ [DESC_EN]: e.target.value })}
+        />
+      </Field>
+    </div>
+  );
+}
+
+/*
  * What a save would send, cut by the tab each part of it is changed on —
  * so a tab can say it has a change on it, and the whole of it still says
  * whether the card has one. How each form is practised is written on the
@@ -10746,12 +10811,12 @@ type CardTab = "overview" | "content" | "exercises" | "settings";
  * counted on the Exercises tab instead.
  */
 function byTab(written: ReturnType<typeof writtenCard>, clue: string, capitals: boolean | null): Record<CardTab, string> {
-  const { forms, name, category, decks, examples, uses, sentence, note, stripped, drill, fills, ref, spread, scene } = written;
+  const { forms, name, category, decks: modules, examples, uses, sentence, note, stripped, drill, fills, ref, spread, scene } = written;
   const bare = (forms as Record<string, any>[]).map(({ ask, lend, ...rest }) => rest);
   const practice = (forms as Record<string, any>[]).map((f) => [f.ask, f.lend]);
   const { sceneKind, ...sceneRest } = scene || ({} as Record<string, any>);
   return {
-    overview: JSON.stringify([name, decks, bare.slice(0, 1)]),
+    overview: JSON.stringify([name, modules, bare.slice(0, 1)]),
     content: JSON.stringify([bare.slice(1), category, sceneKind || null, examples, uses, sentence, note, stripped, scene ? sceneRest : null, clue, capitals, fills, ref, spread]),
     exercises: JSON.stringify([practice, drill]),
     settings: "",
@@ -10820,18 +10885,20 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
+export function CardEditor({ card, lang, modules, inModules, onCreateModule, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null, made = "" }: {
   card: Card | null;
+  /** Who made the card and who last changed it, as one line (0.711); empty while creating. */
+  made?: string;
   /** Why the last save failed, said inside this screen, which covers the
       space it opened from (0.580, audit finding 12). */
   error?: string | null;
   lang: Lang;
-  decks: Deck[];
-  inDecks?: string[];
+  modules: Module[];
+  inModules?: string[];
   /** Make a deck in this card's language from its decks screen, so a card
       written for a deck not yet made need not be left to make it (0.594).
       Resolves to the deck made, or nothing where it could not be. */
-  onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
+  onCreateModule?: (title: string) => Promise<Module | null | undefined>;
   allCards: Card[];
   onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean, publish: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
@@ -10905,7 +10972,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
   });
   const word = shape === "word" ? wordDraft : textDraft;
   const talk = useSceneDraft({ card: base === "scene" ? card : null, allCards });
-  const [chosen, setChosen] = useState(inDecks || []);
+  const [chosen, setChosen] = useState(inModules || []);
   /* A basic card is held to its name and its word, which is all it shows. */
   const canSave = scene
     ? talk.canSave
@@ -11019,7 +11086,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
   /* What is short, as against what is wrong: an empty field a red
      asterisk marks, or a mistake that already has its own red line. */
   /* In personal sets and nothing else (0.634): see SetOnly. */
-  const setOnly = chosen.length > 0 && chosen.every((id) => !!((decks || []).find((d) => d.id === id) || {}).set);
+  const setOnly = chosen.length > 0 && chosen.every((id) => !!((modules || []).find((d) => d.id === id) || {}).set);
   const missing = (() => {
     if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
     if (word.needsName) return true;
@@ -11197,6 +11264,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
           <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}>
             <SetOnly.Provider value={setOnly}>
             <BasicBlock
+              made={made}
               lang={lang}
               scene={scene}
               word={word}
@@ -11205,13 +11273,13 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
               canUntick={!(typeLocked && base !== "word")}
               onAdvanced={(on) => reshape(picked, on)}
               drops={drops}
-              decks={decks || []}
+              modules={modules || []}
               chosen={chosen}
-              onToggleDeck={(id, on) =>
+              onToggleModule={(id, on) =>
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
-              onSetDecks={setChosen}
-              onCreateDeck={onCreateDeck}
+              onSetModules={setChosen}
+              onCreateModule={onCreateModule}
               onExport={locked ? onExport : undefined}
               onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}
@@ -11260,6 +11328,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
                 The other meanings of its word and the clue that tells them
                 apart, how its English is capitalised, and how other cards'
                 blanks reach it. A scene has none of these. */}
+            {meanings && <DescriptionBlock word={word} lang={lang} alone={written().forms.length <= 1} />}
             {!scene && (
               <>
                 {meanings && (

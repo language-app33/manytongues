@@ -146,7 +146,7 @@ test("a session asks the tense, each question of a person, the table first", () 
   const v = withTenses(verb(), AR);
   const items = [v].concat(words(8));
   installIndexes(items);
-  const asked = T.buildSession({ items, settings, inDeck: () => true }).exercises.filter((/** @type {any} */ e) => e.id === "v1");
+  const asked = T.buildSession({ items, settings, inModule: () => true }).exercises.filter((/** @type {any} */ e) => e.id === "v1");
   assert.ok(asked.length > 0, "the verb is dealt");
   assert.ok(asked.every((/** @type {any} */ e) => e.subId === PRESENT), `only the present: ${asked.map((/** @type {any} */ e) => e.subId)}`);
   assert.ok(asked.every((/** @type {any} */ e) => typeof e.person === "string" && e.person.startsWith("p-")), "each about a person of it");
@@ -305,7 +305,7 @@ test("the subjunctive is a tense like the others, asked only in its examples", (
   const keys = T.laddered(form, settings);
   assert.ok(keys.length > 0, "the tense is asked");
   assert.ok(keys.every((/** @type {string} */ k) => EXAMPLE_TYPES.includes(k)), `asked in examples alone: ${keys}`);
-  const asked = T.buildSession({ items: [eat].concat(words(8)), settings, inDeck: () => true }).exercises.filter((/** @type {any} */ e) => e.id === "eat");
+  const asked = T.buildSession({ items: [eat].concat(words(8)), settings, inModule: () => true }).exercises.filter((/** @type {any} */ e) => e.id === "eat");
   assert.ok(asked.length > 0, "and dealt");
   for (const ex of asked) {
     const r = must(T.resolveQuestion([eat], ex, false, []), "resolved");

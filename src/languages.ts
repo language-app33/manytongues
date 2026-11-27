@@ -122,11 +122,11 @@ export const TYPES = [
   "vpattern", "vread",
   "ar2pick", "ar2en", "rec2en", "rec2img", "ex2en", "vwho", "vwhorec",
   /* 2: which one is it */
-  "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "vrow",
+  "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "def2pick", "vrow",
   /* 3: write it from a cue */
   "tr2ar", "rec2ar", "rec2attr", "vshift",
   /* 4: write it from its meaning */
-  "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
+  "en2ar", "own2ar", "img2ar", "ctx2ar", "def2ar", "rec2ctx",
   /* and a conversation, on its own levels: 1, 3, 3 */
   "dlgwhole", "dlgpick", "dlgorder",
   /* and a word taken out of a scene: chosen, then typed. Levels 2 and 4,
@@ -581,6 +581,47 @@ export const EX: Record<string, ExerciseSpec> = {
     hintLabel: "Show {translit}",
     hintHideLabel: "Hide {translit}",
     hintTells: true,
+    answerMode: "ar",
+  },
+  /* The word for its description, written in the language itself by the
+     teacher — "where you buy bread" — and chosen out of four (0.697). The
+     meaning without English: what "English → choose" asks, asked in the
+     language. On the second level with it, for the same reason. The
+     description's English, where the teacher wrote one, is behind the
+     nudge and free: it says what the description says, not the word. See
+     src/description.ts. */
+  def2pick: {
+    level: 2,
+    instruction: "Choose the word",
+    label: "Description → choose",
+    short: "D→?",
+    needs: ["desc", "ar", "mates"],
+    question: "Which word is this?",
+    placeholder: "",
+    promptField: "desc",
+    answerField: "ar",
+    hintField: "descEn",
+    hintLabel: "Show the description in English",
+    hintHideLabel: "Hide the English",
+    answerMode: "choice",
+    picks: "word",
+    gentle: true,
+  },
+  /* And the word written for it: the top of the ladder, beside
+     "English → {script}". The same free English behind the nudge. */
+  def2ar: {
+    level: 4,
+    instruction: "Write in {script}",
+    label: "Description → {script}",
+    short: "D→{S}",
+    needs: ["desc", "ar"],
+    question: "Write the word this describes, in {script}",
+    placeholder: "",
+    promptField: "desc",
+    answerField: "ar",
+    hintField: "descEn",
+    hintLabel: "Show the description in English",
+    hintHideLabel: "Hide the English",
     answerMode: "ar",
   },
   /* And the same again by ear. Harder than hearing the word alone, which is
@@ -2194,6 +2235,7 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     /* Read the forms checks a reading against either (0.661). */
     saidOrHeard: `the ${translit} or a recording`,
     images: "a picture",
+    desc: "a description in the language itself",
     pictured: "a few more cards with a picture",
     heard: "a few more cards with a recording",
     figure: "a number written in figures",

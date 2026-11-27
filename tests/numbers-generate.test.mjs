@@ -21,7 +21,7 @@ import { must } from "./helpers.mjs";
 import { arComposer } from "../src/numbers/ar-PS.ts";
 import { arTimeComposer } from "../src/numbers/ar-PS.time.ts";
 import {
-  askingsKnown, askKnown, componentId, fileIntoDecks, generate, handOn, handOnCounting, handOnSplit, isFromSystem,
+  askingsKnown, askKnown, componentId, fileIntoModules, generate, handOn, handOnCounting, handOnSplit, isFromSystem,
   isRangeSkill, rangeId, wordsOfRange,
 } from "../src/numbers/generate.ts";
 import { countingOf, partsNow } from "../src/numbers/types.ts";
@@ -371,7 +371,7 @@ const SET = { composer: arComposer, sys: SYS, timeComposer: arTimeComposer, time
 
 test("a part in a deck brings its skill and the words it is built of, and nothing else", () => {
   const { items } = made();
-  const filed = fileIntoDecks(items, SET, [{ title: "Week 1", parts: ["numbers:0-9"] }]);
+  const filed = fileIntoModules(items, SET, [{ title: "Week 1", parts: ["numbers:0-9"] }]);
   const ids = new Set(filed.map((i) => i.id));
   assert.ok(ids.has(rangeId(SYS.id, "numbers:0-9")), "the skill itself");
   assert.ok(ids.has(componentId(SYS.id, "unit.3")), "the word for three");
@@ -385,13 +385,13 @@ test("a part in a deck brings its skill and the words it is built of, and nothin
 
 test("nothing is sent from parts that are in no deck", () => {
   const { items } = made();
-  assert.deepEqual(fileIntoDecks(items, SET, []), []);
-  assert.deepEqual(fileIntoDecks(items, SET, [{ title: "Week 1", parts: [] }]), []);
+  assert.deepEqual(fileIntoModules(items, SET, []), []);
+  assert.deepEqual(fileIntoModules(items, SET, [{ title: "Week 1", parts: [] }]), []);
 });
 
 test("a word two decks need is filed under both", () => {
   const { items } = made();
-  const filed = fileIntoDecks(items, SET, [
+  const filed = fileIntoModules(items, SET, [
     { title: "Week 1", parts: ["numbers:0-9"] },
     { title: "Week 2", parts: ["numbers:20-99"] },
   ]);
@@ -488,7 +488,7 @@ test("a deck that held 0 to 10 or 11 to 99 holds the parts split out of them", (
   assert.deepEqual(partsNow(["numbers:count-11-20", "numbers:count-1-2"]), ["numbers:10-19", "numbers:0-9"]);
   assert.deepEqual(partsNow(["numbers:11-99", "numbers:20-99"]), ["numbers:10-19", "numbers:20-99"]);
   const { items } = made();
-  const ids = new Set(fileIntoDecks(items, SET, [{ title: "Week 2", parts: ["numbers:11-99"] }]).map((i) => i.id));
+  const ids = new Set(fileIntoModules(items, SET, [{ title: "Week 2", parts: ["numbers:11-99"] }]).map((i) => i.id));
   assert.ok(ids.has(rangeId(SYS.id, "numbers:10-19")) && ids.has(rangeId(SYS.id, "numbers:20-99")));
   assert.ok(!ids.has(rangeId(SYS.id, "numbers:0-9")));
 });

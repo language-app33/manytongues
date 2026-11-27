@@ -305,7 +305,7 @@ stage.
   you will need are already there: `SpaceFrame` + `Tabs`, `Section`,
   `Field`/`FormField`, `Segmented`, `CheckList`, `RadioGroup`, `ItemList`,
   `Tile`, `TileNote`, `Notice`, `Nudge`, `Help`, `Lede`, `Button`,
-  `IconButton`, `ConfirmModal`, `Popover`, `DeckSwitch`. If something
+  `IconButton`, `ConfirmModal`, `Popover`, `ModuleSwitch`. If something
   genuinely has no existing piece, stop and ask the owner. Don't invent a
   new look.
 - **Wording.** Text people see says "space" (or the space's name), never
@@ -623,7 +623,7 @@ changes like this (85a, 86a):
   1. Work out `teaches` from the real courses **first**, exactly as now.
   2. Append the pseudo-course to `courseRows` **last**, only when the
      person has at least one personal deck with `practise: true`.
-  3. In the `deckToCourse` loop, its decks map to it. Personal decks are
+  3. In the `moduleToCourse` loop, its decks map to it. Personal decks are
      never in a real course, so "first course wins" never applies.
   4. The deck loop then gives each personal deck `courseId: "my-space"` and
      `courseTitle: "My space"`. `link` is undefined (personal decks have no
@@ -650,8 +650,8 @@ changes like this (85a, 86a):
   of a course in the space, space admins and App admins may create a
   space deck (33a). Today any signed-in user can call `create-deck`, so
   this tightens it.
-- **`canEditDeck(store, deck, handle, isAdmin)`**: becomes
-  `canEditDeck(store, deck, me, org)`. It's false if
+- **`canEditModule(store, deck, handle, isAdmin)`**: becomes
+  `canEditModule(store, deck, me, org)`. It's false if
   `!sameOrg(deck, org)`. A personal deck can be edited by its owner only.
   Otherwise it's true for the owner, App admin, space admin (6a), or a
   teacher of a course in the space holding the deck (as today).
@@ -662,9 +662,9 @@ changes like this (85a, 86a):
 - **`attach-deck`**: refuse personal decks (`personal-deck`). A personal
   deck reaches a course only by being copied (see `copy-to-space` below).
 - **`rename-deck`, `lock-deck`, `set-deck-parts`, `detach-deck`,
-  `deck-cards`**: org check plus the new `canEditDeck`.
+  `deck-cards`**: org check plus the new `canEditModule`.
 - **`delete-deck`, `delete-card(s)`**: org check plus the new
-  `canEditDeck`/`mayEditCard`. A space admin may delete anything in their
+  `canEditModule`/`mayEditCard`. A space admin may delete anything in their
   space that isn't personal, the same as a co-teacher (94a). The warning is
   the client's job (B7, stage 4). The server doesn't need a flag for it.
 - **New `set-deck-practise`** `{ deckId, practise }`: owner of a personal
@@ -701,7 +701,7 @@ changes like this (85a, 86a):
   doesn't change the card's owner or `personal`, and needs no edit right
   on the card (66b).
 - **`mayEditCard`**: org check. A personal card can be edited by its owner
-  only. Otherwise the same as the new `canEditDeck`.
+  only. Otherwise the same as the new `canEditModule`.
 - **`my-cards`**: filter by `org`. Return personal cards separately, as
   for decks.
 - **`card-status`, `review-card`**: org check plus `mayEditCard`.
@@ -1148,7 +1148,7 @@ comment above it says so. Add the same kinds to the backup manifest
   `partsWaiting`, `systemKeysOf`, `wipeAccount`, `admin-overview`,
   `my-*`, and the export plan (`exportable`). The stage-2 test exists to
   catch this.
-- **`canEditDeck` is called from many places** (rename, lock, delete,
+- **`canEditModule` is called from many places** (rename, lock, delete,
   parts, attach, report checks, `mayEditCard`). Change its signature
   once, and let the type checker find every caller.
 - **`wipeAccount` is the most dangerous change.** It used to delete all of
@@ -1218,7 +1218,7 @@ Server:
 Client:
 - `src/shared.tsx`, where systems are filed into decks: move the choice of
   `holding` decks into a small pure exported function (for example
-  `decksForSystem(decks, systemId)`) so it can be unit-tested, and filter
+  `modulesForSystem(decks, systemId)`) so it can be unit-tested, and filter
   by `d.numbersSystemId === systemId`. **Compatibility:** when a deck has
   no `numbersSystemId` field at all (an answer from a server older than
   this release, which can happen for a moment during a deploy), keep
@@ -1226,7 +1226,7 @@ Client:
   deck".
 - The "Numbers from" field (B7, stage 1).
 
-Tests: the server cases in B7 stage 1; a unit test of `decksForSystem`
+Tests: the server cases in B7 stage 1; a unit test of `modulesForSystem`
 (two systems in one language, two decks naming different ones: each
 system lands only in its deck; a deck without the field gets both).
 
@@ -1241,7 +1241,7 @@ Server:
   org (B2 table). `signup` (still the old sign-up for now) stamps Main.
 - The org check and list filter on **every existing action** (B3, B4),
   limited to what exists today. No personal records, no suspension, no
-  space-admin powers yet. In this stage `canEditDeck` is:
+  space-admin powers yet. In this stage `canEditModule` is:
   same org and (owner, App admin, or teacher of a course holding it).
 - `number-sources` filtered by org.
 - `admin-overview` filtered to the acting org. Every other `admin-*`
@@ -1303,7 +1303,7 @@ Tell the owner: remove `SIGNUP_CODE` from the server's environment if set.
 Server:
 - The admin gate table, space-admin rows (B4, Admin actions), and the
   space admin's powers in `create-course`, `assign-*`, `remove-member`,
-  `canEditDeck` and `mayEditCard` (6a, 94a), `my-decks` (all of the
+  `canEditModule` and `mayEditCard` (6a, 94a), `my-decks` (all of the
   space's decks), and reports (`my-reports`, `dismiss-reports`,
   `admin-delete-flags`).
 - `whoami` adds `orgAdmin` and `keySaved` on `user`.
@@ -1333,7 +1333,7 @@ Server:
   personal rule in B3.
 - `create-deck` (personal decks, and the tightening of who may create a
   space deck), `save-card` (personal decided at creation; borrowing course
-  cards), `canEditDeck`/`mayEditCard` (personal = owner only),
+  cards), `canEditModule`/`mayEditCard` (personal = owner only),
   `my-decks`/`my-cards` (separate `personal` lists), `set-deck-practise`,
   `attach-deck` refusing personal decks, `copy-to-space` (B4, Decks and
   Cards).

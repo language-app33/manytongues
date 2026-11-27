@@ -26,7 +26,7 @@ import { buildOnce } from "./helpers.mjs";
 import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CORPUS, DECKS, POOL } from "./card-corpus.mjs";
+import { CORPUS, MODULES, POOL } from "./card-corpus.mjs";
 import { blanksOn, combosOf, examplesOf, fieldsOn, fillersFor } from "../src/card-facts.ts";
 import { LANGUAGES } from "../src/languages.ts";
 import { leadOf } from "../src/cards.ts";
@@ -44,7 +44,7 @@ const readOut = (/** @type {Record<string, any>} */ card) => {
     React.createElement(CardReadout, {
       card,
       lang: LANGUAGES[card.lang],
-      decks: DECKS,
+      modules: MODULES,
       cards: POOL,
     }),
   );
@@ -66,7 +66,7 @@ test("every value on a card is somewhere on the screen that shows it", () => {
       /* A list is walked in its own right; a field nobody has described yet
          is drawn raw, which the test below is about. */
       if (!field.rule || field.rule.container || !field.rule.shown) continue;
-      const wanted = field.rule.shown(field.value, { lang, card, cards: POOL, decks: DECKS });
+      const wanted = field.rule.shown(field.value, { lang, card, cards: POOL, decks: MODULES });
       for (const said of wanted) {
         if (said && !screen.includes(said)) {
           lost.push(`${field.where}.${field.key}${field.at ? ` (${field.at})` : ""} — "${said}"`);
@@ -150,7 +150,7 @@ test("a student's card says the card and not the teacher's side of it", () => {
     React.createElement(CardReadout, {
       card,
       lang: LANGUAGES[card.lang],
-      decks: [],
+      modules: [],
       reader: "both",
     }),
   );
@@ -161,4 +161,28 @@ test("a student's card says the card and not the teacher's side of it", () => {
   assert.ok(!screen.includes("Where it lives"), "a student is shown which decks carry the card");
   assert.ok(!screen.includes("The card's ID"), "a student is shown what other cards call it");
   assert.ok(!screen.includes("Also on this card"), "a student is shown the raw fields of their item");
+});
+
+test("a student's own card page leaves out what is written for teachers (0.704)", () => {
+  const screenOf = (/** @type {Record<string, any>} */ card, /** @type {string} */ reader) =>
+    renderToStaticMarkup(
+      React.createElement(CardReadout, { card, lang: LANGUAGES[card.lang], modules: [], reader }),
+    ).replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
+  /* Over the whole corpus, so a card with a kind and reference rows is
+     among those checked, not only the first. */
+  let teacherParts = 0;
+  for (const { what, card } of CORPUS) {
+    if (/^(dialog|text)$/.test(String(card.kind || ""))) continue;
+    const both = screenOf(card, "both");
+    if (/What it is|Reference/.test(both)) teacherParts++;
+    const screen = screenOf(card, "student");
+    for (const gone of ["What it is", "What the teacher says", "Reference", "never asked in an exercise"]) {
+      assert.ok(!screen.includes(gone), `${what}: a student is shown "${gone}"`);
+    }
+  }
+  assert.ok(teacherParts > 0, "no card in the corpus has a teacher's part to leave out");
+  const card = CORPUS[0].card;
+  const screen = screenOf(card, "student");
+  assert.ok(screen.includes("Book"), "a student cannot read their own card");
+  assert.ok(screen.includes(String(leadOf(card).ar)), "a student cannot see the word");
 });

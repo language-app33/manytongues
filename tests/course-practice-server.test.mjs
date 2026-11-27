@@ -56,9 +56,9 @@ const student = await someone("Student");
 const stranger = await someone("Stranger");
 await post("assign-teacher", owner.key, { courseId: course.id, handle: teacher.user.handle });
 await post("assign-student", owner.key, { courseId: course.id, handle: student.user.handle });
-const deck = (await post("create-deck", teacher.key, { title: "Words", lang: "ar-PS" })).json.deck;
-await post("attach-deck", teacher.key, { courseId: course.id, deckId: deck.id });
-await post("save-card", teacher.key, { card: { id: "", lang: "ar-PS", forms: [{ ar: "بيت", en: "house", lat: "beit" }] }, decks: [deck.id], publish: true });
+const module = (await post("create-deck", teacher.key, { title: "Words", lang: "ar-PS" })).json.deck;
+await post("attach-deck", teacher.key, { courseId: course.id, deckId: module.id });
+await post("save-card", teacher.key, { card: { id: "", lang: "ar-PS", forms: [{ ar: "بيت", en: "house", lat: "beit" }] }, decks: [module.id], publish: true });
 
 const material = async () => (await raw("/api/courses?action=my-material", { key: student.key })).json;
 const NONE = { mode: "none", off: ["tr2ar"] };
@@ -102,7 +102,7 @@ test("every other write to the course keeps them", async () => {
   await post("attach-deck", teacher.key, { courseId: course.id, deckId: second.id });
   await post("detach-deck", teacher.key, { courseId: course.id, deckId: second.id });
   await post("admin-rename-course", owner.key, { courseId: course.id, title: "Arabic 1" });
-  await post("save-card", teacher.key, { card: { id: "", lang: "ar-PS", forms: [{ ar: "باب", en: "door", lat: "bab" }] }, decks: [deck.id], publish: true });
+  await post("save-card", teacher.key, { card: { id: "", lang: "ar-PS", forms: [{ ar: "باب", en: "door", lat: "bab" }] }, decks: [module.id], publish: true });
   const m = await material();
   assert.deepEqual(m.courses[0].practice, NONE);
   const mine = (await raw("/api/courses?action=my-courses", { key: teacher.key })).json;

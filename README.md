@@ -1136,11 +1136,11 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
     own version there (`save-system`). There was a separate Publish step
     (`sign-system`, still answered for old builds); it was one decision
     split over two buttons, and the second was the one forgotten.
-- **A deck says how well it is built to be learnt from.** Every deck under
-  Teaching › Decks carries a *Deck quality* out of 100, in green from 80,
+- **A deck says how well it is built to be learnt from.** Every module under
+  Teaching › Modules carries a quality out of 100, in green from 80,
   amber from 50 and red below; the deck's own page shows it large, with the
   three changes that would raise it most folded under it. Teachers only.
-  The owner's rules, in `src/deck-quality.ts`:
+  The owner's rules, in `src/module-quality.ts`:
 
   | part | points | what earns it |
   |---|---|---|
@@ -1161,7 +1161,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   works out, and finding unknown words in a sentence goes through `keyed` on
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
-  `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+  `tests/module-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
 - **A course's path: units, in order (0.613).** A course holds a second
   kind of element beside its decks: the **unit**. Underneath, a unit is a
   deck with `unit: true`; a course lists its units in `path`, in order,
@@ -1266,8 +1266,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   what can be asked, so that both stages full is exactly the path's
   "finished". Progress lists every published unit in order with
   `pathStateWord`, and leaves the units' titles out of the deck tiles and
-  out of the decks a saved session or a prep picks (`deckTags`). A unit
-  opens on `UnitScreen` — `DeckScreen`, fed by `unitItems`, with its state
+  out of the decks a saved session or a prep picks (`moduleTags`). A unit
+  opens on `UnitScreen` — `ModuleScreen`, fed by `unitItems`, with its state
   and stages above — locked ones too, read only; one open for the learner,
   or opened early, offers "Practise this unit", which is `begin` with the
   unit's items as the pool and `pathUnit` set.
@@ -1310,6 +1310,17 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   recording is `voices` on a form, a name per recording hash, asked on the
   recording screen of every card. Every rule is in `src/sets.ts`; the plan
   is `docs/PLAN-personal-sets.md`; why: DECISIONS.md, "Personal sets".
+- **Modules: the word for a deck, a unit or a personal set (0.686).** On
+  screen, *module* is whatever a teacher hands a course to learn from;
+  the tabs, lists, pickers and messages that mean any of the three say
+  "module", and a module's own screen names its kind ("Delete unit",
+  "Personal set name", "Deck quality"). `src/modules.ts` holds the one
+  rule (`moduleKind`). The code says *module* too (0.687): the type is
+  `Module`, and every name a programmer gives it says module. What is
+  sent to the server or kept — a card's `decks`, `deckId`, the `deck:`
+  records, the server's actions such as `create-deck`, backup files,
+  changes waiting to be sent — still says deck, so nothing saved had to
+  change; why: DECISIONS.md, "Modules".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck
@@ -1320,6 +1331,21 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   get what is written, and a pronoun written later joins the decks that
   already hold the set. The word was "built-in" before 0.569, which wrongly
   said the app supplied the words. Why: DECISIONS.md, "Word sets".
+
+  **One teacher's set per course (0.696).** A set is one teacher's. In My
+  space each set has **Share with** the space: pronouns go in as a copy
+  (sharing again updates it, `share-word-set`), numbers are marked with
+  the space (`spaces` on the system) and stay one document. Material's
+  Word sets tab lists the teacher's own sets, then every other
+  teacher's shared set by name (`space-word-sets`); any teacher of the
+  space may edit one, and a pronoun added to another's set is saved as
+  theirs (`forOwner`). A course uses one set of each kind
+  (`course.wordSets`, chosen on its page, `set-course-word-set`), or the
+  earliest written of those reaching it; `my-material` sends each deck
+  holding pronouns that set's cards in place of its own. Why:
+  DECISIONS.md, "One word set per course". Since 0.713 a space uses one
+  set per kind and language, the first written (`schoolWordSet`), and a
+  course's stored choice is no longer read.
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it
@@ -1456,12 +1482,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   word already cleared is given its reading as done and starts on writing
   — `creditNumbers` again.
 
-  **A deck's numbers come from one person** (since 0.541): its own
-  choice, `numbersFrom`, set on the deck's screen under "Numbers from",
-  or its owner. The server stamps each deck it sends a learner with that
-  person's system and clock ids, and the device files a system only into
-  the decks that name it (`decksForSystem` in `src/number-decks.ts`), so
-  two teachers with numbers no longer give a course every number twice.
+  **A course's numbers come from one person** (since 0.696; a deck's own
+  choice from 0.541): the teacher chosen on the course under Word sets ›
+  "Numbers from" (`course.wordSets.numbers`), or else the earliest written
+  of those its decks reach it from (`wordSetPick`). The server stamps each
+  deck it sends a learner with that person's system and clock ids, and the
+  device files a system only into the decks that name it
+  (`modulesForSystem` in `src/number-modules.ts`), so two teachers with
+  numbers no longer give a course every number twice. Pronouns go the same
+  way — see "Word sets".
 
   **A deck holds the parts it teaches.** A system is one document per
   language and not cards, so a deck cannot list it among its cards: it
@@ -1704,7 +1733,7 @@ How the wall is kept, in `server/api/courses.js` (since 0.542):
 - A request acts in the caller's own org, or, for an App admin, in the
   one its `x-org` header names. That org is held for the request in
   `orgScope`, and while it is set the record readers (`readCourse`,
-  `readDeck`, `readCard`, `readUser`) answer null for another org's record.
+  `readModule`, `readCard`, `readUser`) answer null for another org's record.
   So something in another space reads exactly like something that doesn't
   exist, whichever action asked. Lists read straight off an index are
   filtered with `inScope` where they are read.
@@ -1948,6 +1977,8 @@ src/
   flag-export.ts   reported problems written out as text to paste elsewhere,
                    each with the card it is about. Pure: the clock, the
                    locale and every name it cannot work out are passed in.
+  modules.ts       what a module is called on screen (0.686): a deck, a
+                   unit or a personal set. Pure, imports nothing.
   sets.ts          personal sets (0.629–0.632): a deck's `set`, read and
                    narrowed; a student's answer under `SET_KEY` in a
                    picture's progress; which list is chosen, what is still to

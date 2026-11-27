@@ -22,8 +22,8 @@ type Named = Pick<SavedSession, "ids" | "decks" | "everything">;
 export function cardsOfSaved(s: Named, items: Item[]): Item[] {
   if (s.everything) return items;
   const ids = new Set(s.ids);
-  const decks = new Set(s.decks || []);
-  return items.filter((it) => ids.has(it.id) || (it.tags || []).some((t) => decks.has(t)));
+  const modules = new Set(s.decks || []);
+  return items.filter((it) => ids.has(it.id) || (it.tags || []).some((t) => modules.has(t)));
 }
 
 /**
@@ -53,14 +53,14 @@ export function describeSaved({ picked, groups, all }: {
   all: Item[];
 }): Required<Named> {
   if (all.length && all.every((it) => picked.has(it.id))) return { ids: [], decks: [], everything: true };
-  const decks = [...groups]
+  const modules = [...groups]
     .filter(([, cards]) => cards.length && cards.every((it) => picked.has(it.id)))
     .map(([name]) => name)
     .sort();
-  const covered = new Set(decks.flatMap((d) => (groups.get(d) as Item[]).map((it) => it.id)));
+  const covered = new Set(modules.flatMap((d) => (groups.get(d) as Item[]).map((it) => it.id)));
   return {
     ids: [...picked].filter((id) => !covered.has(id)).sort(),
-    decks,
+    decks: modules,
     everything: false,
   };
 }

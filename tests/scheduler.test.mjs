@@ -756,6 +756,8 @@ test("the settings say which level each exercise stands on, and every one has a 
      what it means: the grid, and the two that offer the word among four. */
   assert.deepEqual(TYPES.filter((t) => levelOf(t) === 2), [
     "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick",
+    /* The word chosen for its description, in the language itself. */
+    "def2pick",
     /* A verb's tense put back together from its forms as tiles. */
     "vrow",
     /* A word taken out of a scene, chosen out of four; and a scene's

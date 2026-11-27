@@ -117,14 +117,14 @@ const LENGTHS = [10, 20, 40];
  */
 const SESSIONS = {
   /* The home screen's Start session. */
-  everyday: (items, length) => buildSession({ items, settings, inDeck: () => true, budget: length, systems: SETS }),
+  everyday: (items, length) => buildSession({ items, settings, inModule: () => true, budget: length, systems: SETS }),
   /* Build a session, in each of its styles. */
   regular: (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "regular", count: length, systems: SETS }),
   "get started": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "started", count: length, systems: SETS }),
   "not seen lately": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "unseen", count: length, systems: SETS }),
   "weak spots": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "weak", count: length, systems: SETS }),
   /* What is going wrong. */
-  "weak skills": (items, length) => buildWeakSession({ items, settings, inDeck: () => true, budget: length, systems: SETS }),
+  "weak skills": (items, length) => buildWeakSession({ items, settings, inModule: () => true, budget: length, systems: SETS }),
 };
 /* A timed session is Regular given minutes rather than a count: six
    questions a minute. */

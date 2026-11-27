@@ -5,10 +5,11 @@
  * being parsed by every student on every launch.
  */
 
-import { decksForSystem } from "./number-decks.ts";
+import { descriptionAsked, storedDescription } from "./description.ts";
+import { modulesForSystem } from "./number-modules.ts";
 import { installHow } from "./install-steps.ts";
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
-import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
+import type { Card, Course, Module, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
 import * as API from "./courses-api.ts";
@@ -18,7 +19,7 @@ import { asMeaning, cardRef, fillNames, fillsOf, isSentence, mergeMet, slotsOf, 
 import { reviewOf } from "./review.ts";
 import type { Reader, TableGroup } from "./card-facts.ts";
 import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSaid, dimText, EXAMPLES_CEILING,
-  examplesOf, fillersOn, IN_NO_DECK, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
+  examplesOf, fillersOn, IN_NO_MODULE, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
 import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
@@ -32,7 +33,7 @@ import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { setsWithNouns } from "./numbers/nouns.ts";
 import type { SystemSet } from "./numbers/generate.ts";
-import { fileIntoDecks, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
+import { fileIntoModules, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
 /* The one reading of which schedules say nothing (0.580: this file had its
    own, which dropped a skipped-but-never-answered state when set aside). */
 import { compactStates } from "./sync.ts";
@@ -441,7 +442,7 @@ export function plural(n: number, one: string, many?: string) {
  * them (0.563) — a part is one skill on the teacher's numbers, held by the
  * deck as an id (Deck.parts), and counted as the card it is to a student.
  */
-export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
+export function moduleSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
   /* A number part is a card like any other (0.563): it is counted with
      them, and whether it reaches students is notReaching's to say. */
   return plural(cards + (d.parts || []).length, "card");
@@ -456,7 +457,7 @@ export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.
 export function notReaching(
   d: { parts?: string[]; partsWaiting?: string[] },
   cards: { status?: string }[],
-): { n: number; long: string; short: string; why: string } | null {
+): { n: number; long: string; why: string } | null {
   const drafts = cards.filter((c) => c.status === "draft").length;
   const review = cards.filter((c) => c.status === "review").length;
   const held = d.parts || [];
@@ -471,7 +472,6 @@ export function notReaching(
   return {
     n,
     long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
-    short: `${n} not reaching students`,
     /* The reasons alone, for a sentence that names the cards its own way —
        a course's (0.679). */
     why,
@@ -841,6 +841,27 @@ export function ChatArt() {
   );
 }
 
+/* --- TeaArt -------------------------------------------------------
+   A cup of tea on its saucer, steam rising, drawn as the logo is: loose
+   loops in its four colours, and its dot (0.693). For To do on Teaching's
+   Home when nothing is waiting: time for a cup. The lines carry their own
+   colours, so it reads the same in either theme; the dot follows the
+   page's ink, as the Home card's does. */
+export function TeaArt() {
+  return (
+    <svg className="at-teaart" viewBox="0 0 240 150" width="240" height="150" focusable="false">
+      <g fill="none" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M100 46C92 36 110 28 102 14" stroke="#A99BE0" />
+        <path d="M128 46C120 36 138 28 130 14" stroke="#A99BE0" />
+        <path d="M156 75C178 68 192 84 184 98C177 110 160 110 151 101" stroke="#F7C548" />
+        <path d="M74 62C100 57 138 57 162 62C165 98 150 123 118 124C86 125 71 100 74 62Z" stroke="#FF7A59" />
+        <path d="M50 134C78 126 158 124 188 132C194 140 162 144 118 144C76 144 44 141 50 134Z" stroke="#7FD1C7" />
+      </g>
+      <circle cx="117" cy="90" r="7" fill="currentColor" />
+    </svg>
+  );
+}
+
 /* --- Nudge ---------------------------------------------------------
    "Nothing here yet", said inside an open deck or course where the
    section would otherwise be one grey line. An icon, one warm sentence,
@@ -1034,7 +1055,14 @@ export function Segmented<T extends string | number | boolean | null>({
 
 /* --- Tabs ---------------------------------------------------------
    The trainer, the teaching space and the admin space each had their
-   own copy of this, and only one of them said which tab was current. */
+   own copy of this, and only one of them said which tab was current.
+
+   Inside a page, every set of tabs is the one full-width track the card
+   screen had (0.685, the owner's 1a): the parts share it equally, the
+   current one raised. Anything that changes what a page lists is these
+   tabs, not a Segmented — that is a setting, and a screen reader says so;
+   the sentence review, Narrow a blank and Super admin's reports were
+   Segmented until then (2a). */
 /**
  * The main half of the bar that floats at the foot of the window, for a
  * space's own sections to be shown in. The app owns the bar, because the
@@ -1056,7 +1084,7 @@ export const PlaceContext = createContext<Node>(null);
 /**
  * @param props  Each tab is [key, label, iconName].
  */
-export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock = false }: {
+export function Tabs({ tabs, value, onChange, label = "Section", dots = [], counts, dock = false }: {
   tabs: [string, string, string?][];
   value?: string;
   onChange: (key: string) => void;
@@ -1064,6 +1092,10 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock
   /** Tabs with something on them worth looking at — the card screen's
       unsaved changes, say — marked with a dot and said out loud. */
   dots?: string[];
+  /** How many are on each tab, under its name, where the number helps
+      choose between them — the sentences waiting, struck and approved on
+      a card's review (0.685). Most tabs have none. */
+  counts?: Record<string, number>;
   /** A space's own sections, shown in the bar at the foot of the window
       rather than at the top of the page. Where there is no bar — the
       component gallery — they stay where they are. */
@@ -1071,7 +1103,7 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock
 }) {
   const slot = useContext(DockContext);
   const strip = (
-    <div className={dock && slot ? "at-docktabs" : "at-nav2"} role="tablist" aria-label={label}>
+    <div className={dock && slot ? "at-docktabs" : "at-nav2"} data-n={tabs.length} role="tablist" aria-label={label}>
       {tabs.map(([k, text, icon]) => (
         <button
           key={k}
@@ -1084,6 +1116,7 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock
         >
           {icon ? <Icon name={icon} size={18} /> : null}
           {text}
+          {counts && k in counts ? <span className="at-tabcount">{counts[k]}</span> : null}
           {dots.includes(k) ? <span className="at-tabdot" aria-label="needs a look" /> : null}
         </button>
       ))}
@@ -1184,8 +1217,11 @@ export function TabTitle({ children }: { children?: Node }) {
   );
 }
 
-export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
+export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, counts, children }: {
   tabs: [string, string, string?][];
+  /** A number on a tab's button in the bar: what Teaching's To do holds,
+      on Home (0.693). */
+  counts?: Record<string, number>;
   /** Which of Teaching, Admin or Super admin this is. Each tab is headed
       with its own name (0.553); the mode itself is said by where you are,
       at the title's right (0.601), so it no longer prefixes the name. */
@@ -1224,7 +1260,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {/* No app name here (0.554): each tab is headed with its own name
               below. The space's sections are in the bar at the foot. */}
           <Notice kind="error">{error}</Notice>
-          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
+          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} counts={counts} dock />
           {/* The tab's own name at the top (0.553), in the words of the bar.
               A screen opened over the tab covers it, with its own title. */}
           {space && tabs.find((t) => t[0] === tab) ? (
@@ -1312,7 +1348,7 @@ function Written({ text }: { text?: string | null }) {
  * The card is a form rather than a `Card` or an `Item`, because both
  * sides show these: only the wording is read, and that is all a form is.
  */
-export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, className }: {
+export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className }: {
   /* A card, not one of its forms: the tile shows the card's own word —
      the first of them — and says what the card is called, which is a fact
      about the card. */
@@ -1333,6 +1369,9 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, cla
    */
   bar?: { pct: number } | null;
   actions?: Node;
+  /** Drawn in the tile's top corner rather than along its foot: a card's
+      three dots (0.717), so the tile is the card and nothing under it. */
+  corner?: Node;
   onClick?: () => void;
   className?: string;
 }) {
@@ -1347,7 +1386,7 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, cla
   const face = isDialog(card) ? firstOfEach(linesOf(card)[0]).ar : lead.ar || String(card.numeral || "");
   return (
     <div
-      className={`at-minicard${className ? " " + className : ""}`}
+      className={`at-minicard${corner ? " cornered" : ""}${className ? " " + className : ""}`}
       /* Which card, for a test asking whether a question is about it: the
          words on the tile are not always on the question. */
       data-card={card.id || undefined}
@@ -1432,6 +1471,7 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, onClick, cla
         </div>
       ) : null}
       {actions ? <div className="at-miniacts">{actions}</div> : null}
+      {corner ? <div className="at-minicorner">{corner}</div> : null}
     </div>
   );
 }
@@ -1617,21 +1657,30 @@ export function dateTime(ms?: Millis) {
 /* --- Tile ---------------------------------------------------------
    The deck and course tile. Lived in spaces.tsx, which meant the one
    library the docs point at did not actually hold it. */
-export function Tile({ title, meta, onOpen, actions, footer }: {
+export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
   title?: Node;
   meta?: Node;
   onOpen?: () => void;
   actions?: Node;
   footer?: Node;
+  /** Before the title, centred on it and what is under it: a module's
+      quality ring (0.715, the owner's 3a), so the scores of a list stand
+      in one column down its left. */
+  lead?: Node;
+  /** A line straight under the title, inside the column beside `lead`,
+      where `footer` sits under the whole row (0.715). */
+  note?: Node;
 }) {
   return (
     /* data-open marks a tile that actually opens something, so only those
        get the hover treatment. */
     <div className="at-deckcard" onClick={onOpen} data-open={onOpen ? "" : undefined}>
       <div className="at-deckrow2">
+        {lead ? <div className="at-decklead">{lead}</div> : null}
         <div className="at-deckmain">
           <div className="at-decktitle">{title}</div>
           {meta ? <div className="at-deckmeta">{meta}</div> : null}
+          {note}
         </div>
         {actions ? <div className="at-deckacts">{actions}</div> : null}
       </div>
@@ -1640,7 +1689,9 @@ export function Tile({ title, meta, onOpen, actions, footer }: {
   );
 }
 
-/* The line under a deck's rule: whether anyone can see it. Said in words
+/* The line at the foot of a tile: whether anyone can see it. No rule over
+   it since 0.715 (the owner's wish), so it reads as part of the tile's
+   text rather than a separate strip. Said in words
    alone — a green or grey dot beside them repeated the sentence in a code
    nobody had been told. `live` is kept on the element for anything that
    wants to tell the two apart. */
@@ -2000,45 +2051,32 @@ export function ClipList({ clips, onChange, load }: {
 const PAGE_SIZE = 120;
 
 /*
- * The four ways a card list can be drawn, which its view button steps
- * through: small tiles, big tiles, a line per card, and a table.
+ * The two ways a card list can be drawn, which its view button switches
+ * between: a grid of tiles, for browsing, and a table, for comparing.
  *
- * The two grids are the tiles at two sizes. The scale drives the grid's own
- * column width as well as the type inside a tile, so a bigger card is a
- * bigger card — fewer to a row, each with its word set larger — rather than
- * the same tile with the words spilling out of it. Large is the size that
- * was "Medium" when there were three sizes and no other views: the biggest
- * of them was readable across the room and nobody's list.
- *
- * The line is the word and what it means and nothing else, for reading down
- * a long list; the table is everything a list knows about each card, side
- * by side, for comparing them. What goes in either is the list's to say —
+ * There were four until 0.714 — small and large grids, a line per card, and
+ * the table. The owner's wish (1a) was one view for each job and nothing
+ * twice: the large grid was the small one bigger, and the line was the
+ * table's first two columns. What goes in the table is the list's to say —
  * see CardViews.
  */
-export type ListView = "small" | "large" | "list" | "table";
+export type ListView = "small" | "table";
 const VIEWS: { id: ListView; name: string; icon: string }[] = [
-  { id: "small", name: "Small grid", icon: "viewSmall" },
-  { id: "large", name: "Large grid", icon: "viewLarge" },
-  { id: "list", name: "List", icon: "viewList" },
+  { id: "small", name: "Grid", icon: "viewSmall" },
   { id: "table", name: "Table", icon: "viewTable" },
 ];
-const LARGE_TILE = 1.35;
 
 /*
- * What a list draws a card as, in the list and table views.
+ * What a list draws a card as, in the table.
  *
- * `word` and `meaning` are the line; `cells` are the table's, by the key of
- * each of `columns`. `open` is what pressing the row does — what pressing
- * the tile does — and `actions` sit at the end of it, as they sit on a tile.
+ * `cells` are the table's, by the key of each of `columns`. `open` is what
+ * pressing the row does — what pressing the tile does — and `actions` sit at
+ * the end of it, as they sit on a tile.
  */
 export interface CardRow {
-  word: Node;
-  meaning: Node;
   cells: Record<string, Node>;
   open?: () => void;
   actions?: Node;
-  /** Drawn first on a line, before the word — a card's status. */
-  lead?: Node;
 }
 export interface CardViews<T> {
   /** Which list this is, for remembering the view it was left at. */
@@ -2053,16 +2091,14 @@ export interface CardViews<T> {
    device's theme and keyboard to every other one. And kept per list: a
    table suits the whole collection and a grid suits one deck.
 
-   A device that last chose a size under the old button starts from the
-   grid nearest it, so nobody's cards shrink under them on the day this
-   arrives. */
+   A device left at a view that has gone opens at the one that took over
+   its job (0.714): the large grid at the grid, the list at the table. */
 const VIEW_KEY = "arabic-trainer-view:";
-const OLD_TILE_KEY = "arabic-trainer-tile-size";
 function loadView(list: string): ListView {
   try {
     const said = localStorage.getItem(VIEW_KEY + list);
     if (VIEWS.some((v) => v.id === said)) return said as ListView;
-    return Number(localStorage.getItem(OLD_TILE_KEY)) >= 1 ? "large" : "small";
+    return said === "list" ? "table" : "small";
   } catch (e) {
     return "small";
   }
@@ -2106,16 +2142,26 @@ export const cardSubtypeLabel = (card: Record<string, any>, lang?: Lang | null):
  * word beside nothing; `en` and `lat` are each alone, for the table's
  * columns of them.
  */
-export function cardWords(card: Record<string, any>, lang?: Lang | null): { word: Node; meaning: Node; en: Node; lat: Node } {
+export function cardWords(card: Record<string, any>, lang?: Lang | null): { word: Node; short: Node; meaning: Node; en: Node; lat: Node } {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   /* A scene is known by its first line, its meaning as much as its words. */
   const lead = firstOfEach(isDialog(card as any) ? linesOf(card as any)[0] : leadOf(card));
   const face = lead.ar || String(card.numeral || "");
   const said = asMeaning(card.name || lead.en);
+  const style = { ...(L.fontStack ? { fontFamily: L.fontStack } : null), ...scriptVars(L) };
+  /* And as the table's first column shows them (0.717): cut after twenty
+     characters, the whole of them on hover. */
+  const whole = shownAlternatives(face);
+  const cut = clipped(whole);
   return {
     word: (
-      <span className="ar" lang={L.id} dir={L.direction} style={{ ...(L.fontStack ? { fontFamily: L.fontStack } : null), ...scriptVars(L) }}>
+      <span className="ar" lang={L.id} dir={L.direction} style={style}>
         <Written text={face} />
+      </span>
+    ),
+    short: (
+      <span className="ar" lang={L.id} dir={L.direction} style={style} title={cut !== whole ? whole : undefined}>
+        <Written text={cut} />
       </span>
     ),
     meaning: said ? <span dir="auto"><Written text={said} /></span> : lead.lat ? <span className="at-lat"><Written text={lead.lat} /></span> : null,
@@ -2125,19 +2171,32 @@ export function cardWords(card: Record<string, any>, lang?: Lang | null): { word
 }
 
 /*
- * A card list drawn as lines or as a table, for ItemList.
+ * A card's words cut to the first `n` characters, with "…" where some were
+ * left off — for the table's first column, which would otherwise be as wide
+ * as the longest sentence in the list (0.717, the owner's wish). Counted as
+ * a reader counts them, a letter with its harakat being one, where the
+ * browser can say so.
+ */
+export function clipped(text: string, n = 20): string {
+  const Seg = (Intl as any).Segmenter;
+  const chars: string[] = Seg
+    ? Array.from(new Seg(undefined, { granularity: "grapheme" }).segment(text), (s: any) => s.segment)
+    : Array.from(text);
+  return chars.length > n ? chars.slice(0, n).join("").trimEnd() + "…" : text;
+}
+
+/*
+ * A card list drawn as a table, for ItemList.
  *
  * A row does what its tile does: pressing it opens the card, and while
  * selecting it ticks the card instead. The run headings of a grouped list
- * are drawn here too — a line of their own in the list, a row across the
- * table — so a deck's cards stay sorted by where they stand whichever way
- * they are drawn.
+ * are drawn here too, as a row across the table, so a deck's cards stay
+ * sorted by where they stand whichever way they are drawn.
  *
  * The table scrolls sideways inside its own frame where it is wider than
  * the screen, rather than pushing the page wider with it.
  */
-function CardLines<T>({ view, views, page, itemKey, selecting, picked, toggle, headingAt }: {
-  view: "list" | "table";
+function CardTable<T>({ views, page, itemKey, selecting, picked, toggle, headingAt }: {
   views: CardViews<T>;
   page: T[];
   itemKey: (item: T) => string;
@@ -2155,7 +2214,7 @@ function CardLines<T>({ view, views, page, itemKey, selecting, picked, toggle, h
   };
   const tick = (on: boolean) =>
     selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
-  /* What makes a row a thing to press, said the same way for both. */
+  /* What makes a row a thing to press. */
   const pressable = (id: string, row: CardRow) =>
     selecting || row.open
       ? {
@@ -2165,36 +2224,6 @@ function CardLines<T>({ view, views, page, itemKey, selecting, picked, toggle, h
           ...(selecting ? { "aria-pressed": picked.has(id) } : null),
         }
       : {};
-
-  if (view === "list") {
-    return (
-      <div className="at-cardlines">
-        {rows.map(({ id, row }, i) => {
-          const head = headingAt(page[i], i);
-          const on = picked.has(id);
-          return (
-            <React.Fragment key={id}>
-              {head && (
-                <p className="at-grouphead">
-                  {head.label}
-                  <span>{head.n}</span>
-                </p>
-              )}
-              <div className={`at-cardline${on ? " picked" : ""}`} role="button" data-card={id} {...pressable(id, row)}>
-                {tick(on)}
-                {row.lead ? <span className="at-cardline-lead">{row.lead}</span> : null}
-                <span className="at-cardline-word">{row.word}</span>
-                <span className="at-cardline-meaning">{row.meaning}</span>
-                {row.actions && !selecting ? (
-                  <span className="at-cardline-acts" onClick={(e) => e.stopPropagation()}>{row.actions}</span>
-                ) : null}
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
-    );
-  }
 
   const acts = !selecting && rows.some((r) => r.row.actions);
   const span = views.columns.length + (selecting ? 1 : 0) + (acts ? 1 : 0);
@@ -2361,15 +2390,16 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   quiet?: string;
 }) {
   const [open, setOpen] = useState(false);
-
-  /* The same close-on-anything-else the corner menu uses. Registered only
-     while it is open, and the menu stops the click that opened it from
-     closing it again. */
+  const shut = useCallback(() => setOpen(false), []);
 
   if (!options || options.length < 2) return null;
   const on = value !== quiet;
   const chosen = options.find((o) => o.value === value);
 
+  /* The choices open in the app's one panel (0.690, the owner's 2a): the
+     sheet three dots open, a row each with the chosen one ticked — a long
+     list of people scrolls there, where a list hanging from the button ran
+     off a phone. */
   return (
     <div className="at-pickwrap" onClick={(e) => e.stopPropagation()}>
       <button
@@ -2378,37 +2408,143 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
         /* The label says what the filter does; the title also says where it
            has got to, because the lit button alone does not name the person
            the list has been narrowed to. */
-        title={on && chosen ? `${label}: ${chosen.label}` : label}
+        title={on && chosen ? `${label}: ${typeof chosen.label === "string" ? chosen.label : ""}` : label}
         aria-label={label}
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-pressed={on}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
       >
         <Icon name={icon} />
       </button>
 
       {open && (
-        <Popover className="at-pickmenu" onClose={() => setOpen(false)}>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={`at-pickline${o.value === value ? " on" : ""}`}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-            >
-              <span className="at-pickmark">
-                {o.value === value ? <Icon name="check" size={16} /> : null}
-              </span>
-              <span className="at-picktext">{o.label}</span>
-              {o.note ? <span className="at-picknote">{o.note}</span> : null}
-            </button>
-          ))}
-        </Popover>
+        <PickSheet title={label || "Filter"} className="at-picksheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {options.map((o) => (
+              <SheetAction
+                key={o.value}
+                icon={o.value === quiet ? "group" : icon}
+                label={o.label}
+                note={o.note}
+                on={o.value === value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(o.value);
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
       )}
     </div>
+  );
+}
+
+/*
+ * Three dots that open the panel of what can be done with the thing they
+ * sit on — a module's Export and Delete, a list's Import (0.689).
+ *
+ * The panel is the app's one context menu (0.690, the owner's wish): the
+ * sheet a saved session's dots open on Focused training, up from the foot
+ * of the screen on a phone and in the middle of a wide one, named for what
+ * it acts on, a row per action. A thumb reaches it, and a tile at the foot
+ * of the screen cannot cut it off, which a menu hanging from the dots did.
+ *
+ * Its clicks stop at it, so a tile it sits on does not open as well.
+ * Items are { label, icon, danger, note, disabled, onClick }; anything
+ * falsy is left out, so an action that only some things have is written in
+ * place with `&&`.
+ */
+export type MoreItem = { label: string; icon: string; danger?: boolean; note?: string; disabled?: boolean; onClick: () => void };
+export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
+  /** What the button is called, to a screen reader and on hover. */
+  label?: string;
+  /** The panel's heading: the thing it acts on. */
+  title: string;
+  /** A line under the heading, where one helps. */
+  lede?: string;
+  items: (MoreItem | null | false | undefined)[];
+  ghost?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const shut = useCallback(() => setOpen(false), []);
+  const live = items.filter(Boolean) as MoreItem[];
+  if (!live.length) return null;
+  return (
+    <div className="at-morewrap" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${open ? " on" : ""}`}
+        title={label}
+        aria-label={label}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="more" />
+      </button>
+      {open && (
+        <PickSheet title={title} lede={lede} className="at-moresheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {live.map((it) => (
+              <SheetAction
+                key={it.label}
+                icon={it.icon}
+                label={it.label}
+                note={it.note}
+                danger={it.danger}
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onClick();
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
+      )}
+    </div>
+  );
+}
+
+/* One thing to do in a panel of them (0.680): its icon in a round well,
+   and its name, with a line under it where it cannot be done and why.
+   Drawn like a row of "Where you are", the other panel of places to go.
+   In the library since 0.690, where MoreMenu draws its rows with it, and
+   so do the pickers that choose one of a few — a card's status, whose
+   modules to show — where `on` marks the one chosen now with a tick. */
+export function SheetAction({ icon, label, note, danger, disabled, on, onClick }: {
+  icon: string;
+  label: Node;
+  note?: Node;
+  danger?: boolean;
+  disabled?: boolean;
+  /** The choice that holds now, in a sheet of choices. */
+  on?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`at-sheetact${danger ? " danger" : ""}${on ? " on" : ""}`}
+      disabled={disabled}
+      aria-current={on ? "true" : undefined}
+      onClick={onClick}
+    >
+      <span className="at-sheetactico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="at-sheetacttext">
+        <b>{label}</b>
+        {note ? <i>{note}</i> : null}
+      </span>
+      {on ? (
+        <span className="at-sheetacton" aria-hidden="true">
+          <Icon name="check" size={20} />
+        </span>
+      ) : null}
+    </button>
   );
 }
 
@@ -2425,6 +2561,8 @@ export function ItemList<T>({
   noun,
   plural,
   tools,
+  more,
+  narrow,
   menus,
   filters,
   count,
@@ -2437,7 +2575,6 @@ export function ItemList<T>({
   views,
   onNew,
   newOff,
-  searchBelow,
   query: outsideQuery,
   renderItem,
   selected,
@@ -2452,25 +2589,25 @@ export function ItemList<T>({
   "person";
   "card". */ noun: string;
   plural?: string;
-  /** Controls in the toolbar itself;
-  right of the search box. */ tools?: Node;
+  /** Controls in the top row, after New and its three dots: the main
+      thing a screen does with its list, such as "Copy all reports". */
+  tools?: Node;
+  /** What the three dots beside New hold — Import, on a list that has it
+      (0.689). Nothing here, no dots. */
+  more?: (MoreItem | null | false | undefined)[];
+  /** Controls that narrow the list in a way of their own, at the end of
+      the search row after Select and the menus — a FilterMenu. */
+  narrow?: Node;
   /**
-   * The menus in the second row, beside Select — Sort and Filter on a card
-   * list. Each is a button that opens its `content` in a panel under the
+   * The menus on the search row, after Select — Sort and Filter on a card
+   * list. Each is an icon that opens its `content` in a panel under the
    * row, and one is open at a time: two panels at once is two answers to
    * "why is this list short". `busy` is how many of its settings are away
-   * from their default, which the button carries as a count — `narrowing`
+   * from their default, which the icon carries as a count — `narrowing`
    * counts a FilterBar's groups for it.
    */
   menus?: { key: string; label: string; icon?: string; busy?: number; content?: Node }[];
   /** Controls under the toolbar — tag pickers and the like. */ filters?: Node;
-  /**
-   * The search box on a line of its own, under New and the toolbar's
-   * buttons, rather than between them. The Cards tab asks for it: its row
-   * carries three or four icons beside New card, which left the box too
-   * narrow to read what was typed in it on a phone.
-   */
-  searchBelow?: boolean;
   /**
    * The search, typed somewhere else on the screen. Given, the list draws
    * no search box of its own and narrows by this instead — the Courses tab
@@ -2676,71 +2813,95 @@ export function ItemList<T>({
       className="at-listwrap"
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
-      <div className="at-toolbar at-toolbar-top">
-        {(onNew || newOff) && !bare && (
-          <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
-            onClick={newOff || onNew}>
-            <Icon name="add" />
-            New {noun}
-          </button>
-        )}
-        {items.length > 0 && !searchBelow && !outside && searchBox}
-        {/* Beside the search box, because narrowing by hand and narrowing by
-            typing are the same job. */}
-        {tools}
-        {/* And at the far end, how to draw them — which is about reading
-            the list rather than about what is in it, so it stands apart
-            from the row below that decides that. Its icon is a picture of
-            the view the list is in. */}
-        {views && items.length > 0 && (
-          <button
-            className="at-icon at-viewbtn"
-            title={viewLabel}
-            aria-label={viewLabel}
-            onClick={() => {
-              setView(then.id);
-              saveView(viewKey, then.id);
-            }}
-          >
-            <Icon name={at.icon} />
-          </button>
-        )}
-      </div>
+      {/* The top row (0.689): New and the three dots holding the list's
+          less used actions, together at the start; the screen's own
+          button after them; and at the far end how to draw the list —
+          which is about reading it rather than about what is in it. Its
+          icon is a picture of the view the list is in. Left out when it
+          would hold nothing. */}
+      {(() => {
+        const withNew = (onNew || newOff) && !bare;
+        const dots = !bare && more && more.some(Boolean);
+        const viewBtn = views && items.length > 0;
+        if (!withNew && !dots && !tools && !viewBtn) return null;
+        return (
+          <div className="at-toolbar at-toolbar-top">
+            {withNew && (
+              <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
+                onClick={newOff || onNew}>
+                <Icon name="add" />
+                New {noun}
+              </button>
+            )}
+            {dots ? (
+              <MoreMenu
+                label={`More for these ${plural || `${noun}s`}`}
+                title={(plural || `${noun}s`).replace(/^./, (c) => c.toUpperCase())}
+                items={more || []}
+              />
+            ) : null}
+            {tools}
+            {viewBtn && (
+              <button
+                className="at-icon at-viewbtn"
+                title={viewLabel}
+                aria-label={viewLabel}
+                onClick={() => {
+                  setView(then.id);
+                  saveView(viewKey, then.id);
+                }}
+              >
+                <Icon name={at.icon} />
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
-      {searchBelow && !outside && items.length > 0 && (
-        <div className="at-toolbar at-toolbar-search">{searchBox}</div>
-      )}
-
-      {/* Select, and the menus that order and narrow the list — one row,
-          under the one that searches it. Select is not a filter and comes
-          first; the menus are in the order they are given. */}
-      {(canSelect || live.length > 0) && !bare && (
-        <div className="at-toolbar at-toolbar-sub">
-          {canSelect && (
-            <button
-              className={`at-btn sm ghost at-selectbtn${selecting ? " on" : ""}`}
-              aria-pressed={selecting}
-              onClick={() => (selecting ? stopSelecting() : startSelecting())}
-            >
-              <Icon name={selecting ? "close" : "select"} size={16} />
-              {selecting ? "Done" : "Select"}
-            </button>
-          )}
-          {live.map((m) => (
-            <button
-              key={m.key}
-              className={`at-btn sm ghost at-menubtn${m.busy ? " on" : ""}`}
-              aria-expanded={openMenu === m.key}
-              onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
-            >
-              <Icon name={m.icon || "tune"} size={16} />
-              {m.label}
-              {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
-              <Icon name={openMenu === m.key ? "chevronUp" : "chevronDown"} size={16} />
-            </button>
-          ))}
-        </div>
-      )}
+      {/* The search row (0.689): the box on a line of its own, wide enough
+          to read what was typed in it on a phone, and after it, as icons,
+          Select and the menus that order and narrow the list. Select is not
+          a filter and comes first; the menus are in the order they are
+          given. */}
+      {(() => {
+        const box = items.length > 0 && !outside;
+        const sel = canSelect && !bare;
+        const menusHere = live.length > 0 && !bare;
+        if (!box && !sel && !menusHere && !narrow) return null;
+        const selLabel = selecting ? "Done selecting" : "Select";
+        return (
+          <div className="at-toolbar at-toolbar-search">
+            {box ? searchBox : <span className="at-toolbarfill" />}
+            {sel && (
+              <button
+                type="button"
+                className={`at-icon ghost at-selectbtn${selecting ? " on" : ""}`}
+                title={selLabel}
+                aria-label={selLabel}
+                aria-pressed={selecting}
+                onClick={() => (selecting ? stopSelecting() : startSelecting())}
+              >
+                <Icon name={selecting ? "close" : "select"} />
+              </button>
+            )}
+            {menusHere && live.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className={`at-icon ghost at-menubtn${m.busy ? " on" : ""}${openMenu === m.key ? " open" : ""}`}
+                title={m.busy ? `${m.label} (${m.busy} on)` : m.label}
+                aria-label={m.label}
+                aria-expanded={openMenu === m.key}
+                onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
+              >
+                <Icon name={m.icon || "tune"} />
+                {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
+              </button>
+            ))}
+            {narrow}
+          </div>
+        );
+      })()}
 
       {shownMenu ? <div className="at-listmenu">{shownMenu.content}</div> : null}
 
@@ -2772,9 +2933,8 @@ export function ItemList<T>({
       {/* Nothing to draw, no table: its heading row with no rows under
           it read as a table with something missing, above the empty
           panel or the "nothing matches" line. */}
-      {views && (drawn === "list" || drawn === "table") ? (
-        page.length === 0 ? null : <CardLines
-          view={drawn}
+      {views && drawn === "table" ? (
+        page.length === 0 ? null : <CardTable
           views={views}
           page={page}
           itemKey={itemKey}
@@ -2790,12 +2950,7 @@ export function ItemList<T>({
           }}
         />
       ) : (
-      /* The scale rides on the grid rather than on each tile: the columns
-          are as much of "bigger cards" as the type inside them is. */
-      <div
-        className={size === "small" ? "at-cardgrid" : "at-decklist2"}
-        style={drawn === "large" ? ({ "--tile": String(LARGE_TILE) } as React.CSSProperties) : undefined}
-      >
+      <div className={size === "small" ? "at-cardgrid" : "at-decklist2"}>
         {page.map((it, i) => {
           const id = itemKey(it);
           const on = picked.has(id);
@@ -3080,12 +3235,12 @@ function ReadForm({ form, lang, title, what, reader }: {
   return (
     <section className="at-panel">
       <p className="at-eyebrow">{title}</p>
-      <p className="at-hint">{what}</p>
+      {what ? <p className="at-hint">{what}</p> : null}
       <ReadSaid form={form} lang={lang} />
       <ReadSound form={form} />
       {reader === "teacher" ? <ReadAsked form={form} /> : null}
       {form.note ? <ReadRow label="Note">{String(form.note)}</ReadRow> : null}
-      <ReadReference form={form} lang={lang} />
+      {reader === "student" ? null : <ReadReference form={form} lang={lang} />}
     </section>
   );
 }
@@ -3396,15 +3551,18 @@ function ReadUnnamed({ card }: { card: Record<string, any> }) {
  *   what is behind a blank is a fact about the collection and not about this
  *   card.
  */
-export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
+export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: {
   card: Record<string, any> & { subs?: Record<string, any>[], decks?: string[] };
   lang?: Lang;
-  decks: { id: string, title?: string }[];
+  modules: { id: string, title?: string }[];
   cards?: Record<string, any>[];
   reader?: Reader;
 }) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   const teacher = reader === "teacher";
+  /* The student's own card page (0.704): no "What it is", no line about
+     what is asked, no Reference. See Reader in card-facts.ts. */
+  const student = reader === "student";
   const forms: Record<string, any>[] = formsOf(card);
   const tables = tablesOn(card, L);
   /* The forms that are not cells of a table: a cell is a form like any
@@ -3412,7 +3570,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
      which tense and which person it is. */
   const loose = forms.filter((f) => !isTableCell(f, L) && !isTenseForm(f));
   const titles = (card.decks || [])
-    .map((id: string) => decks.find((d) => d.id === id))
+    .map((id: string) => modules.find((d) => d.id === id))
     .map((d) => d && d.title)
     .filter(Boolean);
 
@@ -3428,10 +3586,10 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
     <section className="at-panel">
       <p className="at-eyebrow">Where it lives</p>
       <p className="at-hint">
-        A card is seen through its decks. One in no deck reaches nobody.
+        A card is seen through its modules. One in no module reaches nobody.
       </p>
       <ReadRow label="Language">{L.name}</ReadRow>
-      <ReadRow label="Decks">
+      <ReadRow label="Modules">
         {titles.length ? (
           <span className="at-flags">
             {titles.map((t) => (
@@ -3441,7 +3599,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
             ))}
           </span>
         ) : (
-          IN_NO_DECK
+          IN_NO_MODULE
         )}
       </ReadRow>
       {/* What the card is for, where it is not simply a card. A value
@@ -3530,7 +3688,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
           offered and which blanks it fills without anybody ticking one.
           First, because it is the first question the editor asks — before
           the editor opens, in the case of the three shapes. */}
-      <ReadKind card={card} lang={L} />
+      {student ? null : <ReadKind card={card} lang={L} />}
 
       {loose.map((f, i) => (
         <React.Fragment key={String(f.id || i)}>
@@ -3541,7 +3699,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
             title={i === 0 ? "The card" : `Other form ${i}`}
             what={
               i === 0
-                ? "What a student is asked, and what counts as the answer."
+                ? student ? "" : "What a student is asked, and what counts as the answer."
                 : "Another way the same thing is said. It is practiced on its own."
             }
           />
@@ -5103,7 +5261,7 @@ export const cardLostRecordings = (card: any): number =>
    the part that failed. */
 export async function pullTeaching(handle: string) {
   const at = API.actingSpace();
-  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myModules(), API.myCards()]);
   if (movedSince(at)) {
     const kept = recallSpace("teach", handle);
     return kept
@@ -5116,7 +5274,7 @@ export async function pullTeaching(handle: string) {
      nothing held, ask again for the whole of it. */
   if (!held && [c, d, k].some(same)) {
     API.forgetEtags();
-    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myModules(), API.myCards()]);
   }
   /* Nothing moved: the space stands as it is, and nobody is told. */
   if (held && same(c) && same(d) && same(k)) return { ...held, failed: null };
@@ -5300,7 +5458,7 @@ function recsOf(form: { clips?: string[]; slowClips?: string[] }) {
 const keptAnswers = (form: Record<string, any>) =>
   answersOf(form, answerFields()).map(({ at: _at, ...answer }) => storedAnswer(answer));
 
-export function cardToItem(card: Card, deckTitle: string, courseId: string, deckId: string, freshStates: () => Record<string, ExerciseState>): Item {
+export function cardToItem(card: Card, moduleTitle: string, courseId: string, moduleId: string, freshStates: () => Record<string, ExerciseState>): Item {
   /*
    * What a sub-form is called on this device.
    *
@@ -5409,7 +5567,14 @@ export function cardToItem(card: Card, deckTitle: string, courseId: string, deck
   }
   const forms = (lead ? [lead] : [])
     .concat(joined.forms.map(({ at, ...f }) => ({ f, id: String(at) })))
-    .map(({ f, id }) => ({ ...formOf(f, id), ...(copies[id] ? { joinedFrom: copies[id] } : null) }));
+    .map(({ f, id }) => ({
+      ...formOf(f, id),
+      ...(copies[id] ? { joinedFrom: copies[id] } : null),
+      /* The card's description and its English, on its own word, where it
+         is asked: a word or phrase with one form (0.697). Kept off a card
+         with more, which the editor says is not asked. */
+      ...(id === localIdFor(card.id) && descriptionAsked(card as any) ? storedDescription(f) : null),
+    }));
 
   /* A conversation's turns, which are forms with a speaker on them. Named
      the way the other forms are, so a line keeps its progress across a
@@ -5544,10 +5709,10 @@ export function cardToItem(card: Card, deckTitle: string, courseId: string, deck
     ...(typeof card.value === "number" && Number.isFinite(card.value)
       ? { value: card.value }
       : null),
-    tags: [deckTitle],
+    tags: [moduleTitle],
     locked: true,
     flags: [],
-    source: { courseId, deckId, cardId: card.id, rev: card.rev || 1 },
+    source: { courseId, deckId: moduleId, cardId: card.id, rev: card.rev || 1 },
     /* When the card was made, not when it reached this device — so "added"
        means the same thing to the student as it does to the teacher who
        added it. Falls back for a card made before the server kept the
@@ -5574,7 +5739,7 @@ export function serverCardId(item: Item | null | undefined) {
   /* A card out of a number system also says where it came from, and what
      it says is not a card id — so the two are told apart by name rather
      than by which fields happen to be filled in. */
-  const from = fromDeck(item);
+  const from = fromModule(item);
   if (from && from.cardId) return from.cardId;
   return item.id || "";
 }
@@ -5586,7 +5751,7 @@ export function serverCardId(item: Item | null | undefined) {
  * language's number system — which carries a source of its own shape, and
  * which nothing that asks this is about.
  */
-export function fromDeck(
+export function fromModule(
   item: { source?: Item["source"] } | null | undefined,
 ): { courseId: string; deckId: string; cardId: string; rev: number } | null {
   const source = item && item.source;
@@ -5631,7 +5796,7 @@ export interface Folded {
 
 export type CoursesPulled = Folded & {
   unchanged?: false;
-  decks: Deck[];
+  decks: Module[];
   courses: Course[];
   /* The teachers' numbers, paired with their clocks. Held by the caller
      as well as folded into the cards, because a skill's question is drawn
@@ -5663,8 +5828,8 @@ export async function pullCourses(
     return { unchanged: true, version: r.version || "", teaches: !!r.teaches, teachesIn: idsOf(r.teachesIn) };
   }
   const enrolled = r.courses || [];
-  const decks = r.decks || [];
-  const cardsByDeck: Map<string, Card[]> = new Map(
+  const modules = r.decks || [];
+  const cardsByModule: Map<string, Card[]> = new Map(
     (r.cards || []).map((x: { deckId: string; cards?: Card[] }) => [x.deckId, x.cards || []]),
   );
 
@@ -5692,16 +5857,16 @@ export async function pullCourses(
    */
   const incoming: Item[] = [];
   const at: Map<string, Item> = new Map();
-  for (const deck of decks) {
-    const lists = new Set(deck.cardIds || []);
-    for (const card of cardsByDeck.get(deck.id) || []) {
-      const tag = lists.has(card.id) ? String(deck.title || "") : "";
+  for (const module of modules) {
+    const lists = new Set(module.cardIds || []);
+    for (const card of cardsByModule.get(module.id) || []) {
+      const tag = lists.has(card.id) ? String(module.title || "") : "";
       const had = at.get(localIdFor(card.id));
       if (had) {
         if (tag && !had.tags.includes(tag)) had.tags = had.tags.concat([tag]);
         continue;
       }
-      const item = cardToItem(card, deck.title, deck.courseId, deck.id, freshStates);
+      const item = cardToItem(card, module.title, module.courseId, module.id, freshStates);
       /* cardToItem names it after the deck it was built from; a value
          borrowed by that deck is not in it and carries no tag from it. */
       item.tags = tag ? [tag] : [];
@@ -5753,9 +5918,9 @@ export async function pullCourses(
     /* And only the parts a deck holds, filed under that deck: numbers
        arrive the way every other card does — see fileIntoDecks. A deck in
        another language holds none of this system's. */
-    const holding = decksForSystem(decks, set.numbers.languageId, set.numbers.id)
-      .map((d: Deck) => ({ id: d.id, title: String(d.title || ""), parts: d.parts || [] }));
-    const filed = fileIntoDecks(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
+    const holding = modulesForSystem(modules, set.numbers.languageId, set.numbers.id)
+      .map((d: Module) => ({ id: d.id, title: String(d.title || ""), parts: d.parts || [] }));
+    const filed = fileIntoModules(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
     for (const item of filed) {
       if (at.has(item.id)) continue;
       at.set(item.id, item);
@@ -5766,7 +5931,7 @@ export async function pullCourses(
   const folded = foldCourses(items, incoming, parked);
   return {
     ...folded,
-    decks,
+    decks: modules,
     courses: enrolled,
     systems,
     /* The same fold again, against whatever the cards are by the time the
@@ -6396,8 +6561,8 @@ export function PickSheet({ title, lede, className = "", onClose, children }: {
  * line long and belongs near the top, beside what kind of card this is:
  * both are facts about the card rather than about its words.
  */
-/* What DeckSwitch says, where it is not putting a card in decks. */
-export interface DeckWords {
+/* What ModuleSwitch says, where it is not putting a card in decks. */
+export interface ModuleWords {
   /** The button while nothing is chosen. */
   first: string;
   /** The way off a chosen deck's pill, for a screen reader. */
@@ -6412,11 +6577,11 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving, onAdd, disabled = false }: {
+export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = moduleSize, saving, onAdd, disabled = false }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
-  decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
+  modules: Pick<Module, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];
   onToggle: (id: string, wasOn: boolean) => void;
   /** Where a pill's name opens what it names — a course's decks do. */
@@ -6428,7 +6593,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
       them — Set a goal picks the decks it aims at, and "Add this card to a
       deck" would be the wrong sentence there. Each one left out is the
       card's. */
-  words?: Partial<DeckWords>;
+  words?: Partial<ModuleWords>;
   /** The sheet's title, where what is picked from it is not decks — the
       Build a session screen picks single cards with the same pills. */
   title?: string;
@@ -6437,13 +6602,13 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   find?: { placeholder: string; match: (id: string, q: string) => boolean };
   /** The small line under each row's name, or nothing. A deck says how
       big it is; a single card has nothing to add. */
-  size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
+  size?: ((d: Pick<Module, "cardCount">) => Node) | null;
   /** Decks whose change is still being saved, and which way. Such a row
       says "Adding…" or "Removing…" and cannot be tapped until it is done,
       where a save takes long enough for a teacher to wonder. */
   saving?: Record<string, "add" | "drop">;
   /** Where the decks are chosen somewhere else than this sheet — a card's
-      editor opens DeckPickScreen, the screen selected cards are put in
+      editor opens ModulePickScreen, the screen selected cards are put in
       decks from, so a deck can be made on the way (0.594). Given, the add
       button calls it, and is there even with no decks yet: making the
       first one is what that screen is for. */
@@ -6457,17 +6622,17 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   const [q, setQ] = useState("");
   const pending = saving || {};
 
-  const all = decks || [];
+  const all = modules || [];
   const wanted = q.trim().toLowerCase();
   const listed = find && wanted ? all.filter((d) => find.match(d.id, wanted)) : all;
   const inThese = all.filter((d) => chosen.includes(d.id));
-  const say: DeckWords = {
-    first: `Add this ${of} to a deck`,
+  const say: ModuleWords = {
+    first: `Add this ${of} to a module`,
     drop: (title) => `Take this ${of} out of ${title}`,
-    lede: `Choose the decks this ${of} belongs to.`,
-    note: `A student sees this ${of} only where it is in a deck their course uses.`,
-    none: `You have no decks yet. Make one under Decks, then this ${of} can go in it.`,
-    another: "Another deck",
+    lede: `Choose the modules this ${of} belongs to.`,
+    note: `A student sees this ${of} only where it is in a module their course uses.`,
+    none: `You have no modules yet. Make one under Modules, then this ${of} can go in it.`,
+    another: "Another module",
     ...words,
   };
 
@@ -6612,9 +6777,9 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
  * and the name box closes; nothing, and it stays open with the name in it.
  * Left out — taking cards out of decks — there is no New deck.
  */
-export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no decks yet." }: {
+export function ModulePickScreen({ title, modules, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no modules yet." }: {
   title: Node;
-  decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
+  modules: Pick<Module, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];
   onToggle: (id: string, wasOn: boolean) => void;
   onCreate?: (title: string) => Promise<unknown>;
@@ -6688,7 +6853,7 @@ export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHi
         ))}
 
       <CheckList
-        options={decks.map((d) => ({
+        options={modules.map((d) => ({
           id: d.id,
           title: d.title,
           /* A locked deck is shown, and cannot be ticked: its cards stay
@@ -6698,10 +6863,10 @@ export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHi
               <span className="at-lockmark" title="Locked" aria-label="Locked" role="img">
                 <Icon name="lock" size={12} />{" "}
               </span>
-              {deckSize(d)}
+              {moduleSize(d)}
             </>
           ) : (
-            deckSize(d)
+            moduleSize(d)
           ),
           disabled: !!d.locked,
         }))}

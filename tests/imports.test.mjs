@@ -15,13 +15,13 @@ import {
 const card = (id, ar, en, over = {}) => ({ id, lang: "ar-PS", forms: [{ ar, en, lat: "" }], ...over });
 const hash = (/** @type {number} */ n) => String(n).padStart(64, "0");
 
-/** @param {any[]} cards @param {any[]} [decks] @param {Record<string, string>} [more] */
-const fileOf = (cards, decks = [], more = {}) => ({
+/** @param {any[]} cards @param {any[]} [modules] @param {Record<string, string>} [more] */
+const fileOf = (cards, modules = [], more = {}) => ({
   format: "language-app-backup",
   manifest: { version: 1 },
   records: Object.fromEntries([
     ...cards.map((c) => [`card:${c.id}`, c]),
-    ...decks.map((d) => [`deck:${d.id}`, d]),
+    ...modules.map((d) => [`deck:${d.id}`, d]),
     ...Object.entries(more),
   ]),
 });
@@ -52,12 +52,12 @@ test("a word in another language is not the same word", () => {
 });
 
 test("a deck you have is added to, by id or by its name in its language", () => {
-  const decks = [
+  const modules = [
     { id: "d1", title: "Kitchen", lang: "ar-PS", cardIds: ["k1"] },
     { id: "d2", title: " home ", lang: "ar-PS", cardIds: [] },
     { id: "d3", title: "Home", lang: "vi", cardIds: [] },
   ];
-  const file = /** @type {any} */ (readImportFile(fileOf([card("k1", "طنجرة", "pot")], decks)));
+  const file = /** @type {any} */ (readImportFile(fileOf([card("k1", "طنجرة", "pot")], modules)));
   const mine = /** @type {any[]} */ ([
     { id: "d1", title: "Renamed", lang: "ar-PS" },
     { id: "x", title: "Home", lang: "ar-PS" },

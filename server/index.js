@@ -14,7 +14,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import courses from "./api/courses.js";
+import courses, { retireMySpace } from "./api/courses.js";
 import sync from "./api/sync.js";
 import { dataRoot, dataRootFrom, dataRootDurable } from "./store.js";
 import { renameStoredLangs } from "./rename-langs.js";
@@ -328,11 +328,30 @@ export async function migrateOnStart({ migrate = renameStoredLangs } = {}) {
   }
 }
 
+/**
+ * Deleting what is left in My space (0.719), which must never keep the
+ * site down either: a failure is logged, and it runs again at the next
+ * start.
+ * @param {{ retire?: () => Promise<number> }} [opts]
+ * @returns {Promise<boolean>} whether it ran without throwing
+ */
+export async function retireOnStart({ retire = retireMySpace } = {}) {
+  try {
+    const gone = await retire();
+    if (gone) console.log(`deleted ${gone} My space cards and decks`);
+    return true;
+  } catch (err) {
+    console.error("My space clean-up failed; serving anyway:", err);
+    return false;
+  }
+}
+
 /* Started directly rather than imported by a test. */
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   /* Before anything is served, so no request reads a language by an id the
      app no longer knows. */
   await migrateOnStart();
+  await retireOnStart();
   const server = createApp();
   closeOn(server);
   server.listen(PORT, () => {

@@ -78,8 +78,30 @@ export type Where = "card" | "form" | "line" | "answer";
  * everything that is about the word itself, which is what a student is
  * looking at when they open a card between sessions. Nothing is a
  * student's alone — there is no fact about a card its teacher may not see.
+ * `student` (0.704) is `both` without the parts written for teachers: what
+ * kind of card it is, the line saying what a student is asked, and the
+ * reference rows never asked in an exercise. It is the student's card page.
  */
-export type Reader = "teacher" | "both";
+export type Reader = "teacher" | "both" | "student";
+
+/** "Made by Tala Teacher · last changed by Rana Khoury, Nov 26" (0.711).
+    A person is "you" when they are `me`, else their name, else their
+    handle. No owner, no first part; no date, no second. */
+export function madeLine(
+  r: { owner?: string; ownerName?: string; editedBy?: string; editedByName?: string; updated?: number },
+  me: string,
+  day: (t: number) => string,
+): string {
+  const who = (handle: string, name?: string) => (handle === me ? "you" : name || handle);
+  const parts: string[] = [];
+  if (r.owner) parts.push(`Made by ${who(r.owner, r.ownerName)}`);
+  if (r.updated) {
+    parts.push(r.editedBy
+      ? `last changed by ${who(r.editedBy, r.editedByName)}, ${day(r.updated)}`
+      : `last changed ${day(r.updated)}`);
+  }
+  return parts.join(" · ");
+}
 
 export interface FactCtx {
   lang: Lang;
@@ -152,7 +174,7 @@ export const ASKED = "Asked on its own";
 export const NOT_ASKED = "Not asked on its own";
 export const LENT = "Lent to sentences";
 export const NOT_LENT = "Not lent to sentences";
-export const IN_NO_DECK = "In no deck";
+export const IN_NO_MODULE = "In no module";
 export const A_SENTENCE = "A sentence — other cards fill its blanks";
 export const NOT_DRILLED = "Not on its own — it fills other cards";
 /* The words the read-out has always used for a scene whose part nobody
@@ -623,13 +645,13 @@ export const lexicalLabel = (lang: Lang | null | undefined, key: string): string
    The list itself
    ------------------------------------------------------------------ */
 
-const deckTitles = (value: unknown, ctx: FactCtx): string[] => {
+const moduleTitles = (value: unknown, ctx: FactCtx): string[] => {
   const ids = Array.isArray(value) ? value : [];
   const titles = ids
     .map((id) => (ctx.decks || []).find((d) => d.id === str(id)))
     .map((d) => str(d && d.title))
     .filter(Boolean);
-  return titles.length ? titles : ids.length ? [] : [IN_NO_DECK];
+  return titles.length ? titles : ids.length ? [] : [IN_NO_MODULE];
 };
 
 /**
@@ -875,10 +897,10 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "decks",
     on: "card",
-    label: "Decks",
-    what: "Which decks carry the card. A card is seen through its decks, and one in no deck reaches nobody — which is the teacher's problem to fix and so their line to read.",
+    label: "Modules",
+    what: "Which modules carry the card. A card is seen through its modules, and one in no module reaches nobody — which is the teacher's problem to fix and so their line to read.",
     reader: "teacher",
-    shown: deckTitles,
+    shown: moduleTitles,
   },
   {
     key: "lang",
@@ -1227,6 +1249,9 @@ export const NOT_SHOWN: [string, string][] = [
   ["card.rev", "Which revision of the card this is. A fact about syncing, not about the word."],
   ["card.created", "When the card was made. Shown beside it in the card list, where a date belongs."],
   ["card.updated", "And when it was last saved — the same."],
+  ["card.editedBy", "Who last changed it (0.711): said in the line under the editor's first heading, not in the readout."],
+  ["card.ownerName", "The owner's name, sent with a teacher's list for that same line (0.711); never stored."],
+  ["card.editedByName", "The name of whoever last changed it, for that same line (0.711); never stored."],
   ["card.inDecks", "Which decks the server says carry it, which is what `decks` says in words."],
   ["card.org", "Which space it belongs to (0.542): where it lives, not something about the card a reader needs."],
   ["card.personal", "Made in its owner's My space (0.545): who may see it, which the screen it is on already says."],

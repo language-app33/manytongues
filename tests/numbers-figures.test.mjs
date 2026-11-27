@@ -22,7 +22,7 @@ import { must, buildOnce } from "./helpers.mjs";
 const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { cardStandings, installIndexes, laddered, marksForAnswer, ownFigures } = await import(path.join(built, "ArabicTrainer.js"));
-const { generate, fileIntoDecks, componentId, isRangeSkill } = await import(
+const { generate, fileIntoModules, componentId, isRangeSkill } = await import(
   path.join(here, "..", "src", "numbers", "generate.ts")
 );
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
@@ -43,7 +43,7 @@ const settings = { language: "ar-PS" };
 const AR = LANGUAGES["ar-PS"];
 
 const generated = generate({ ...SET, now: 1750000000000, numerals: AR.numerals });
-const filed = fileIntoDecks(generated.items, SET, [
+const filed = fileIntoModules(generated.items, SET, [
   { title: "Numbers", parts: generated.items.filter(isRangeSkill).map((/** @type {any} */ it) => it.range.id) },
 ]);
 const byId = (/** @type {string} */ id) => must(filed.find((/** @type {any} */ it) => it.id === id), id);

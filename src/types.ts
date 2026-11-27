@@ -835,7 +835,7 @@ export interface User {
    * The space (org) this account belongs to (0.542). Stored as its id;
    * whoami answers with the space's card. Absent on older accounts: Main.
    */
-  org?: string | { id: string; slug: string; name: string; logo: string; colour: string };
+  org?: string | { id: string; slug: string; name: string; logo: string; colour: string; sets?: boolean };
   /** Whether this account runs its space (0.544). Worked out by whoami, never stored. */
   orgAdmin?: boolean;
   /**
@@ -1069,6 +1069,12 @@ export type Card = {
   personal?: boolean;
   id: string;
   owner?: string;
+  /** Who last changed it (0.711): stamped by the server; absent on anything not changed since. */
+  editedBy?: string;
+  /** Its owner's display name, sent with a teacher's lists (0.711); never stored. */
+  ownerName?: string;
+  /** `editedBy`'s display name, sent with a teacher's lists (0.711); never stored. */
+  editedByName?: string;
   lang: LangId;
   /** The card's own word first, then the alternates it carries. */
   forms: CardForm[];
@@ -1268,20 +1274,26 @@ export type Card = {
 export type CardStatus = "draft" | "review" | "published";
 
 /** Where a deck sits in a course, and since when. */
-export interface DeckLink {
+export interface ModuleLink {
   courseId: string;
   addedAt?: Millis;
 }
 
-export interface Deck {
+export interface Module {
   id: string;
   owner: string;
+  /** Who last changed it (0.711): stamped by the server; absent on anything not changed since. */
+  editedBy?: string;
+  /** Its owner's display name, sent with a teacher's lists (0.711); never stored. */
+  ownerName?: string;
+  /** `editedBy`'s display name, sent with a teacher's lists (0.711); never stored. */
+  editedByName?: string;
   title: string;
   description?: string;
   lang: LangId;
   /** Moves whenever the deck's cards change. */
   version?: number;
-  courses: DeckLink[];
+  courses: ModuleLink[];
   cardIds?: string[];
   cardCount?: number;
   updated?: Millis;
@@ -1362,6 +1374,8 @@ export interface Course {
   pathLive?: Record<string, Millis>;
   /** The ids of the path units a teacher has opened early for this course's class. */
   opened?: string[];
+  /** Display names of its teachers and students by handle (0.707): sent to its teachers only, never stored. */
+  people?: Record<string, string>;
 }
 
 /**
@@ -1373,7 +1387,7 @@ export interface AdminOverview {
     studying: { title: string; language?: LangId }[];
   })[];
   courses: Course[];
-  decks: (Deck & { cardCount: number; ownerName: string; courseTitles: string[] })[];
+  decks: (Module & { cardCount: number; ownerName: string; courseTitles: string[] })[];
   flags: Flag[];
   /** Who has left the space this overview is of (0.544). */
   former?: FormerMember[];

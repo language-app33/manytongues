@@ -22,7 +22,7 @@ const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "language
 const { sentenceWords, wordCount, longSentenceOf, LONG_SENTENCE } = await import(path.join(here, "..", "src", "sentence-words.ts"));
 
 const settings = { language: "ar-PS" };
-const anyDeck = () => true;
+const anyModule = () => true;
 
 /** A state answered right twice running: cleared, at whatever it asks. */
 const solidState = () => ({
@@ -49,7 +49,7 @@ const text = (over = {}, linesS = () => ({})) => ({
 test("a new text is asked about its sentences, each met before its first question", () => {
   const items = [text()];
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: anyDeck });
+  const got = buildSession({ items, settings, inModule: anyModule });
   const asked = got.exercises.filter((/** @type {any} */ e) => e.id === "T");
   assert.ok(asked.length > 0, "the text is dealt");
   assert.ok(asked.every((/** @type {any} */ e) => e.subId && e.subId !== "T"), "every question is about a sentence");
@@ -130,7 +130,7 @@ test("a sentence is not met until most of its words are known", () => {
      with no card behind any of its words. */
   const lines = [["أنا ساكن بالبيت", "I live in the house"], ["مش عارف شو بدي", "I don't know what I want"]];
   /** @param {boolean[]} known @param {Record<string, any>} [over] */
-  const deck = (known, over = {}) => [
+  const module = (known, over = {}) => [
     text({
       lines: lines.map(([ar, en], i) => ({ id: `t${i}`, who: 0, ar, en, lat: "", recs: [], uses: [], s: {} })),
       ...over,
@@ -143,14 +143,14 @@ test("a sentence is not met until most of its words are known", () => {
     installIndexes(items, settings);
     return quietUnits(items, settings);
   };
-  assert.ok(quiet(deck([false, false, false])).has("t0"), "none of its words known: it waits");
-  assert.ok(!quiet(deck([false, false, false])).has("t1"), "a sentence of words nobody teaches does not wait for ever");
-  assert.ok(quiet(deck([true, true, false])).has("t0"), "two of three is not enough: three or fewer wants every one");
-  assert.ok(!quiet(deck([true, true, true])).has("t0"), "every word known: it is met");
+  assert.ok(quiet(module([false, false, false])).has("t0"), "none of its words known: it waits");
+  assert.ok(!quiet(module([false, false, false])).has("t1"), "a sentence of words nobody teaches does not wait for ever");
+  assert.ok(quiet(module([true, true, false])).has("t0"), "two of three is not enough: three or fewer wants every one");
+  assert.ok(!quiet(module([true, true, true])).has("t0"), "every word known: it is met");
 
   /* A sentence asked in its own right waits too (0.443), keeping its
      record for when its words are known. */
-  const asked = deck([false, false, false]);
+  const asked = module([false, false, false]);
   asked[0].lines[0].s = { sen2en: { ...solidState(), hist: [0], right: 0, wrong: 1, phase: "learning" } };
   assert.ok(quiet(asked).has("t0"), "a sentence already asked waits on words it holds that are not known");
   asked.splice(1, 3, word("w1", "أنا", "I", true), word("w2", "ساكن", "living", true), word("w3", "بيت", "house", true));
@@ -160,7 +160,7 @@ test("a sentence is not met until most of its words are known", () => {
   /* A text begun before sentences were asked on their own is held like
      any other (0.437): its read-through, and the progress it handed down,
      are the text's and not the sentence's. */
-  const begun = deck([false, false, false], {
+  const begun = module([false, false, false], {
     forms: [{ id: "T", ar: "", en: "At home", lat: "", lang: "ar-PS", s: { dlgwhole: solidState(), sen2en: solidState() } }],
   });
   const handed = carryToSentences(begun[0]);
@@ -202,7 +202,7 @@ test("every question about a sentence is asked of the whole sentence", () => {
     lat: "", recs: [], uses: [], s: {},
   }] })];
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: anyDeck });
+  const got = buildSession({ items, settings, inModule: anyModule });
   const about = got.exercises.filter((/** @type {any} */ e) => /^(sen2en|en2sen)/.test(e.type));
   assert.ok(about.length > 0, "the sentence is asked about");
   for (const e of about) {
@@ -220,7 +220,7 @@ test("every question about a sentence is asked of the whole sentence", () => {
 test("a question with nothing to choose between gives way to a backup", () => {
   const items = [text()];
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: anyDeck });
+  const got = buildSession({ items, settings, inModule: anyModule });
   const queue = got.exercises;
   const at = queue.findIndex((/** @type {any} */ e) => e.type === "sen2en");
   assert.ok(at >= 0);

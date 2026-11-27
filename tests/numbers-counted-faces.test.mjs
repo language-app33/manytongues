@@ -199,7 +199,7 @@ const faceQuestions = (/** @type {any[]} */ items, /** @type {number} */ rounds)
   installIndexes(items, settings, SETS);
   const found = [];
   for (let i = 0; i < rounds; i += 1) {
-    const { exercises } = buildSession({ items, settings, inDeck: () => true, systems: SETS, includeAll: true, budget: 80 });
+    const { exercises } = buildSession({ items, settings, inModule: () => true, systems: SETS, includeAll: true, budget: 80 });
     for (const ex of exercises) {
       const card = items.find((it) => it.id === ex.id);
       const unit = card && ex.subId && card.forms.find((/** @type {any} */ f) => f.id === ex.subId);

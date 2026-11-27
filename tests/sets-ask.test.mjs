@@ -31,16 +31,16 @@ const st = (/** @type {number} */ right, extra = {}) => ({
   skips: 0, near: 0, hints: 0, hist: Array(right).fill(1), updated: NOW - 1000, ...extra,
 });
 
-/** @param {string} deck @param {string} id @param {Record<string, any>} form */
-const card = (deck, id, form, s = {}) => ({
-  id: `srv${id}`, tags: [deck], created: 1, updated: 1, lang: "ar-PS", kind: "word",
-  source: { courseId: "c1", deckId: deck, cardId: id, rev: 1 },
+/** @param {string} module @param {string} id @param {Record<string, any>} form */
+const card = (module, id, form, s = {}) => ({
+  id: `srv${id}`, tags: [module], created: 1, updated: 1, lang: "ar-PS", kind: "word",
+  source: { courseId: "c1", deckId: module, cardId: id, rev: 1 },
   forms: [{ id: `srv${id}`, lat: "", lang: "ar-PS", s, ...form }],
 });
 const picture = (/** @type {string} */ id, /** @type {string} */ ar, /** @type {string[]} */ images, s = {}, extra = {}) =>
   card("dFam", id, { ar, en: "", images, ...extra }, s);
-const word = (/** @type {string} */ deck, /** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ en, extra = {}) =>
-  card(deck, id, { ar, en, ...extra });
+const word = (/** @type {string} */ module, /** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ en, extra = {}) =>
+  card(module, id, { ar, en, ...extra });
 
 const answer = (/** @type {any} */ a) => ({ [S.SET_KEY]: { updated: NOW - 5000, list: "dHanoi", ...a } });
 
@@ -68,7 +68,7 @@ function pictures(/** @type {Record<string, any>} */ answers = {}, /** @type {Re
   ];
 }
 const SET = { ...S.emptySet(), lists: ["dHanoi", "dSaigon"], named: ["w1", "w2", "w4", "s1", "s2", "s4"] };
-const decks = (set = SET) => [
+const modules = (set = SET) => [
   { id: "dFam", title: "Our family", lang: "ar-PS", cardIds: ["Lan", "Minh", "Hoa", "Tuan"], set },
   { id: "dHanoi", title: "Hanoi", lang: "ar-PS", cardIds: HANOI.map((w) => w.source.cardId) },
   { id: "dSaigon", title: "Saigon", lang: "ar-PS", cardIds: SAIGON.map((w) => w.source.cardId) },
@@ -83,7 +83,7 @@ const ALL_ANSWERED = {
 /** Installs the indexes over these items and decks, and hands them back. */
 function install(/** @type {any[]} */ pics, set = SET) {
   const items = [...pics, ...HANOI, ...SAIGON];
-  const d = decks(set);
+  const d = modules(set);
   const sets = T.setViewsOf(items, d);
   T.installIndexes(items, settings, [], { courses: [{ id: "c1", decks: d.map((x) => x.id) }], decks: d }, sets);
   return items;
@@ -168,7 +168,7 @@ test("with two lists and none chosen, no word held only by a list is in play; wi
   assert.ok(HANOI.every((w) => !T.setHolds(items.find((it) => it.id === w.id))));
   assert.ok(SAIGON.every((w) => T.setHolds(items.find((it) => it.id === w.id))));
   const held = items.filter((it) => !T.setHolds(it));
-  const built = T.buildSession({ items: held, settings, inDeck: () => true, practice: true, includeAll: true });
+  const built = T.buildSession({ items: held, settings, inModule: () => true, practice: true, includeAll: true });
   assert.ok(!(built.exercises || []).some((/** @type {any} */ e) => SAIGON.some((w) => w.id === e.id)), "and a session asks none of Saigon's");
 });
 

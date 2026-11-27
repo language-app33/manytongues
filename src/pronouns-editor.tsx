@@ -39,7 +39,7 @@ import { verbOf } from "./languages.ts";
 import { personsOf, picksOf } from "./verbs.ts";
 import { formsOf } from "./cards.ts";
 import { beReadings } from "./variables.ts";
-import { Button, DeckSwitch, Field, Help, Notice, Screen, plural, useReach } from "./shared.tsx";
+import { Button, ModuleSwitch, Field, Help, Notice, Screen, plural, useReach } from "./shared.tsx";
 import { RecordingScreen, ScriptInput } from "./card-editor.tsx";
 import * as API from "./courses-api.ts";
 
@@ -102,17 +102,17 @@ export const pronounCardFor = (cards: Card[], langId: string, person: string): C
 export const hasPronouns = (lang: Lang | null | undefined): boolean =>
   personsOf(verbOf(lang)).length > 1;
 
-export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDeck }: {
+export function PronounsEditor({ lang, cards, busy, onSave, onClose, modules, onModule }: {
   lang: Lang;
   /** The teacher's cards, which is where the pronouns already written are. */
   cards: Card[];
   busy?: boolean;
   /** The decks in this language, which the set can be put in from here. */
-  decks?: { id: string; title: string; locked?: boolean; cardCount?: number }[];
+  modules?: { id: string; title: string; locked?: boolean; cardCount?: number }[];
   /** Put the whole set into a deck, or take it out; saved straight away. */
-  onDeck?: (deckId: string, on: boolean) => void;
+  onModule?: (moduleId: string, on: boolean) => void;
   /** Save one card; resolves when the server has it (or it is kept for later). */
-  onSave: (card: Partial<Card>, decks: string[]) => Promise<unknown>;
+  onSave: (card: Partial<Card>, modules: string[]) => Promise<unknown>;
   onClose: () => void;
 }) {
   const persons = useMemo(() => personsOf(verbOf(lang)), [lang]);
@@ -129,7 +129,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
   const reach = useReach();
   const saveRef = useRef<() => Promise<void>>(async () => {});
   /* The decks the set is in: any that holds a pronoun of it. */
-  const setDecks = useMemo(
+  const setModules = useMemo(
     () => [...new Set(Object.values(held).flatMap((c) => (c && Array.isArray((c as any).decks) ? (c as any).decks as string[] : [])))],
     [held],
   );
@@ -193,7 +193,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
               ...picks,
             }],
           } as Partial<Card>,
-          card && Array.isArray((card as any).decks) ? (card as any).decks : setDecks,
+          card && Array.isArray((card as any).decks) ? (card as any).decks : setModules,
         );
       }
       reach.ok();
@@ -231,7 +231,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
     >
       <Help>
         The words for I, you, he and the rest, written once for {lang.name}. Each becomes a card
-        that can be practised and put in decks, and a sentence with a {"{{pronoun}}"} blank puts
+        that can be practised and put in modules, and a sentence with a {"{{pronoun}}"} blank puts
         its verb in the form that goes with the pronoun it is filled with.
       </Help>
       <Help>
@@ -241,17 +241,17 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
         are filled in for you; change them only if you want other words.
       </Help>
       <Notice kind="error">{error}</Notice>
-      {decks && onDeck ? (
-        <Field label="Decks" lede="The decks this set is in. A pronoun written later goes into them too.">
+      {modules && onModule ? (
+        <Field label="Modules" lede="The modules this set is in. A pronoun written later goes into them too.">
           {Object.values(held).some(Boolean) ? (
-            <DeckSwitch
-              decks={decks}
-              chosen={setDecks}
+            <ModuleSwitch
+              modules={modules}
+              chosen={setModules}
               of="word set"
-              onToggle={(id, wasOn) => onDeck(id, !wasOn)}
+              onToggle={(id, wasOn) => onModule(id, !wasOn)}
             />
           ) : (
-            <Help>Write and save a pronoun first, then the set can go in a deck.</Help>
+            <Help>Write and save a pronoun first, then the set can go in a module.</Help>
           )}
         </Field>
       ) : null}

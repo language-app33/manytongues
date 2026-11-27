@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, useContext, useId } from "react";
 import type { OnboardingPlace } from "./spaces.tsx";
 import type {
-  Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
+  Course, DayMoves, Module, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
   Lang, LangId, Millis, Question, SavedSession, Settings, User,
  VerbSpec, } from "./types.ts";
 import type { CardViews, Node } from "./shared.tsx";
@@ -17,7 +17,7 @@ import {
   cardKindLabel,
   cardSubtypeLabel,
   cardWords,
-  DeckSwitch,
+  ModuleSwitch,
   ChoiceSwitch,
   CheckList,
   usePicture,
@@ -41,13 +41,14 @@ import {
   Screen,
   Section,
   Segmented,
-  fromDeck,
+  fromModule,
   serverCardId,
   localIdFor,
   SnackbarProvider,
   DockContext,
   PlaceContext,
   PickSheet,
+  SheetAction,
   Stat,
   StickyFoot,
   Tabs,
@@ -121,8 +122,10 @@ type SpaceName = {
   [K in keyof SpacesModule]: SpacesModule[K] extends React.ComponentType<any> ? K : never;
 }[keyof SpacesModule];
 
-const fromSpaces = (name: SpaceName): React.ComponentType<any> =>
-  React.lazy(() =>
+/* Typed by the component it loads, so a prop renamed on one side and not
+   the other fails the type check rather than the screen (0.694). */
+const fromSpaces = <K extends SpaceName>(name: K) =>
+  React.lazy<SpacesModule[K]>(() =>
     import("./spaces.tsx")
       .then((m) => {
         try {
@@ -132,7 +135,7 @@ const fromSpaces = (name: SpaceName): React.ComponentType<any> =>
         }
         return { default: m[name] };
       })
-      .catch(recoverChunk)
+      .catch(recoverChunk) as Promise<{ default: SpacesModule[K] }>
   );
 const Onboarding = fromSpaces("Onboarding");
 const AdminSpace = fromSpaces("AdminSpace");
@@ -371,7 +374,7 @@ import { allowedTypes, englishShown, readPractice } from "./course-practice.ts";
 import { allMapped, counts, ofSkill, skillOf, WORD_SKILL_MAP } from "./word-skills.ts";
 import type { Skill } from "./word-skills.ts";
 import type { CoursePractice } from "./course-practice.ts";
-import type { PathCourse, PathDeck, PathRow } from "./path.ts";
+import type { PathCourse, PathModule, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
@@ -1034,14 +1037,13 @@ const LEVEL_REACHED: Record<number, string> = {
  * than the badge, and brass rather than jade: the work is done and the app
  * is still checking.
  */
-const LADDER_TILES: { key: string; label: string; icon: string }[] = [
-  { key: "all", label: "All cards", icon: "cards" },
-  { key: "l1", label: LEVEL_NAME[1], icon: "help" },
-  { key: "l2", label: LEVEL_NAME[2], icon: "search" },
-  { key: "l3", label: LEVEL_NAME[3], icon: "copy" },
-  { key: "l4", label: LEVEL_NAME[4], icon: "edit" },
-  { key: "cleared", label: "Cleared", icon: "check" },
-  { key: "done", label: "Learnt", icon: "verify" },
+/* Three groups since 0.705, in place of seven tiles: the four levels
+   together as Learning, then Cleared as "Almost there", then Learnt. The
+   levels are still on each card's own page. */
+const LADDER_TILES: { key: string; label: string; note: string; icon: string; tone: string; bar: string }[] = [
+  { key: "learning", label: "Learning", note: "You're still getting to know these.", icon: "help", tone: "var(--text)", bar: "at-sharebar-a" },
+  { key: "cleared", label: "Almost there", note: "Right at every level. A few more days and they're learnt.", icon: "check", tone: "var(--brass)", bar: "at-sharebar-b" },
+  { key: "done", label: "Learnt", note: "You still knew these days later.", icon: "verify", tone: "var(--jade)", bar: "at-sharebar-c" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -1157,13 +1159,14 @@ function standingShort(at: Standing | null): string {
 }
 
 /*
- * A learner's card list as lines or a table — see CardViews. The table is
+ * A learner's card list as a table — see CardViews. The table is
  * what a learner compares across their cards: what each says, what kind it
  * is, and how far they have got with it. `key` is which list, so each
  * remembers the view it was left at.
  */
 const STUDENT_COLUMNS = [
-  { key: "word", label: "Word" },
+  /* "Card", and cut after twenty characters, as a teacher's table (0.717). */
+  { key: "word", label: "Card" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
   { key: "subtype", label: "Subtype" },
@@ -1180,10 +1183,8 @@ function studentViews(
       const L = lang(it);
       const said = cardWords(it, L);
       return {
-        word: said.word,
-        meaning: said.meaning,
         cells: {
-          word: said.word,
+          word: said.short,
           meaning: said.en,
           kind: cardKindLabel(it),
           subtype: cardSubtypeLabel(it, L),
@@ -1876,7 +1877,7 @@ function tenseHeld(unit: Form | null | undefined): { card: Item; spec: VerbSpec;
 
 export interface PathIndex {
   /** Every downloaded deck each item is in, by item id. */
-  decksOfCard: Map<string, string[]>;
+  modulesOfCard: Map<string, string[]>;
   /** The downloaded decks that are path units. */
   unitIds: Set<string>;
   /** Each unit's items, by deck id: course cards and word-set items both. */
@@ -1892,7 +1893,7 @@ export interface PathIndex {
 }
 
 const NO_PATH: PathIndex = {
-  decksOfCard: new Map(),
+  modulesOfCard: new Map(),
   unitIds: new Set(),
   unitItemIds: new Map(),
   rows: new Map(),
@@ -1930,7 +1931,7 @@ export function everMet(
 }
 
 /** Every downloaded deck an item is in. */
-function decksOfItem(it: Item, byCard: Map<string, string[]>): string[] {
+function modulesOfItem(it: Item, byCard: Map<string, string[]>): string[] {
   const src = (it as { source?: Record<string, unknown> }).source;
   if (src && typeof src.cardId === "string") return byCard.get(src.cardId) || [];
   if (isFromSystem(it)) return Array.isArray(it.deckIds) ? it.deckIds : [];
@@ -1946,23 +1947,23 @@ function decksOfItem(it: Item, byCard: Map<string, string[]>): string[] {
 export function pathIndexOf(
   items: Item[],
   courses: PathCourse[] | null | undefined,
-  decks: (PathDeck & { title?: string })[] | null | undefined,
+  modules: (PathModule & { title?: string })[] | null | undefined,
   settings: Settings,
 ): PathIndex {
-  const units = (decks || []).filter(isPathUnit);
+  const units = (modules || []).filter(isPathUnit);
   if (!units.length) return NO_PATH;
   const unitIds = new Set(units.map((d) => d.id));
   const byCard: Map<string, string[]> = new Map();
-  for (const d of decks || []) {
+  for (const d of modules || []) {
     for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
   }
-  const decksOfCard: Map<string, string[]> = new Map();
+  const modulesOfCard: Map<string, string[]> = new Map();
   const unitItemIds: Map<string, string[]> = new Map(units.map((d) => [d.id, [] as string[]]));
   const byId: Map<string, Item> = new Map();
   for (const it of items) {
-    const ids = decksOfItem(it, byCard);
+    const ids = modulesOfItem(it, byCard);
     if (!ids.length) continue;
-    decksOfCard.set(it.id, ids);
+    modulesOfCard.set(it.id, ids);
     byId.set(it.id, it);
     for (const d of ids) if (unitIds.has(d)) (unitItemIds.get(d) as string[]).push(it.id);
   }
@@ -1979,14 +1980,14 @@ export function pathIndexOf(
     return ok;
   };
   const finished: Map<string, boolean> = new Map();
-  const finishedNow = (deckId: string) => {
-    const had = finished.get(deckId);
+  const finishedNow = (moduleId: string) => {
+    const had = finished.get(moduleId);
     if (had !== undefined) return had;
-    const ok = (unitItemIds.get(deckId) || [])
+    const ok = (unitItemIds.get(moduleId) || [])
       .map((id) => byId.get(id) as Item)
       .filter((it) => it && !isDialog(it))
       .every(isCleared);
-    finished.set(deckId, ok);
+    finished.set(moduleId, ok);
     return ok;
   };
   const stored = pathReachedOf(settings);
@@ -2000,7 +2001,7 @@ export function pathIndexOf(
     reached[course.id] = got.reached;
     for (const r of got.rows) if (r.state !== "locked") openUnits.add(r.id);
   }
-  return { decksOfCard, unitIds, unitItemIds, rows, openUnits, reached, finished };
+  return { modulesOfCard: modulesOfCard, unitIds, unitItemIds, rows, openUnits, reached, finished };
 }
 
 /* ------------------------------------------------------------------
@@ -2054,18 +2055,18 @@ export type HeldSet = SetView<SetPicture, SetWord>;
 
 export function setViewsOf(
   items: Item[],
-  decks: (Deck & { courseLanguage?: string })[] | null | undefined,
+  modules: (Module & { courseLanguage?: string })[] | null | undefined,
   langsOff: string[] = [],
 ): HeldSet[] {
-  const all = decks || [];
+  const all = modules || [];
   if (!all.some((d) => d && d.set)) return [];
   const byCard: Map<string, Item> = new Map();
   for (const it of items) {
     const src = (it as { source?: Record<string, unknown> }).source;
     if (src && typeof src.cardId === "string") byCard.set(src.cardId, it);
   }
-  const held: Map<string, Deck> = new Map(all.map((d) => [d.id, d]));
-  const cardsOf = (d: Deck) => (d.cardIds || []).map((id) => byCard.get(id)).filter((it): it is Item => !!it);
+  const held: Map<string, Module> = new Map(all.map((d) => [d.id, d]));
+  const cardsOf = (d: Module) => (d.cardIds || []).map((id) => byCard.get(id)).filter((it): it is Item => !!it);
   const out: HeldSet[] = [];
   for (const d of all) {
     const set = readSet(d.set, d.id);
@@ -2123,7 +2124,7 @@ export function setSetIndex(next: SetIndex | null | undefined) {
 
 export function setIndexOf(
   items: Item[],
-  decks: { id: string; cardIds?: string[] }[] | null | undefined,
+  modules: { id: string; cardIds?: string[] }[] | null | undefined,
   views: HeldSet[],
 ): SetIndex {
   if (!views.length) return NO_SETS;
@@ -2151,7 +2152,7 @@ export function setIndexOf(
   const out: Set<string> = new Set();
   for (const [id, e] of pictures) if (e.state === "none") out.add(id);
   const byCard: Map<string, string[]> = new Map();
-  for (const d of decks || []) for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
+  for (const d of modules || []) for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
   for (const it of items) {
     const src = (it as { source?: Record<string, unknown> }).source;
     if (!src || typeof src.cardId !== "string") continue;
@@ -2323,16 +2324,16 @@ export function setReportLine(itemId: string): string {
 export function pathHolds(it: Item, settings: Settings, pathUnit?: string | null): boolean {
   const idx = PATH_INDEX;
   if (!idx.unitIds.size || !(it as { source?: unknown }).source) return false;
-  const decks = idx.decksOfCard.get(it.id) || [];
-  if (pathUnit && decks.includes(pathUnit)) return false;
-  if (!cardHeld(decks, (d) => idx.unitIds.has(d), idx.openUnits)) return false;
+  const modules = idx.modulesOfCard.get(it.id) || [];
+  if (pathUnit && modules.includes(pathUnit)) return false;
+  if (!cardHeld(modules, (d) => idx.unitIds.has(d), idx.openUnits)) return false;
   return !everMet(it, settings);
 }
 
 /** A unit's items: the course cards in its `cardIds` and the word-set items
     filed under it. Every reader of a unit's items goes through here. */
-export function unitItems(deckId: string, items: Item[]): Item[] {
-  const ids = new Set(PATH_INDEX.unitItemIds.get(deckId) || []);
+export function unitItems(moduleId: string, items: Item[]): Item[] {
+  const ids = new Set(PATH_INDEX.unitItemIds.get(moduleId) || []);
   return ids.size ? items.filter((it) => ids.has(it.id)) : [];
 }
 
@@ -2354,9 +2355,9 @@ export const pathIndexNow = (): PathIndex => PATH_INDEX;
  * one back by the existing rule. The unit's text or conversation is left
  * as it was (A7).
  */
-export function clearPathUnit(items: Item[], settings: Settings, deckId: string): Item[] {
+export function clearPathUnit(items: Item[], settings: Settings, moduleId: string): Item[] {
   const ids = new Set(
-    unitItems(deckId, items).filter((it) => !isDialog(it) && isDrillable(it, settings)).map((it) => it.id),
+    unitItems(moduleId, items).filter((it) => !isDialog(it) && isDrillable(it, settings)).map((it) => it.id),
   );
   if (!ids.size) return items;
   const at = Date.now();
@@ -2426,10 +2427,10 @@ export interface UnitStages {
  * it has been up every level it has. When Words and Sentences are both
  * full, the unit is finished — the same reading as the path's.
  */
-export function unitStages(deckId: string, items: Item[], settings: Settings): UnitStages {
+export function unitStages(moduleId: string, items: Item[], settings: Settings): UnitStages {
   const out: UnitStages = { words: { done: 0, all: 0 }, sentences: { done: 0, all: 0 }, final: null, learnt: true };
   let any = false;
-  for (const it of unitItems(deckId, items)) {
+  for (const it of unitItems(moduleId, items)) {
     const at = towardsLearnt(it, settings, items);
     if (!at) continue;
     any = true;
@@ -2455,8 +2456,8 @@ export interface PathLine {
 }
 
 /** The paths of these courses, in their order, from the index. */
-export function pathLinesOf(courses: { id: string; title?: string }[], decks: { id: string; title?: string }[]): PathLine[] {
-  const titleOf = new Map(decks.map((d) => [d.id, String(d.title || "")]));
+export function pathLinesOf(courses: { id: string; title?: string }[], modules: { id: string; title?: string }[]): PathLine[] {
+  const titleOf = new Map(modules.map((d) => [d.id, String(d.title || "")]));
   const out: PathLine[] = [];
   for (const c of courses) {
     const rows = PATH_INDEX.rows.get(c.id);
@@ -3334,7 +3335,7 @@ export function installIndexes(
   items: Item[],
   settings: Settings,
   systems: SystemSet[] = [],
-  path: { courses?: PathCourse[]; decks?: PathDeck[] } = {},
+  path: { courses?: PathCourse[]; decks?: PathModule[] } = {},
   /* The personal sets held, as setViewsOf finds them (0.631). */
   sets: HeldSet[] = [],
 ): void {
@@ -5301,9 +5302,9 @@ export function setPracticeIndex(next: Map<string, (CoursePractice | null)[]>) {
     only for cards where at least one of those courses has any. */
 export function practiceIndexOf(
   courses: { id: string; decks?: string[]; practice?: unknown }[],
-  decks: { id: string; cardIds?: string[] }[],
+  modules: { id: string; cardIds?: string[] }[],
 ): Map<string, (CoursePractice | null)[]> {
-  const cardsOf = new Map(decks.map((d) => [d.id, d.cardIds || []]));
+  const cardsOf = new Map(modules.map((d) => [d.id, d.cardIds || []]));
   const by: Map<string, (CoursePractice | null)[]> = new Map();
   for (const c of courses || []) {
     const p = readPractice(c.practice);
@@ -6322,7 +6323,7 @@ function orderKindOf(it: Item | undefined, settings: Settings): string {
 export function buildSession({
   items,
   settings,
-  inDeck,
+  inModule: inModule,
   practice,
   includeAll,
   budget: budgetIn,
@@ -6334,7 +6335,7 @@ export function buildSession({
   items: Item[];
   settings: Settings;
   /** The pool: the cards this session may draw from. */
-  inDeck: (it: Item) => boolean;
+  inModule: (it: Item) => boolean;
   /**
    * A path unit whose new cards this session may bring in although the
    * learner has not reached it: "Practise this unit" on a unit the teacher
@@ -6371,7 +6372,7 @@ export function buildSession({
   const numbers = knownNumbers(items, settings, sets);
   const drillable = items
     /* And not held back by a course's path — see pathHolds. */
-    .filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings, pathUnit))
+    .filter((it) => inModule(it) && isDrillable(it, settings) && !pathHolds(it, settings, pathUnit))
     /* A skill whose system this device no longer holds — a course left,
        a teacher's language dropped — is a schedule with nothing behind
        it. Left in the collection, so the work comes back if the material
@@ -6623,7 +6624,7 @@ export function buildSession({
     items,
     settings
   );
-  const from = items.filter(inDeck).map((it) => it.id);
+  const from = items.filter(inModule).map((it) => it.id);
   return {
     exercises,
     backups: backupsFor(rows, exercises, settings, typesOf, onlyNumbers),
@@ -7085,7 +7086,7 @@ export function buildManualSession({ items, settings, ids, mode, count, minutes,
   /* Ultimate, and Catch up's "Everything due", have no length: everything. */
   const budget = count && count < 999 ? count : minutes ? minutes * TIMED_PER_MINUTE : mode === "ultimate" || mode === "catchup" ? undefined : SESSION_SIZE;
   const built = buildSession({
-    items, settings, inDeck: (it) => chosen.has(it.id), budget, perDay, systems, mode: mode as SessionMode,
+    items, settings, inModule: (it) => chosen.has(it.id), budget, perDay, systems, mode: mode as SessionMode,
   });
   return { ...built, manual: true, mode, learnt: [] as Item[] };
 }
@@ -7912,30 +7913,30 @@ export function isWeak(it: Item, settings: Settings): boolean {
 
 /* A sitting of what is going wrong: Weak spots, under the session mix
    like every other session — see SessionMode. */
-export function buildWeakSession({ items, settings, inDeck, budget, systems, perDay }: {
+export function buildWeakSession({ items, settings, inModule: inModule, budget, systems, perDay }: {
   items: Item[];
   settings: Settings;
-  inDeck: (it: Item) => boolean;
+  inModule: (it: Item) => boolean;
   budget?: number;
   systems?: SystemSet[];
   perDay?: number;
 }) {
   /* `manual`: not a dealt session. "Keep going" at the end starts another
      of these, not a dealt one — see Again (0.656). */
-  return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
+  return { ...buildSession({ items, settings, inModule: inModule, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
 /* Not seen lately over every card, from Focused training (0.671). Under
    the session mix like the rest — see SessionMode. */
-export function buildUnseenSession({ items, settings, inDeck, budget, systems, perDay }: {
+export function buildUnseenSession({ items, settings, inModule: inModule, budget, systems, perDay }: {
   items: Item[];
   settings: Settings;
-  inDeck: (it: Item) => boolean;
+  inModule: (it: Item) => boolean;
   budget?: number;
   systems?: SystemSet[];
   perDay?: number;
 }) {
-  return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "unseen" }), manual: true, mode: "unseen" };
+  return { ...buildSession({ items, settings, inModule: inModule, budget, systems, perDay, mode: "unseen" }), manual: true, mode: "unseen" };
 }
 
 /*
@@ -10905,7 +10906,7 @@ function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
  * three.
  */
 export function noCardsYet(courseCount: number) {
-  if (!courseCount) return "Join a course and the decks your teacher shares will appear here.";
+  if (!courseCount) return "Join a course and the modules your teacher shares will appear here.";
   const them = courseCount === 1 ? "it" : "them";
   return `You're in ${plural(courseCount, "course")}, but there are no cards in ${them} yet.`;
 }
@@ -11306,7 +11307,7 @@ const MATERIAL_KEY = "arabic-trainer:material" + TRIAL;
 
 interface HeldMaterial {
   courses: Course[];
-  decks: Deck[];
+  decks: Module[];
   /*
    * The teachers' numbers, kept with the courses and for the same reason.
    *
@@ -11343,7 +11344,7 @@ function loadMaterial(handle?: string | null): HeldMaterial | null {
 
 function saveMaterial(
   handle: string,
-  held: { courses: Course[]; decks: Deck[]; systems: unknown[]; version: string },
+  held: { courses: Course[]; decks: Module[]; systems: unknown[]; version: string },
 ) {
   try {
     localStorage.setItem(
@@ -11471,7 +11472,7 @@ export default function ArabicTrainer() {
      to toggle it was removed, and this was left reading as though it
      still worked — so it is always empty and every read below takes
      the unfiltered path. */
-  const [deck] = useState<any[]>([]);
+  const [module] = useState<any[]>([]);
   const [session, setSession] = useState<any | null>(null); // { exercises, practice, items }
   /* A newly deployed build has taken charge — see updates.ts. The page
      does not reload itself for it, since that would throw away whatever
@@ -11705,6 +11706,13 @@ export default function ArabicTrainer() {
     if (open === "teach") return "teach";
     return loadTeaches() ? "teach" : "learn";
   });
+  /* Whether the person has chosen where to be on this launch, and whether
+     the page was opened to a place (0.706). A teacher's first sign-in on a
+     device has no stored answer, so it opens in Learning; when the first
+     answer says they teach, it moves to Teaching — unless either of these
+     has already said where to be. */
+  const pickedSpace = useRef(false);
+  const openedTo = useRef(new URLSearchParams(window.location.search).has("open"));
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (!q.has("open")) return;
@@ -11832,14 +11840,14 @@ export default function ArabicTrainer() {
   const [coursesKnown, setCoursesKnown] = useState(!!heldMaterial);
   /* A deck the person asked to practice from the Courses tab, handed to the
      cards tab once it is on screen. */
-  const [deckWanted, setDeckWanted] = useState<string | null>(null);
+  const [moduleWanted, setModuleWanted] = useState<string | null>(null);
   /* The teachers' numbers, read back through the same narrowing the wire
      goes through — what was kept is a copy of what arrived, and an older
      build's copy is not this build's shape. */
   const [heldSystems, setSystems] = useState<SystemSet[]>(() =>
     pairSystems(heldMaterial ? heldMaterial.systems : []),
   );
-  const [courseDecks, setCourseDecks] = useState<Deck[]>(
+  const [courseModules, setCourseModules] = useState<Module[]>(
     heldMaterial ? heldMaterial.decks : [],
   );
   const [courseBusy, setCourseBusy] = useState(false);
@@ -12878,7 +12886,7 @@ export default function ArabicTrainer() {
    * has to be able to find the phrases that word turns up in.
    */
   const [preview, setPreview] = useState<Item[]>([]);
-  const [previewDecks, setPreviewDecks] = useState<Deck[]>([]);
+  const [previewModules, setPreviewModules] = useState<Module[]>([]);
   /* And where to put the teacher back down afterwards: the card they
      pressed the button on, and the screen they were looking at it from. */
   const [trialBack, setTrialBack] = useState<any>(null);
@@ -12904,7 +12912,7 @@ export default function ArabicTrainer() {
    * would rebuild every question built on them.
    */
   const countedKey = useMemo(
-    () => JSON.stringify(nounsByLanguage(heldSystems, items.filter((it) => !!fromDeck(it)) as unknown as Record<string, unknown>[])),
+    () => JSON.stringify(nounsByLanguage(heldSystems, items.filter((it) => !!fromModule(it)) as unknown as Record<string, unknown>[])),
     [heldSystems, items],
   );
   const systems = useMemo(() => setsGiven(heldSystems, JSON.parse(countedKey)), [heldSystems, countedKey]);
@@ -12930,7 +12938,7 @@ export default function ArabicTrainer() {
   /* And which courses each card came through, with their switches — what
      each form may be asked (0.627). First of the indexes, because the rest
      read what a form can be asked and this changes it. */
-  const practiceIndex = useMemo(() => practiceIndexOf(myCourses, courseDecks), [myCourses, courseDecks]);
+  const practiceIndex = useMemo(() => practiceIndexOf(myCourses, courseModules), [myCourses, courseModules]);
   setPracticeIndex(practiceIndex);
 
   /* And the same for where each word turns up. Rebuilt only when the cards
@@ -12977,8 +12985,8 @@ export default function ArabicTrainer() {
      Computes only: what it finds reached is remembered by the effect
      below, never from in here. */
   const pathIndex = useMemo(
-    () => pathIndexOf(items, myCourses as PathCourse[], courseDecks as PathDeck[], settings),
-    [items, myCourses, courseDecks, settings],
+    () => pathIndexOf(items, myCourses as PathCourse[], courseModules as PathModule[], settings),
+    [items, myCourses, courseModules, settings],
   );
   setPathIndex(pathIndex);
 
@@ -13167,9 +13175,9 @@ export default function ArabicTrainer() {
     return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
   }, [items]);
 
-  const inDeck = useCallback(
-    (it: Item) => deck.length === 0 || (it.tags || []).some((t) => deck.includes(t)),
-    [deck]
+  const inModule = useCallback(
+    (it: Item) => module.length === 0 || (it.tags || []).some((t) => module.includes(t)),
+    [module]
   );
 
   /* Everything this device could practise, before the language switch has
@@ -13180,9 +13188,9 @@ export default function ArabicTrainer() {
     /* Held back by a path exactly as buildSession holds them, so the count
        here and the session it promises cannot disagree. pathIndex is what
        pathHolds reads. */
-    () => items.filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings)),
+    () => items.filter((it) => inModule(it) && isDrillable(it, settings) && !pathHolds(it, settings)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, settings, inDeck, pathIndex]
+    [items, settings, inModule, pathIndex]
   );
 
   /*
@@ -13343,12 +13351,12 @@ export default function ArabicTrainer() {
   );
   const orgOfSystem = useMemo(() => {
     const m = new Map<string, string>();
-    for (const d of courseDecks as any[]) {
+    for (const d of courseModules as any[]) {
       const org = orgOfCourse.get(d.courseId) || "";
       for (const sid of [d.numbersSystemId, d.timeSystemId]) if (sid && org && !m.has(sid)) m.set(sid, org);
     }
     return m;
-  }, [courseDecks, orgOfCourse]);
+  }, [courseModules, orgOfCourse]);
   const spaceOfItem = useCallback(
     (it: Item): string | null => {
       const src: any = (it as any).source;
@@ -13365,16 +13373,16 @@ export default function ArabicTrainer() {
   const spaceNow = learnSpaces.length > 1 && learnSpaces.some((o) => o.id === spaceFilter) ? spaceFilter : "";
   /* The personal sets held, in the languages in play, and what is still
      to ask in them (0.630). */
-  const heldSets = useMemo(() => setViewsOf(items, courseDecks, langsOff), [items, courseDecks, langsOff]);
+  const heldSets = useMemo(() => setViewsOf(items, courseModules, langsOff), [items, courseModules, langsOff]);
   const setSteps = useMemo(() => stepsToAsk(heldSets), [heldSets]);
   /* And what they mean for practice: which items are pictures, how each
      is asked, and which are out of play (0.631). */
-  const setIndex = useMemo(() => setIndexOf(items, courseDecks, heldSets), [items, courseDecks, heldSets]);
+  const setIndex = useMemo(() => setIndexOf(items, courseModules, heldSets), [items, courseModules, heldSets]);
   /* A teacher trying a set's picture has no answers: a stand-in does, the
      first word of the first list for every picture (0.632). */
   const trialSets = useMemo(
-    () => (preview.length && previewDecks.length ? setIndexOf(preview, previewDecks, standInSets(setViewsOf(preview, previewDecks))) : null),
-    [preview, previewDecks],
+    () => (preview.length && previewModules.length ? setIndexOf(preview, previewModules, standInSets(setViewsOf(preview, previewModules))) : null),
+    [preview, previewModules],
   );
   setSetIndex(trialSets || setIndex);
   const inPlay = useCallback(
@@ -13415,24 +13423,24 @@ export default function ArabicTrainer() {
     () => (spaceNow ? myCourses.filter((c) => ((c as any).org || "") === spaceNow) : myCourses),
     [myCourses, spaceNow]
   );
-  const learnDecks = useMemo(
-    () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
-    [courseDecks, spaceNow, orgOfCourse]
+  const learnModules = useMemo(
+    () => (spaceNow ? courseModules.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseModules),
+    [courseModules, spaceNow, orgOfCourse]
   );
   /* Each course's path, for Home and Progress (0.617): the courses of the
      space and languages shown, in the order they are listed elsewhere. */
   const pathLines = useMemo(
-    () => pathLinesOf(learnCourses.filter((c) => !langsOff.includes(c.language)), courseDecks),
+    () => pathLinesOf(learnCourses.filter((c) => !langsOff.includes(c.language)), courseModules),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [learnCourses, langsOff, courseDecks, pathIndex],
+    [learnCourses, langsOff, courseModules, pathIndex],
   );
   /* The names of the downloaded units, which are on the path and not
      among the deck tiles or the decks a saved session or a prep picks. */
   const unitTitles = useMemo(
-    () => new Set(courseDecks.filter((d) => isPathUnit(d as PathDeck)).map((d) => String(d.title || ""))),
-    [courseDecks],
+    () => new Set(courseModules.filter((d) => isPathUnit(d as PathModule)).map((d) => String(d.title || ""))),
+    [courseModules],
   );
-  const deckTags = useMemo(() => allTags.filter((t) => !unitTitles.has(t)), [allTags, unitTitles]);
+  const moduleTags = useMemo(() => allTags.filter((t) => !unitTitles.has(t)), [allTags, unitTitles]);
 
   /* How much is waiting, in the languages that are switched on: the number
      on the home screen, and what decides whether there is a session to
@@ -13488,14 +13496,14 @@ export default function ArabicTrainer() {
   /* The decks a prep can be aimed at, for Prep mode: the deck tags, with
      how many cards of each can be asked (towardsLearnt, as Progress counts
      them). Only while the screen is open — it is a walk of every card. */
-  const prepDecks = useMemo(() => {
+  const prepModules = useMemo(() => {
     if (!prepOpen) return [];
     const counted = asCounted(shown).filter((it) => towardsLearnt(it, settings, shown));
-    return deckTags
+    return moduleTags
       .map((name) => ({ name, n: counted.filter((it) => (it.tags || []).includes(name)).length, learnt: 0 }))
       .filter((d) => d.n > 0)
       .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
-  }, [prepOpen, shown, settings, deckTags]);
+  }, [prepOpen, shown, settings, moduleTags]);
   /* And how much has not been met lately, for the Not seen lately button
      beside it (0.671) — the test its session picks with, as above. */
   const unseenCount = useMemo(
@@ -13529,15 +13537,15 @@ export default function ArabicTrainer() {
    * progress is written when it is answered, and leaving asks nothing,
    * because there is nothing to lose.
    */
-  function tryExercise({ items: material, exercise, back, decks: setDecks }: {
+  function tryExercise({ items: material, exercise, back, modules: setModules }: {
     items: Item[];
     exercise: Question;
     back?: any;
     /** The personal sets and their lists, where a teacher has any (0.632). */
-    decks?: Deck[];
+    modules?: Module[];
   }) {
     setPreview(material || []);
-    setPreviewDecks(setDecks || []);
+    setPreviewModules(setModules || []);
     /* Where the teacher was standing when they pressed it. The teaching
        space is unmounted while the question is up — it is a different
        screen, not a layer over this one — so getting back to the card
@@ -13713,11 +13721,11 @@ export default function ArabicTrainer() {
   function buildAgain(a: Again) {
     if (a.kind === "begin") {
       return buildSession({
-        items: shown, settings, inDeck: a.only || inDeck, practice: a.practice, perDay, systems, pathUnit: a.pathUnit,
+        items: shown, settings, inModule: a.only || inModule, practice: a.practice, perDay, systems, pathUnit: a.pathUnit,
       });
     }
-    if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
-    if (a.kind === "unseen") return buildUnseenSession({ items: shown, settings, inDeck, systems, perDay });
+    if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inModule: inModule, systems, perDay });
+    if (a.kind === "unseen") return buildUnseenSession({ items: shown, settings, inModule: inModule, systems, perDay });
     const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
     /* Regular is dealt as the home screen deals, so it reads the cards the
        home screen does: the language switch has its say over which words
@@ -13816,7 +13824,18 @@ export default function ArabicTrainer() {
           materialVersion.current,
           dataRef.current.parked || {},
         );
+        /* Whether this device had no answer yet (0.706), read before the
+           answer below is kept. */
+        let firstTimeHere = false;
+        try {
+          firstTimeHere = localStorage.getItem(teachesKey()) === null;
+        } catch (e) {
+          firstTimeHere = false;
+        }
         setTeaches(r.teaches);
+        if (r.teaches && firstTimeHere && !pickedSpace.current && !TRYING && !openedTo.current) {
+          setSpace((s) => (s === "learn" ? "teach" : s));
+        }
         /* Trying a space (0.574): its answer is not yours to keep. */
         if (!TRYING) {
           saveTeaches(r.teaches);
@@ -13832,7 +13851,7 @@ export default function ArabicTrainer() {
           return;
         }
         setMyCourses(r.courses);
-        setCourseDecks(r.decks);
+        setCourseModules(r.decks);
         setSystems(r.systems);
         setServerLacks(r.missingClips);
         setServerLacks(r.missingImages, "image");
@@ -14423,7 +14442,10 @@ export default function ArabicTrainer() {
      "fill the gap" put both up under one press, and a learner reported
      being shown two hints. Without a meaning to give, the nudge is the
      pronunciation, as it always was. */
-  const hintValue = !phraseHint && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
+  /* A description's English is English, so a course that shows none
+     offers none behind the nudge either (0.697). */
+  const hintHidden = !!(spec && spec.hintField === "descEn" && englishModeFor(exercise ? String(exercise.id || "") : "") === "hidden");
+  const hintValue = !phraseHint && !hintHidden && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
   const hintAt = phraseHint || hintValue;
   const hintShown = !!hintAt && !!hintOpen;
   /* And the case that costs an answer its good mark: right, but written
@@ -14992,7 +15014,9 @@ export default function ArabicTrainer() {
    */
   const alsoField = useMemo(() => {
     if (!spec || !item) return "";
-    if (spec.hintField) return spec.hintField;
+    /* A description's English is about the description, not the word:
+       once answered, the word's own third field is the one worth having. */
+    if (spec.hintField && spec.hintField !== "descEn") return spec.hintField;
     return (
       ["lat", "en"].find(
         (f) => f !== spec.promptField && f !== spec.answerField && item[f],
@@ -15601,8 +15625,8 @@ export default function ArabicTrainer() {
       /* Where the card reached this device from. A bad card is usually one
          of a bad batch, and the deck is what somebody goes and looks at.
          Absent on a card the learner made, which came through neither. */
-      courseId: (fromDeck(parentItem) || { courseId: "" }).courseId || "",
-      deckId: (fromDeck(parentItem) || { deckId: "" }).deckId || "",
+      courseId: (fromModule(parentItem) || { courseId: "" }).courseId || "",
+      deckId: (fromModule(parentItem) || { deckId: "" }).deckId || "",
       /* What they put, and what the app made of it — the half of "it
          marked me wrong" that the learner cannot be expected to type out
          and that usually names the bug on its own.
@@ -15830,7 +15854,7 @@ export default function ArabicTrainer() {
        is read it holds what this answer actually moved. */
     let moving: { id: string; move: Move }[] = [];
     const prep = prepOf(settings);
-    const forPrep = !!prep && prepDeckOf(prep.decks)(parentItem);
+    const forPrep = !!prep && prepModuleOf(prep.decks)(parentItem);
     persist((cur) => {
       const marked = gradeInto(cur.items, marks, {
         ...gradingFor(exercise, settings),
@@ -15942,7 +15966,7 @@ export default function ArabicTrainer() {
     /* And what tells where a problem came from (0.646): the question on
        screen and the course and deck it came from, the languages switched
        off, and the device. The server adds their role and courses. */
-    const from = session && parentItem ? fromDeck(parentItem) : null;
+    const from = session && parentItem ? fromModule(parentItem) : null;
     const context: API.FeedbackSent["context"] = {
       ...(session && parentItem
         ? {
@@ -16148,7 +16172,7 @@ export default function ArabicTrainer() {
     setScreen(null);
     setTab("home");
     setMyCourses([]);
-    setCourseDecks([]);
+    setCourseModules([]);
     setTeaches(false);
     forgetTeaches();
   };
@@ -16222,6 +16246,7 @@ export default function ArabicTrainer() {
   /* Going to another space is going to its address, as it always was:
      every screen then agrees about where you are. */
   const goToSpace = (to: { id: string; slug: string }, open = "") => {
+    pickedSpace.current = true;
     const then = open ? `?open=${open}` : "";
     if (to.id === "super") {
       /* Super admin is shown only at one of your own addresses: from a
@@ -16278,6 +16303,7 @@ export default function ArabicTrainer() {
   /* A mode beside a space. Learning there is Learning narrowed to it;
      another space's mode is gone to at its address (0.610). */
   const pickMode = (row: WhereRow, mode: string) => {
+    pickedSpace.current = true;
     setWhereOpen(false);
     if (!row.here) {
       if (mode === "learn" && where.multi) setSpaceFilter(row.id);
@@ -16540,9 +16566,9 @@ export default function ArabicTrainer() {
                     learner set themselves. */}
                 {homePrep && (
                   <div className="at-home at-preptile">
-                    <Climb items={shown.filter(prepDeckOf(homePrep.decks))} settings={settings} target={homePrep.target} />
+                    <Climb items={shown.filter(prepModuleOf(homePrep.decks))} settings={settings} target={homePrep.target} />
                     <div className="at-row">
-                      <Button variant="primary" onClick={() => begin(false, prepDeckOf(homePrep.decks))}>
+                      <Button variant="primary" onClick={() => begin(false, prepModuleOf(homePrep.decks))}>
                         Practice for {homePrep.name}
                       </Button>
                     </div>
@@ -16575,7 +16601,7 @@ export default function ArabicTrainer() {
                       Start session (R27). */}
                   {pathLines.map((p) => (
                     <PathHomeLine key={p.courseId} line={p} items={shown} settings={settings}
-                      onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
+                      onOpen={(moduleId) => setUnitOpen({ courseId: p.courseId, deckId: moduleId })} />
                   ))}
 
                   {/* A shape in the logo's style and a fact about how
@@ -16987,6 +17013,11 @@ export default function ArabicTrainer() {
                     ) : spec.promptField === "context" && checked && filledGap ? (
                       /* Put back, with the word that went in marked. */
                       <Filled parts={filledGap} lang={qLang} name="question-prompt-text" />
+                    ) : spec.promptField === "desc" ? (
+                      /* A description, in the language itself: a phrase
+                         in the script, set the way a phrase with a gap
+                         is (0.697). */
+                      <Field value={item.desc} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
                         /* The phrase can go between building the queue and
@@ -17858,7 +17889,7 @@ export default function ArabicTrainer() {
                 <Stat value={`${tally.first} / ${tally.asked}`} big />
                 <Help>
                   {practice
-                    ? "Your schedule is untouched, apart from anything marked Again."
+                    ? "Extra practice. Your schedule hasn't changed, apart from anything you marked Again."
                     : /*
                        * Which kind of session this was.
                        *
@@ -17871,12 +17902,12 @@ export default function ArabicTrainer() {
                        * your schedule.
                        */
                     session.due === 0
-                    ? "None of these were due, so your schedule has barely moved. The practice still counts."
+                    ? "None of these were due yet, so they will come back when planned. The practice still counts."
                     : session.items && session.due && session.due < session.items
-                    ? `${session.items - session.due} of these weren't due yet and have barely moved.`
+                    ? `${session.items - session.due} of these weren't due yet, so they will come back when planned.`
                     : tally.first === tally.asked
-                    ? "Clean run. Every gap just got longer."
-                    : `${tally.asked - tally.first} lapsed and will come back shortly.`}
+                    ? "All correct. These words will come back less often now."
+                    : `${tally.asked - tally.first} to try again. They will come back soon.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
                 {/* Another session started exactly as this one was, on top
@@ -17904,10 +17935,10 @@ export default function ArabicTrainer() {
             allTags={allTags}
             data={data}
             settings={settings}
-            courseDecks={learnDecks}
+            courseModules={learnModules}
             myCourses={learnCourses}
-            deckWanted={deckWanted}
-            onDeckWantedUsed={() => setDeckWanted(null)}
+            moduleWanted={moduleWanted}
+            onModuleWantedUsed={() => setModuleWanted(null)}
             onPriority={setPriority}
           />
         )}
@@ -17919,7 +17950,7 @@ export default function ArabicTrainer() {
             items={shown}
             paths={pathLines}
             unitTitles={unitTitles}
-            onUnit={(courseId, deckId) => setUnitOpen({ courseId, deckId })}
+            onUnit={(courseId, moduleId) => setUnitOpen({ courseId, deckId: moduleId })}
             myCourses={learnCourses}
             spaceOf={!spaceNow && learnSpaces.length > 1 ? spaceOfItem : undefined}
             spaceNames={!spaceNow && learnSpaces.length > 1 ? spaceNameOf : undefined}
@@ -17995,7 +18026,7 @@ export default function ArabicTrainer() {
         {training && prepOpen && !session && (
           <PrepScreen
             prep={prepOf(settings)}
-            decks={prepDecks}
+            modules={prepModules}
             collection={shown}
             settings={settings}
             perDay={perDay}
@@ -18010,7 +18041,7 @@ export default function ArabicTrainer() {
         {building && (
           <ManualSessionSheet
             items={shown}
-            allTags={deckTags}
+            allTags={moduleTags}
             settings={settings}
             onStart={beginManual}
             onSave={keepSession}
@@ -18024,7 +18055,7 @@ export default function ArabicTrainer() {
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
-            allTags={deckTags}
+            allTags={moduleTags}
             settings={settings}
             editing={editingSaved}
             onStart={beginManual}
@@ -18041,7 +18072,7 @@ export default function ArabicTrainer() {
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
             courses={learnCourses}
-            decks={learnDecks}
+            modules={learnModules}
             spaces={!spaceNow && learnSpaces.length > 1 ? learnSpaces : undefined}
             mySpaceIds={accountOrgs.map((o) => o.id)}
             languages={LANGUAGES}
@@ -18051,12 +18082,12 @@ export default function ArabicTrainer() {
             /* Trying a space is not joining it (0.574). */
             onJoin={TRYING ? undefined : joinWithCode}
             onRefresh={() => refreshCourses(true)}
-            onPractise={(deckTitle: string) => {
+            onPractise={(moduleTitle: string) => {
               /* The cards tab owns its own filter, so ask for it by name and
                  let that tab apply it when it mounts. */
-              setDeckWanted(deckTitle);
+              setModuleWanted(moduleTitle);
               setTab("items");
-              flash(`${deckTitle} — showing just this deck`);
+              flash(`${moduleTitle} — showing just this module`);
             }}
           />
           </React.Suspense>
@@ -18068,6 +18099,7 @@ export default function ArabicTrainer() {
             <TeachSpace
               account={account}
               spaceName={shownSpace && shownSpace.name}
+              setsOn={!!(shownSpace && typeof shownSpace === "object" && shownSpace.sets)}
               languages={LANGUAGES}
               settings={settings}
               langsOff={teachLangsOff}
@@ -18363,7 +18395,7 @@ export default function ArabicTrainer() {
               onLangs={(next) => setSetting(teachingLangs ? "teachLangsOff" : "langsOff", next)}
               note={
                 teachingLangs
-                  ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
+                  ? "Select the languages you see in your courses, modules, and cards. This doesn't change anything for your students."
                   : "Select the languages you see in your cards, progress, and anything you practice."
               }
             />
@@ -18439,7 +18471,7 @@ export function climbOf(cards: Item[], settings: Settings, all: Item[], target: 
       spread[4]++;
     } else spread[toward.at.level - 1]++;
   }
-  return { n, learnt, pct: deckPercent({ n, learnt, got }), spread };
+  return { n, learnt, pct: modulePercent({ n, learnt, got }), spread };
 }
 
 /*
@@ -18794,35 +18826,6 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete, onPi
   );
 }
 
-/* One thing to do in a panel of them (0.680): its icon in a round well,
-   and its name, with a line under it where it cannot be done and why.
-   Drawn like a row of "Where you are", the other panel of places to go. */
-function SheetAction({ icon, label, note, danger, disabled, onClick }: {
-  icon: string;
-  label: string;
-  note?: string;
-  danger?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`at-sheetact${danger ? " danger" : ""}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span className="at-sheetactico" aria-hidden="true">
-        <Icon name={icon} size={22} />
-      </span>
-      <span className="at-sheetacttext">
-        <b>{label}</b>
-        {note ? <i>{note}</i> : null}
-      </span>
-    </button>
-  );
-}
-
 /*
  * What this sitting moved, under the score.
  *
@@ -18928,23 +18931,12 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
   if (!levels.length || !at) return null;
   return (
     <Section title="Progress" lede={standingLabel(at)}>
-      <div className="at-ladder">
-        {levels.map((row) => (
-          <div className={`at-ladderrow${row.level === at.level ? " on" : ""}`} key={row.level}>
-            <span className="num" style={{ color: LEVEL_COLOR[row.level] }}>
-              {row.level}
-            </span>
-            <span className="nm">{LEVEL_NAME[row.level] || `Level ${row.level}`}</span>
-            <span className="st" style={{ color: STATUS_COLOR[row.status] }}>
-              {STATUS_LABEL[row.status] || row.status}
-            </span>
-            {/* The count only where it means something: on the level being
-                worked on, where it says how much of what has to hold for
-                the next one to open does. */}
-            <span className="ct">
-              {row.level === at.level && row.status !== "done" ? `${row.done} of ${row.of}` : ""}
-            </span>
-          </div>
+      {/* One bar of four (0.704): the level the card is on, filled up to
+          it. The levels by name are not listed: the line above says where
+          the card is, and the bar how far up. */}
+      <div className="at-levelbar" role="img" aria-label={`Level ${at.level} of 4`}>
+        {[1, 2, 3, 4].map((n) => (
+          <span key={n} className={n <= at.level ? "at-levelbar-on" : undefined} />
         ))}
       </div>
       <Help>
@@ -18952,7 +18944,7 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
           ? "Missing the same question twice running closes the levels above it. Nothing is lost — this opens again as soon as the level under it is back."
           : at.status === "done"
           ? "Every level is done. The card still comes back, just further and further apart."
-          : "A level opens once everything under it is through the learning steps and back in review. The last one waits longer: everything under it has to hold for four days."}
+          : "Answer right twice in a row to move up a level."}
       </Help>
     </Section>
   );
@@ -19057,12 +19049,12 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
         /* Which decks a card arrived in is a teacher's question about their
            own material. The student is looking at the card itself, so the
            readout stops at the card and there are no decks to name. */
-        decks={[]}
+        modules={[]}
         /* And the card as the person learning it reads it: its words, its
            sound and what it means, without the teacher's side of it — which
            decks carry it, what other cards call it, which of its forms are
            lent out. See Reader in card-facts.ts. */
-        reader="both"
+        reader="student"
       />
 
       {tenseFormsOf(live).length ? (
@@ -19073,14 +19065,8 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
 
       {onPriority && (
         <div className="at-card at-mt4">
-          <p className="at-eyebrow">High priority</p>
-          <Help>
-            For a card you want to get on with. Marked, it joins your very next
-            session whatever its schedule says, and opens it — and it stays in
-            every session until you take the mark off. Nothing else about it
-            changes: what you have learnt, and when it would have come round
-            anyway, are both still there underneath.
-          </Help>
+          <p className="at-eyebrow">Practise this first</p>
+          <Help>Puts this card at the start of every session until you turn it off.</Help>
           <div className="at-row at-mt3">
             <Button
               variant={live.priority ? "primary" : "default"}
@@ -19088,7 +19074,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
               icon="star"
               onClick={() => onPriority(live.id, !live.priority)}
             >
-              {live.priority ? "High priority — tap to clear" : "Mark as high priority"}
+              {live.priority ? "Practising first — tap to stop" : "Practise this first"}
             </Button>
           </div>
         </div>
@@ -19107,20 +19093,20 @@ function ItemsTab({
   allTags,
   data,
   settings,
-  courseDecks,
+  courseModules,
   myCourses = [],
-  deckWanted,
-  onDeckWantedUsed,
+  moduleWanted,
+  onModuleWantedUsed,
   onPriority,
 }: {
   items: Item[];
   allTags: string[];
   data: any;
   settings: Settings;
-  courseDecks?: Deck[];
+  courseModules?: Module[];
   myCourses?: Course[];
-  deckWanted?: string | null;
-  onDeckWantedUsed: () => void;
+  moduleWanted?: string | null;
+  onModuleWantedUsed: () => void;
   onPriority: (id: string, on: boolean) => void;
 }) {
   const [sheet, setSheet] = useState<any | null>(null); // null | {view:item}
@@ -19129,11 +19115,11 @@ function ItemsTab({
 
   /* Someone tapped "practice" on a deck elsewhere; show just that deck. */
   useEffect(() => {
-    if (!deckWanted) return;
-    setFilterTags([deckWanted]);
+    if (!moduleWanted) return;
+    setFilterTags([moduleWanted]);
     setQ("");
-    if (onDeckWantedUsed) onDeckWantedUsed();
-  }, [deckWanted, onDeckWantedUsed]);
+    if (onModuleWantedUsed) onModuleWantedUsed();
+  }, [moduleWanted, onModuleWantedUsed]);
 
   /* Escape and the body-scroll lock belong to Screen, which every sheet
      here now goes through. Doing it again from the tab meant two owners for
@@ -19349,7 +19335,7 @@ function FocusedTrainingSheet({
           <TrainingChoice
             title={prep ? "Your goal" : "Set a goal"}
             icon="event"
-            note="Get decks ready by a date, like an exam, a trip or the start of a class."
+            note="Get modules ready by a date, like an exam, a trip or the start of a class."
             status={prepLine}
             onClick={onPrep}
             dialog
@@ -19509,7 +19495,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      back the choice made before. Kept, it is the Everything a saved
      session already knows, so it takes in cards added later. */
   const [allCards, setAllCards] = useState(opened.all);
-  const [decks, setDecks] = useState<string[]>(opened.decks);
+  const [modules, setModules] = useState<string[]>(opened.decks);
   const [cards, setCards] = useState<string[]>(opened.cards);
   /* The kept cards this screen cannot show — another language's, under the
      switch, or one that has gone — carried through a save untouched, so
@@ -19562,9 +19548,9 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const picked = useMemo(() => {
     if (allCards) return new Set(eligible.map((i) => i.id));
     const on = new Set(cards);
-    for (const [n, group] of tagGroups) if (decks.includes(n)) group.forEach((i) => on.add(i.id));
+    for (const [n, group] of tagGroups) if (modules.includes(n)) group.forEach((i) => on.add(i.id));
     return on;
-  }, [allCards, eligible, decks, cards, tagGroups]);
+  }, [allCards, eligible, modules, cards, tagGroups]);
 
   const byId = useMemo(() => new Map(eligible.map((i) => [i.id, i])), [eligible]);
   /* A card is named on its pill and in the list the way the old picker
@@ -19599,7 +19585,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const [tried, setTried] = useState(false);
   const need = {
     mode: !mode ? "Choose a mode." : "",
-    cards: !picked.size ? "Choose at least one deck or card." : "",
+    cards: !picked.size ? "Choose at least one module or card." : "",
     length: needsLength && !limitKind ? "Choose a length." : "",
   };
   const said = tried ? need : { mode: "", cards: "", length: "" };
@@ -19687,39 +19673,39 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Cards</span>
-          <span className="at-formrole">Pick whole decks, single cards, or both.</span>
+          <span className="at-formrole">Pick whole modules, single cards, or both.</span>
         </div>
         <CheckList
           options={[{
             id: "all",
             title: "All cards",
-            note: "Every card you can practise. Decks and cards can't be chosen while this is ticked.",
+            note: "Every card you can practise. Modules and cards can't be chosen while this is ticked.",
             disabled: !eligible.length,
           }]}
           chosen={allCards ? ["all"] : []}
           onToggle={(_, wasOn) => setAllCards(!wasOn)}
         />
-        <FormField label="Decks" className="at-mt5">
-          <DeckSwitch
+        <FormField label="Modules" className="at-mt5">
+          <ModuleSwitch
             disabled={allCards}
-            decks={tagGroups.map(([n, group]) => ({ id: n, title: n, cardCount: group.length }))}
-            chosen={decks}
-            onToggle={(id, wasOn) => setDecks((d) => (wasOn ? d.filter((x) => x !== id) : d.concat([id])))}
+            modules={tagGroups.map(([n, group]) => ({ id: n, title: n, cardCount: group.length }))}
+            chosen={modules}
+            onToggle={(id, wasOn) => setModules((d) => (wasOn ? d.filter((x) => x !== id) : d.concat([id])))}
             words={{
-              first: "Choose decks",
+              first: "Choose modules",
               drop: (title) => `Take ${title} out of this session`,
-              lede: "Every card in a deck you choose is in the session.",
+              lede: "Every card in a module you choose is in the session.",
               note: "",
-              none: "No decks yet. Single cards can still be chosen below.",
+              none: "No modules yet. Single cards can still be chosen below.",
             }}
           />
         </FormField>
         <FormField label="Cards" className="at-mt5">
-          <DeckSwitch
+          <ModuleSwitch
             disabled={allCards}
             title="Cards"
             size={null}
-            decks={(() => {
+            modules={(() => {
               /* The chosen ones first, in the order they were chosen, so
                  the pills read in that order. */
               const on = cards.map((id) => byId.get(id)).filter(Boolean) as Item[];
@@ -19738,7 +19724,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
             words={{
               first: "Choose cards",
               drop: (title) => `Take ${title} out of this session`,
-              lede: "Single cards, on top of any decks chosen above.",
+              lede: "Single cards, on top of any modules chosen above.",
               note: "",
               none: "No cards to practise yet.",
             }}
@@ -20156,7 +20142,7 @@ export function kinTags({ units, cardOf, labelOf }: {
  * read off `learnt` rather than off the sum: a rounding that reached it
  * early would be exactly that tile.
  */
-export function deckPercent({ n, learnt, got }: { n: number; learnt: number; got: number }): number {
+export function modulePercent({ n, learnt, got }: { n: number; learnt: number; got: number }): number {
   if (!n) return 0;
   if (learnt >= n) return 100;
   return Math.max(0, Math.min(99, Math.floor((got / n) * 100)));
@@ -20495,9 +20481,9 @@ export function prepOf(settings: Settings | null | undefined): Prep | null {
   if (!p || typeof p !== "object") return null;
   const name = String(p.name || "").trim();
   const date = String(p.date || "");
-  const decks = Array.isArray(p.decks) ? p.decks.map((d: unknown) => String(d)).filter(Boolean) : [];
-  if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !decks.length) return null;
-  return { name, date, decks, target: p.target === "cleared" ? "cleared" : "learnt" };
+  const modules = Array.isArray(p.decks) ? p.decks.map((d: unknown) => String(d)).filter(Boolean) : [];
+  if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !modules.length) return null;
+  return { name, date, decks: modules, target: p.target === "cleared" ? "cleared" : "learnt" };
 }
 
 /** The first moment of the prep's day: the deadline for being ready. */
@@ -20507,7 +20493,7 @@ export function prepStart(date: string): Millis {
 }
 
 /** Whether a card is in any of the prep's decks. */
-export const prepDeckOf = (decks: string[]) => (it: Item) => (it.tags || []).some((t) => decks.includes(t));
+export const prepModuleOf = (modules: string[]) => (it: Item) => (it.tags || []).some((t) => modules.includes(t));
 
 /**
  * The day's counts with one more question answered: always the log, which
@@ -20543,7 +20529,7 @@ export function prepStatus(
   at: Millis = now(),
 ): "active" | "past" | "done" | "empty" {
   if (at >= prepStart(prep.date)) return "past";
-  const cards = items.filter(prepDeckOf(prep.decks)).filter((it) => standing(cardStandings(it, settings, items)));
+  const cards = items.filter(prepModuleOf(prep.decks)).filter((it) => standing(cardStandings(it, settings, items)));
   if (!cards.length) return "empty";
   return workloadOf(cards, settings, at, prep.target).left ? "active" : "done";
 }
@@ -20551,7 +20537,7 @@ export function prepStatus(
 /** What a prep's forecast says, in a sentence. */
 export function readyWords(answer: ReadyAnswer, date: string, perDay: number, target: PrepTarget = "learnt"): string {
   const day = new Date(prepStart(date)).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-  if (answer.kind === "already") return `Every card in these decks is already ${target === "cleared" ? "cleared" : "learnt"}.`;
+  if (answer.kind === "already") return `Every card in these modules is already ${target === "cleared" ? "cleared" : "learnt"}.`;
   if (answer.kind === "late") {
     return answer.earliest === null
       ? `You can't be ready before ${day}: however much you practise, it would take more than two years.`
@@ -20564,7 +20550,7 @@ export function readyWords(answer: ReadyAnswer, date: string, perDay: number, ta
 
 function PrepScreen({
   prep,
-  decks,
+  modules,
   collection,
   settings,
   perDay,
@@ -20572,7 +20558,7 @@ function PrepScreen({
   onBack,
 }: {
   prep: Prep | null;
-  decks: { name: string; n: number; learnt: number }[];
+  modules: { name: string; n: number; learnt: number }[];
   collection: Item[];
   settings: Settings;
   perDay: number;
@@ -20581,7 +20567,7 @@ function PrepScreen({
 }) {
   const [name, setName] = useState(prep ? prep.name : "");
   const [date, setDate] = useState(prep ? prep.date : "");
-  const [chosen, setChosen] = useState<string[]>(prep ? prep.decks.filter((d) => decks.some((x) => x.name === d)) : []);
+  const [chosen, setChosen] = useState<string[]>(prep ? prep.decks.filter((d) => modules.some((x) => x.name === d)) : []);
   const [target, setTarget] = useState<PrepTarget>(prep ? prep.target : "learnt");
   const tomorrow = dayKey(now() + 86400000);
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= tomorrow;
@@ -20590,7 +20576,7 @@ function PrepScreen({
   const answer = useMemo(
     () =>
       dateOk && chosen.length
-        ? readyFor(workloadOf(collection.filter(prepDeckOf(chosen)), settings, now(), target), prepStart(date))
+        ? readyFor(workloadOf(collection.filter(prepModuleOf(chosen)), settings, now(), target), prepStart(date))
         : null,
     [dateOk, chosen, date, collection, settings, target],
   );
@@ -20618,8 +20604,8 @@ function PrepScreen({
       }
     >
       <Lede>
-        Working towards something on a set date? Pick the decks you need ready by then. The home screen will offer
-        sessions drawn only from those decks, and tell you whether you're on track.
+        Working towards something on a set date? Pick the modules you need ready by then. The home screen will offer
+        sessions drawn only from those modules, and tell you whether you're on track.
       </Lede>
       <FormField label="What are you working towards?" htmlFor="at-prep-name">
         <input
@@ -20652,17 +20638,17 @@ function PrepScreen({
       </FormField>
       {/* The decks as a card's editor puts a card in them: pills, and a
           sheet to add more from. */}
-      <FormField label="Decks to target">
-        <DeckSwitch
-          decks={decks.map((d) => ({ id: d.name, title: d.name, cardCount: d.n }))}
+      <FormField label="Modules to target">
+        <ModuleSwitch
+          modules={modules.map((d) => ({ id: d.name, title: d.name, cardCount: d.n }))}
           chosen={chosen}
           onToggle={(id, wasOn) => setChosen((c) => (wasOn ? c.filter((x) => x !== id) : c.concat([id])))}
           words={{
-            first: "Choose decks",
+            first: "Choose modules",
             drop: (title) => `Stop targeting ${title}`,
-            lede: "Choose the decks to have ready by then.",
+            lede: "Choose the modules to have ready by then.",
             note: "",
-            none: "No decks to prepare yet.",
+            none: "No modules to prepare yet.",
           }}
         />
       </FormField>
@@ -20721,7 +20707,7 @@ function PrepLine({
 }) {
   const left = prepDaysLeft(prep.date);
   const answer = useMemo(
-    () => readyFor(workloadOf(collection.filter(prepDeckOf(prep.decks)), settings, now(), prep.target), prepStart(prep.date)),
+    () => readyFor(workloadOf(collection.filter(prepModuleOf(prep.decks)), settings, now(), prep.target), prepStart(prep.date)),
     [collection, settings, prep],
   );
   const g = prepGlance(left, answer, perDay, today, prep.target);
@@ -20842,7 +20828,7 @@ export function prepGlance(
    ------------------------------------------------------------------ */
 
 /* The runs a deck's cards are listed in, least advanced first. */
-const DECK_RUNS = [
+const MODULE_RUNS = [
   { key: "new", label: "Not started" },
   { key: "l1", label: LEVEL_NAME[1] },
   { key: "l2", label: LEVEL_NAME[2] },
@@ -20856,7 +20842,7 @@ const DECK_RUNS = [
 ];
 
 /** Which of DECK_RUNS a card goes under. */
-function deckRunOf(at: Standing | null | undefined): string {
+function moduleRunOf(at: Standing | null | undefined): string {
   if (!at) return "new";
   if (at.status === "done") return "done";
   if (at.status === "cleared") return "cleared";
@@ -20901,7 +20887,7 @@ export function forecastWords(at: Millis | null, from: Millis = now()): string {
   return `${date} (${off})`;
 }
 
-function DeckScreen({
+function ModuleScreen({
   name,
   cards,
   progressOf,
@@ -20931,7 +20917,7 @@ function DeckScreen({
      numbers opened on the handful being worked on and none of the rest. */
   const shown = cards.filter((it) => towardOf.get(it.id));
   const learnt = shown.filter((it) => towardOf.get(it.id)?.at.status === "done").length;
-  const pct = deckPercent({
+  const pct = modulePercent({
     n: shown.length,
     learnt,
     got: shown.reduce((sum, it) => sum + (towardOf.get(it.id)?.share || 0), 0),
@@ -20954,7 +20940,7 @@ function DeckScreen({
         </span>
       </div>
       {allDone ? (
-        <Lede>Every card in this deck is learnt.</Lede>
+        <Lede>Every card in this module is learnt.</Lede>
       ) : (
         <div className="at-forecast" aria-live="polite">
           <p>
@@ -20977,7 +20963,7 @@ function DeckScreen({
             <span className="at-forecastpace">Practising more than that won't bring it sooner.</span>
           </p>
           <p className="at-forecastnote">
-            Both are estimates, assuming you practise only this deck and get every answer right, so the real date
+            Both are estimates, assuming you practise only this module and get every answer right, so the real date
             will be a little later.
           </p>
         </div>
@@ -20988,8 +20974,8 @@ function DeckScreen({
         itemKey={(it: Item) => it.id}
         size="small"
         empty="No cards match."
-        groups={DECK_RUNS}
-        groupOf={(it: Item) => (progressOf.get(it.id) ? deckRunOf(progressOf.get(it.id)) : "waiting")}
+        groups={MODULE_RUNS}
+        groupOf={(it: Item) => (progressOf.get(it.id) ? moduleRunOf(progressOf.get(it.id)) : "waiting")}
         views={studentViews("student-deck", {
           lang: (it) => langOf(settingsFor(settings, it)),
           open: (it) => onCard(it),
@@ -21018,7 +21004,7 @@ function PathHomeLine({ line, items, settings, onOpen }: {
   line: PathLine;
   items: Item[];
   settings: Settings;
-  onOpen: (deckId: string) => void;
+  onOpen: (moduleId: string) => void;
 }) {
   const current = line.rows.find((r) => r.current);
   if (!current) {
@@ -21073,7 +21059,7 @@ function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise, on
   const before = line.rows.find((r) => r.number === row.number - 1);
   return (
     <>
-      <DeckScreen
+      <ModuleScreen
         name={`Unit ${row.number} · ${row.title}`}
         cards={cards}
         progressOf={progress.at}
@@ -21134,7 +21120,7 @@ function ProgressTab({
   paths?: PathLine[];
   /** The titles of the downloaded units, which are not deck tiles. */
   unitTitles?: Set<string>;
-  onUnit?: (courseId: string, deckId: string) => void;
+  onUnit?: (courseId: string, moduleId: string) => void;
   myCourses?: Course[];
   /** A card's space, and every space's name, when Learning shows more than
       one (memberships): two decks of one name in two spaces are then two
@@ -21149,7 +21135,7 @@ function ProgressTab({
 }) {
   const [viewing, setViewing] = useState<any | null>(null);
   /* The deck open on its own screen, or none. */
-  const [deckOpen, setDeckOpen] = useState<string>("");
+  const [moduleOpen, setModuleOpen] = useState<string>("");
 
   /*
    * Where each card stands, and how far up it has got.
@@ -21220,7 +21206,7 @@ function ProgressTab({
      to say four hundred and once to list them — is a walk of every card
      for nothing. */
   const byBucket = useMemo(() => {
-    const out: Record<string, Item[]> = { all: counted, l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
+    const out: Record<string, Item[]> = { l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
     for (const it of counted) {
       const at = progressOf.get(it.id);
       /* A card with nothing it can be asked yet — no meaning, or every
@@ -21235,6 +21221,8 @@ function ProgressTab({
         at.status === "done" ? "done" : at.status === "cleared" ? "cleared" : `l${at.level}`;
       (out[bucket] || []).push(it);
     }
+    /* The four levels as one group, Learning (0.705), in level order. */
+    out.learning = [...out.l1, ...out.l2, ...out.l3, ...out.l4];
     return out;
   }, [counted, progressOf]);
   /* Which tile is open, or none. One at a time: they are six views of the
@@ -21248,7 +21236,7 @@ function ProgressTab({
      two tiles — "Cards" is spread over every level, so one card's 40% and
      another's would be forty per cent of different climbs, and under
      "Learnt" every bar would be full. */
-  const onLevel = /^l\d$/.test(showing);
+  const onLevel = showing === "learning";
   /* And whether it is one of the two at the top, where the climb is over
      and what is left is time: every bar there would be full, so each card
      says when it is next asked instead. */
@@ -21272,18 +21260,18 @@ function ProgressTab({
    * above count only the cards on a level, so a deck of numbers can hold
    * more cards here than those tiles show.
    */
-  const deckRows = useMemo(() => {
+  const moduleRows = useMemo(() => {
     const held: Map<string, { name: string; space: string; n: number; learnt: number; got: number }> = new Map();
     for (const it of counted) {
       const toward = progress.toward.get(it.id);
       /* A card that can never be asked is not progress to be short of. */
       if (!toward) continue;
       const space = (spaceNames && spaceOf && spaceOf(it)) || "";
-      for (const deck of it.tags || []) {
+      for (const module of it.tags || []) {
         /* A unit is on the path above, not a tile here. */
-        if (unitTitles && unitTitles.has(deck)) continue;
-        const key = `${space}|${deck}`;
-        const row = held.get(key) || { name: deck, space, n: 0, learnt: 0, got: 0 };
+        if (unitTitles && unitTitles.has(module)) continue;
+        const key = `${space}|${module}`;
+        const row = held.get(key) || { name: module, space, n: 0, learnt: 0, got: 0 };
         row.n++;
         row.got += toward.share;
         if (toward.at.status === "done") row.learnt++;
@@ -21298,11 +21286,11 @@ function ProgressTab({
         spaceName: (spaceNames && space && spaceNames.get(space)) || "",
         n,
         learnt,
-        pct: deckPercent({ n, learnt, got }),
+        pct: modulePercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
   }, [counted, progress, spaceOf, spaceNames, unitTitles]);
-  const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
+  const moduleOpenRow = moduleRows.find((d) => d.key === moduleOpen) || null;
 
   return (
     /* One sheet, ruled into parts, the way the card editor is laid out —
@@ -21311,9 +21299,21 @@ function ProgressTab({
       <Lately moves={moves} />
       <Section
         head
-        title="The ladder"
-        lede="See how well you know each card. Answer a card correctly twice in a row to move it up a level."
+        title="Your cards"
+        lede={`How well you know your ${counted.length} cards.`}
       >
+      {/* The three groups' shares, drawn once; the tiles carry the numbers. */}
+      {(() => {
+        const total = LADDER_TILES.reduce((n, t) => n + byBucket[t.key].length, 0);
+        return total ? (
+          <div className="at-sharebar" aria-hidden="true">
+            {LADDER_TILES.map((t) => (
+              <span key={t.key} className={t.bar}
+                style={{ width: `${(100 * byBucket[t.key].length) / total}%` }} />
+            ))}
+          </div>
+        ) : null;
+      })()}
 
       {/* A number you want to see the cards behind is a number worth
           pressing. Buttons rather than divs with a click on them: there is
@@ -21327,16 +21327,8 @@ function ProgressTab({
           looking at now, and each says what its level actually asks rather
           than what number it happens to be. */}
       <div className="at-rungs">
-        {LADDER_TILES.map(({ key, label, icon }) => {
+        {LADDER_TILES.map(({ key, label, note, icon, tone }) => {
           const count = byBucket[key].length;
-          const tone =
-            key === "all"
-              ? "var(--text)"
-              : key === "done"
-              ? "var(--jade)"
-              : key === "cleared"
-              ? STATUS_COLOR.cleared
-              : LEVEL_COLOR[Number(key.slice(1))];
           return (
             <button
               type="button"
@@ -21356,7 +21348,7 @@ function ProgressTab({
               </span>
               <b style={{ color: tone }}>{count}</b>
               <span className="at-rungname">{label}</span>
-              {/^l\d$/.test(key) && <span className="at-rungstep">Level {key.slice(1)}</span>}
+              <span className="at-rungstep">{note}</span>
             </button>
           );
         })}
@@ -21424,7 +21416,7 @@ function ProgressTab({
                  apart is which comes back first — "Cleared" on every
                  tile and "Learnt" on every tile said nothing at all. */
               meta={
-                showing === "all"
+                showing === "learning"
                   ? standingShort(progressOf.get(it.id) || null)
                   : showing === "cleared"
                   ? heldLine(progressOf.get(it.id) || null) ||
@@ -21433,13 +21425,6 @@ function ProgressTab({
                   ? reviewLine(progress.next.get(it.id) || 0)
                   : undefined
               }
-              /* And under a level, how far the card has got on it. The
-                 headings say which of three states it is in, which is the
-                 difference between started and not; this says how much of
-                 the level is behind it, which is the difference between a
-                 card that is nearly through and one that has just begun —
-                 and those look identical under "Learning" without it. */
-              bar={onLevel ? { pct: levelPercent(progressOf.get(it.id)) } : undefined}
               /* Everything on the tile, said in full. Elsewhere a tile is
                  something to scan past and is clipped to keep it short;
                  here the small print is the answer to the question the
@@ -21483,17 +21468,17 @@ function ProgressTab({
           </div>
         </Section>
       ))}
-      {deckRows.length > 0 && (
-        <Section head title="Decks" lede="How you're doing on each deck you're studying.">
+      {moduleRows.length > 0 && (
+        <Section head title="Modules" lede="How you're doing on each module you're studying.">
           <div className="at-deckprog">
-            {deckRows.map((d) => (
+            {moduleRows.map((d) => (
               /* A button: the whole tile opens the deck's own screen. */
               <button
                 type="button"
                 className={`at-deckstat${d.pct === 100 ? " done" : ""}`}
                 key={d.key}
                 aria-haspopup="dialog"
-                onClick={() => setDeckOpen(d.key)}
+                onClick={() => setModuleOpen(d.key)}
               >
                 <span className="at-deckstatname">{d.spaceName ? `${d.name} · ${d.spaceName}` : d.name}</span>
                 <b>
@@ -21523,19 +21508,19 @@ function ProgressTab({
         <Empty title="Nothing to show yet">{noCardsYet(myCourses.length)}</Empty>
       )}
 
-      {deckOpenRow && (
-        <DeckScreen
-          name={deckOpenRow.name}
+      {moduleOpenRow && (
+        <ModuleScreen
+          name={moduleOpenRow.name}
           cards={items.filter(
             (it) =>
-              (it.tags || []).includes(deckOpenRow.name) &&
-              (!deckOpenRow.space || (spaceOf && spaceOf(it)) === deckOpenRow.space)
+              (it.tags || []).includes(moduleOpenRow.name) &&
+              (!moduleOpenRow.space || (spaceOf && spaceOf(it)) === moduleOpenRow.space)
           )}
           progressOf={progressOf}
           towardOf={progress.toward}
           settings={settings}
           perDay={perDay}
-          onBack={() => setDeckOpen("")}
+          onBack={() => setModuleOpen("")}
           onCard={(it) => setViewing(it)}
         />
       )}
@@ -21581,10 +21566,10 @@ const GUIDE = [
     ],
   },
   {
-    title: "Decks and courses",
+    title: "Modules and courses",
     body: [
-      "A deck is a set of cards. A course is a set of decks with people in it. Teachers make decks and put them in courses; students join a course and receive its decks.",
-      "Course cards are studied but not edited — they belong to the course. If a deck is withdrawn from a course, its cards leave your device at the next check.",
+      "A module is something to learn from: a deck of cards, a unit on a course's path, or a personal set. A course is a set of modules with people in it. Teachers make modules and put them in courses; students join a course and receive its modules.",
+      "Course cards are studied but not edited — they belong to the course. If a module is withdrawn from a course, its cards leave your device at the next check.",
     ],
   },
   {
@@ -22888,7 +22873,7 @@ function AccountSettings({
 
             <FormField
               label="Reset progress"
-              lede="Sends every card back to the start, as though never practiced. Your cards, forms, decks and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
+              lede="Sends every card back to the start, as though never practiced. Your cards, forms, modules and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
             >
               <Button variant="danger" size="sm" onClick={() => setResetting(true)}>
                 Reset progress
@@ -22956,7 +22941,7 @@ function AccountSettings({
 
             <FormField
               label="Delete your account"
-              lede="Deletes your account, your My space and your practice history, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
+              lede="Deletes your account, your My space and your practice history, and takes you off every course. Modules and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>

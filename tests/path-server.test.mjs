@@ -98,15 +98,15 @@ const vi = LANGUAGES["vi"];
 /**
  * A unit that clears its checklist: five words that fill `{{food}}` and
  * five sentences, each approved for all five words.
- * @param {string} key @param {string} deckId @param {string} tag
+ * @param {string} key @param {string} moduleId @param {string} tag
  */
-async function fillUnit(key, deckId, tag) {
+async function fillUnit(key, moduleId, tag) {
   /** @type {any[]} */
   const words = [];
   for (const w of ["pho", "com", "banh", "bun", "che"]) {
     const r = await post("save-card", key, {
       card: { id: "", lang: "vi", category: "noun", fills: [`food${tag}`], forms: [{ ar: `${w}${tag}`, en: `${w} ${tag}`, lat: "" }] },
-      decks: [deckId],
+      decks: [moduleId],
     });
     assert.equal(r.status, 200, r.text);
     words.push(r.json.card);
@@ -114,7 +114,7 @@ async function fillUnit(key, deckId, tag) {
   for (const v of ["an", "nau", "mua", "thich", "ghet"]) {
     const r = await post("save-card", key, {
       card: { id: "", lang: "vi", forms: [{ ar: `tôi ${v} {{food${tag}}}`, en: `I ${v} {{food${tag}}}`, lat: "" }] },
-      decks: [deckId],
+      decks: [moduleId],
     });
     assert.equal(r.status, 200, r.text);
     const card = r.json.card;
@@ -202,8 +202,8 @@ test("a unit added to a second course is a draft there and stays published in th
   const teacher = await anAdmin("Binh");
   const one = await aCourse(teacher.key, "Course one");
   const two = await aCourse(teacher.key, "Course two");
-  const plainDeck = (await post("create-deck", teacher.key, { title: "Plain", lang: "vi" })).json.deck;
-  await post("attach-deck", teacher.key, { deckId: plainDeck.id, courseId: two.id });
+  const plainModule = (await post("create-deck", teacher.key, { title: "Plain", lang: "vi" })).json.deck;
+  await post("attach-deck", teacher.key, { deckId: plainModule.id, courseId: two.id });
   const u = await aUnit(teacher.key, one.id, "Shared");
   await fillUnit(teacher.key, u.id, "b");
   assert.equal((await post("publish-unit", teacher.key, { courseId: one.id, deckId: u.id })).status, 200);
@@ -226,7 +226,7 @@ test("a unit added to a second course is a draft there and stays published in th
   const detach = await post("detach-deck", teacher.key, { deckId: u.id, courseId: two.id });
   assert.equal(detach.status, 200, detach.text);
   const twoNow = await courseOf(teacher.key, two.id);
-  assert.deepEqual(twoNow.decks, [plainDeck.id]);
+  assert.deepEqual(twoNow.decks, [plainModule.id]);
   assert.equal(twoNow.path, undefined);
   assert.equal(twoNow.pathLive, undefined);
   assert.equal(twoNow.opened, undefined);
@@ -241,15 +241,15 @@ test("a card goes into two units and an ordinary deck at once; nothing is refuse
   const course = await aCourse(teacher.key, "Free cards");
   const u1 = await aUnit(teacher.key, course.id, "One");
   const u2 = await aUnit(teacher.key, course.id, "Two");
-  const plainDeck = (await post("create-deck", teacher.key, { title: "Plain", lang: "vi" })).json.deck;
+  const plainModule = (await post("create-deck", teacher.key, { title: "Plain", lang: "vi" })).json.deck;
   const r = await post("save-card", teacher.key, {
     card: { id: "", lang: "vi", forms: [{ ar: "nhà", en: "house", lat: "" }] },
-    decks: [u1.id, u2.id, plainDeck.id],
+    decks: [u1.id, u2.id, plainModule.id],
   });
   assert.equal(r.status, 200, r.text);
-  const decks = (await raw("/api/courses?action=my-decks", { key: teacher.key })).json.decks;
-  for (const id of [u1.id, u2.id, plainDeck.id]) {
-    assert.ok(decks.find((/** @type {any} */ d) => d.id === id).cardIds.includes(r.json.card.id), `not in ${id}`);
+  const modules = (await raw("/api/courses?action=my-decks", { key: teacher.key })).json.decks;
+  for (const id of [u1.id, u2.id, plainModule.id]) {
+    assert.ok(modules.find((/** @type {any} */ d) => d.id === id).cardIds.includes(r.json.card.id), `not in ${id}`);
   }
 });
 
@@ -278,9 +278,9 @@ test("deleting a unit takes it off every course's path", async () => {
 test("a course with no units sends nothing of a path, and a unit's draft elsewhere moves nothing", async () => {
   const teacher = await anAdmin("Lien");
   const course = await aCourse(teacher.key, "No units");
-  const plainDeck = (await post("create-deck", teacher.key, { title: "Plain", lang: "vi" })).json.deck;
-  await post("save-card", teacher.key, { card: { id: "", lang: "vi", forms: [{ ar: "mèo", en: "cat", lat: "" }] }, decks: [plainDeck.id] });
-  await post("attach-deck", teacher.key, { deckId: plainDeck.id, courseId: course.id });
+  const plainModule = (await post("create-deck", teacher.key, { title: "Plain", lang: "vi" })).json.deck;
+  await post("save-card", teacher.key, { card: { id: "", lang: "vi", forms: [{ ar: "mèo", en: "cat", lat: "" }] }, decks: [plainModule.id] });
+  await post("attach-deck", teacher.key, { deckId: plainModule.id, courseId: course.id });
   const student = await someone("Vy");
   await enrol(teacher.key, course.id, student.handle);
   const first = await material(student.key);
@@ -288,7 +288,7 @@ test("a course with no units sends nothing of a path, and a unit's draft elsewhe
   assert.equal(sent.path, undefined);
   assert.equal(sent.pathLive, undefined);
   assert.equal(sent.opened, undefined);
-  assert.equal(first.decks.find((/** @type {any} */ d) => d.id === plainDeck.id).unit, undefined);
+  assert.equal(first.decks.find((/** @type {any} */ d) => d.id === plainModule.id).unit, undefined);
   /* A unit in a course this student is not in changes nothing for them. */
   const other = await aCourse(teacher.key, "Elsewhere");
   await aUnit(teacher.key, other.id, "Not theirs");

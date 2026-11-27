@@ -105,9 +105,9 @@ async function classroom(tag, org) {
   };
   const teacher = await made("teacher");
   const student = await made("student");
-  const deck = (await api("create-deck", { key: teacher.key, body: { title: `Deck ${tag}`, lang: "ar-PS" } })).json.deck;
-  assert.equal((await api("attach-deck", { key: teacher.key, body: { deckId: deck.id, courseId: course.id } })).status, 200);
-  return { course, teacher, student, deck };
+  const module = (await api("create-deck", { key: teacher.key, body: { title: `Deck ${tag}`, lang: "ar-PS" } })).json.deck;
+  assert.equal((await api("attach-deck", { key: teacher.key, body: { deckId: module.id, courseId: course.id } })).status, 200);
+  return { course, teacher, student, deck: module };
 }
 
 /** A saved card, asserted. */
@@ -182,12 +182,12 @@ test("a full backup keeps a deleted teacher's cards, recordings and list of card
   const room = await classroom("a2");
   const hash = "a".repeat(64);
   assert.equal((await api("put-clip", { key: room.teacher.key, body: { hash, data: "data:audio/webm;base64,AAAA" } })).status, 200);
-  const inDeck = await save(room.teacher.key, {
+  const inModule = await save(room.teacher.key, {
     card: card("kitaab-a2", { forms: [{ ar: "كتاب", en: "book-a2", lat: "kitaab", clips: [hash] }] }),
     decks: [room.deck.id],
   });
   const value = await save(room.teacher.key, { card: card("sami-a2", { fills: ["guest"], drill: false }), decks: [] });
-  for (const c of [inDeck, value]) {
+  for (const c of [inModule, value]) {
     assert.equal((await api("card-status", { key: room.teacher.key, body: { cardId: c.id, to: "published" } })).status, 200);
   }
 
@@ -198,14 +198,14 @@ test("a full backup keeps a deleted teacher's cards, recordings and list of card
   assert.equal(got.status, 200, got.text);
   const manifest = got.json.manifest;
   const planned = manifest.plan.flatMap((/** @type {any} */ c) => c.keys);
-  for (const c of [inDeck, value]) assert.ok(planned.includes(`card:${c.id}`), `card ${c.id} is in the backup`);
+  for (const c of [inModule, value]) assert.ok(planned.includes(`card:${c.id}`), `card ${c.id} is in the backup`);
   assert.ok(planned.includes(`clip:${hash}`), "with its recording");
   assert.ok(planned.includes(`mycards:${room.teacher.handle}`), "and the former teacher's list of cards");
 
   /* Taken off the site, and put back from the file: the student is served
      both again. */
   const records = await wholeBackup(manifest);
-  for (const k of [`card:${inDeck.id}`, `card:${value.id}`, `mycards:${room.teacher.handle}`]) await store.delete(k);
+  for (const k of [`card:${inModule.id}`, `card:${value.id}`, `mycards:${room.teacher.handle}`]) await store.delete(k);
   await store.set(`deck:${room.deck.id}`, JSON.stringify({ ...(await raw(`deck:${room.deck.id}`)), cardIds: [] }));
   const keys = Object.keys(records);
   for (let i = 0; i < keys.length; i += 150) {
@@ -215,7 +215,7 @@ test("a full backup keeps a deleted teacher's cards, recordings and list of card
   }
   const served = await api("deck-cards", { key: room.student.key, params: { deck: room.deck.id } });
   assert.equal(served.status, 200, served.text);
-  assert.ok(served.json.cards.some((/** @type {any} */ c) => c.id === inDeck.id), "the deck's card is back for the student");
+  assert.ok(served.json.cards.some((/** @type {any} */ c) => c.id === inModule.id), "the deck's card is back for the student");
   assert.ok(await raw(`card:${value.id}`), "and the value card is back on the site");
   assert.ok((await raw(`mycards:${room.teacher.handle}`)).includes(value.id), "on its owner's list, for a hand-over");
 });
@@ -232,9 +232,9 @@ test("a space's export keeps a member whose first space is elsewhere, with their
   const course = await raw(`course:${inB.course.id}`);
   const joined = await api("join-course", { key: home.teacher.key, org: B, body: { code: course.teacherCode } });
   assert.equal(joined.status, 200, joined.text);
-  const deckB = (await api("create-deck", { key: home.teacher.key, org: B, body: { title: "Deck by a visitor", lang: "ar-PS" } })).json.deck;
-  const deckCard = await api("save-card", { key: home.teacher.key, org: B, body: { card: card("visit-a3"), decks: [deckB.id] } });
-  assert.equal(deckCard.status, 200, deckCard.text);
+  const moduleB = (await api("create-deck", { key: home.teacher.key, org: B, body: { title: "Deck by a visitor", lang: "ar-PS" } })).json.deck;
+  const moduleCard = await api("save-card", { key: home.teacher.key, org: B, body: { card: card("visit-a3"), decks: [moduleB.id] } });
+  assert.equal(moduleCard.status, 200, moduleCard.text);
   const valueCard = await api("save-card", { key: home.teacher.key, org: B, body: { card: card("val-a3", { fills: ["guest"], drill: false }), decks: [] } });
   assert.equal(valueCard.status, 200, valueCard.text);
 
@@ -242,7 +242,7 @@ test("a space's export keeps a member whose first space is elsewhere, with their
   assert.equal(got.status, 200, got.text);
   const planned = got.json.manifest.plan.flatMap((/** @type {any} */ c) => c.keys);
   assert.ok(planned.includes(`user:${home.teacher.handle}`), "the visiting teacher is in B's export");
-  assert.ok(planned.includes(`card:${deckCard.json.card.id}`), "with their deck card");
+  assert.ok(planned.includes(`card:${moduleCard.json.card.id}`), "with their deck card");
   assert.ok(planned.includes(`card:${valueCard.json.card.id}`), "and their value card");
   const usage = await api("admin-org-usage", { key: admin.key, body: { id: B } });
   assert.ok(usage.json.usage.people >= 3, "and the space's usage counts them");

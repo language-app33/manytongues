@@ -137,12 +137,12 @@ test("nothing is asked about it, and the sessions dealt are the ones dealt witho
   const types = (/** @type {any} */ built) => (built.exercises || []).map((/** @type {any} */ e) => `${e.id}:${e.type}`);
   const a = loaded(plain()).items;
   T.installIndexes(a, settings);
-  const regular = fixed(() => T.buildSession({ items: a, settings, inDeck: () => true }));
-  const weak = fixed(() => T.buildWeakSession({ items: a, settings, inDeck: () => true }));
+  const regular = fixed(() => T.buildSession({ items: a, settings, inModule: () => true }));
+  const weak = fixed(() => T.buildWeakSession({ items: a, settings, inModule: () => true }));
   const b = loaded(withFuture()).items;
   T.installIndexes(b, settings);
-  const regularB = fixed(() => T.buildSession({ items: b, settings, inDeck: () => true }));
-  const weakB = fixed(() => T.buildWeakSession({ items: b, settings, inDeck: () => true }));
+  const regularB = fixed(() => T.buildSession({ items: b, settings, inModule: () => true }));
+  const weakB = fixed(() => T.buildWeakSession({ items: b, settings, inModule: () => true }));
   assert.ok(types(regular).length > 0 && types(weak).length > 0, "sessions were dealt at all");
   assert.deepEqual(types(regularB), types(regular));
   assert.deepEqual(types(weakB), types(weak));

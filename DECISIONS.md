@@ -12,6 +12,24 @@ anything that was never really a choice.
 ---
 
 
+## Tabs in a page are one track, and views switch by tabs (0.685)
+
+An inventory found ten sets of tabs in three looks. The bar at the foot was
+already one piece. Inside pages, switching what a page lists was done two
+ways: `Tabs` as outlined pills (Decks / Cards, All / By space) and
+`Segmented` (the sentence review, Narrow a blank, Super admin's reports),
+which a screen reader announces as pressed buttons. The card screen dressed
+`Tabs` as a track of its own.
+
+The owner chose the card screen's track for every set of tabs in a page
+(1a), and `Tabs` wherever a page's view changes (2a). So `.at-nav2` is that
+track and `.at-cardtabs` only pins it; `Tabs` gained `counts`, kept to the
+sentence review where the number helps choose (3a). The cost: in-page tabs
+now look like the settings tracks around them, where the pills set them
+apart; the raised tab with its outline, and the icons, are what tell them
+apart now. Admin's Flags tab is named Reports, as Super admin's is (4a),
+and Material and My space share one Decks / Cards piece (5a).
+
 ## A picture says its count again (0.677)
 
 0.651 stopped picture questions saying "dual" or "plural", after a learner
@@ -4045,7 +4063,7 @@ than a guess.
 ## A deck's forecast is the rules played forward, and the simulation's clock moves
 
 **30 September 2026** · `src/ArabicTrainer.tsx` (`deckForecast`,
-`earliestForecast`, `DeckScreen`, `buildSession`'s `elsewhere`),
+`earliestForecast`, `ModuleScreen`, `buildSession`'s `elsewhere`),
 `src/scheduler.ts` (`REAL_CLOCK`), `tests/forecast.test.mjs`,
 `tests/pace.test.mjs`
 
@@ -5132,7 +5150,7 @@ it says.
 
 ## Which decks a course holds is the course's say
 
-**4 October 2026** · `server/api/courses.js` (`linksOf`, `withLinks`, `dropFromCourses`, `canEditDeck`, `attach-deck`)
+**4 October 2026** · `server/api/courses.js` (`linksOf`, `withLinks`, `dropFromCourses`, `canEditModule`, `attach-deck`)
 
 A deck being in a course is written twice: the course lists the deck's id,
 and the deck lists the course with the day it was added. Every write to
@@ -5525,7 +5543,7 @@ comma; nothing has been reported there, and it was left as it was.
 ## A prep can aim at Cleared, and the deck picker moved to shared
 
 **6 October 2026** · `src/ArabicTrainer.tsx` (`PrepTarget`, `workloadOf`,
-`climbOf`, `towardsLearnt`'s `reach`), `src/shared.tsx` (`DeckSwitch`,
+`climbOf`, `towardsLearnt`'s `reach`), `src/shared.tsx` (`ModuleSwitch`,
 `PickSheet`)
 
 The owner asked for a prep to aim at Cleared as well as Learnt, with the
@@ -5538,7 +5556,7 @@ floor at `CLEAR_DAYS` (twice that for a card whose words come first)
 rather than `LEARN_DAYS` — the same measured figures, not new ones; the
 estimate is no better checked than the Learnt one was.
 
-The prep's decks are chosen with the card editor's `DeckSwitch`, as
+The prep's decks are chosen with the card editor's `ModuleSwitch`, as
 asked. It and `PickSheet` moved from `card-editor.tsx` to `shared.tsx`
 rather than the trainer importing the card editor, which loads on its own
 and would otherwise be pulled into every student's first load. The
@@ -5547,7 +5565,7 @@ overridable (`words`).
 
 ## Numbers are followed through their decks, waiting ones included
 
-**6 October 2026** · `src/ArabicTrainer.tsx` (`DeckScreen`, `workloadOf`)
+**6 October 2026** · `src/ArabicTrainer.tsx` (`ModuleScreen`, `workloadOf`)
 
 The owner asked for the Numbers section on Progress to go: a deck that
 holds numbers is the place to follow them. Its word-by-word view went with
@@ -6697,7 +6715,7 @@ its claim to the top of the screen. Tests: the `homeLine` case in
 
 ## A deck's quality (0.461)
 
-**22 October 2026** · `src/deck-quality.ts`, `src/spaces.tsx`
+**22 October 2026** · `src/module-quality.ts`, `src/spaces.tsx`
 
 The owner asked for a score on each deck saying how well built and
 pedagogical it is, and settled its rules question by question before any
@@ -6786,7 +6804,7 @@ no untaught word, because a blank stands in for the link a plain sentence
 needs. That let a sentence no student is ever shown earn its share of the
 10 points: one whose blank no card fits, or whose sentences review lets
 none of through. It is now a third flaw, read off the same lists the
-words part already reads (`shown` in `deckQuality`), with a fix of its own,
+words part already reads (`shown` in `moduleQuality`), with a fix of its own,
 "Fill the blank in N sentences", and a joint fix where the sentence also
 uses untaught words. Only a blank that was read is judged: a line picked
 from a sentence card of another deck is reviewed on that card and is left
@@ -6798,7 +6816,7 @@ owner's answer to whether a sentence with a blank counts differently.
 
 ## Words with several answers, in sentences (0.468)
 
-**24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/deck-quality.ts`
+**24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/module-quality.ts`
 
 Found by the audit in `docs/AUDIT-what-teachers-can-make.md` (findings 4
 to 6), and settled by the owner question by question.
@@ -7186,7 +7204,7 @@ raw `<button className="at-btn">` has no such box, so it does not get this.
 
 ## A deck is read and edited on one screen, as a card is
 
-**27 October 2026** · `src/spaces.tsx` (the open deck in `TeachSpace`, `NewDeck`, `DeckDraft`)
+**27 October 2026** · `src/spaces.tsx` (the open deck in `TeachSpace`, `NewModule`, `ModuleDraft`)
 
 Deck settings was its own screen, reached from a pencil on each deck, and
 the deck's own screen could not change anything about the deck. A card had
@@ -7195,7 +7213,7 @@ the edit's own controls held still in a disabled fieldset while it is read.
 The owner asked for the deck to work exactly the same, so the settings
 screen is gone and its title, lock and courses live under "This deck".
 
-What an edit holds is a draft (`DeckDraft`) and nothing reaches the server
+What an edit holds is a draft (`ModuleDraft`) and nothing reaches the server
 until Save — including the deck's built-in cards, which used to save from
 their own sheet. Save writes the lock last when it goes on and first when
 it comes off, so pronoun cards going in or out of the deck in the same save
@@ -7291,10 +7309,55 @@ drafts per screen; only the shown one is saved.
 
 ---
 
+## One word set per course
+
+**27 November 2026** · `wordSetPick`, `spaceWordSets`, `share-word-set`,
+`course-word-sets`, `set-course-word-set` and the pronoun swap in
+`my-material` in `server/api/courses.js`; `CourseWordSets` and the Word sets
+screen in `src/spaces.tsx`
+
+Two teachers who each moved a module holding their pronouns into a space,
+onto one course, gave its students 18 pronoun cards: two of each. Numbers
+did the same through two modules, since 0.541's choice was per module. The
+owner's answers (1a, 1b then 1a, 2a–7a): a word set is one teacher's;
+Material lists every teacher's shared set; any teacher may edit one; a
+course chooses whose set of each kind it uses; until somebody does, it uses
+the earliest written of those reaching it, and says so where there are two;
+the per-module numbers choice goes.
+
+Pronouns stay cards, so a module still holds a set as cards, and the choice
+is applied on the way out: `my-material` drops a deck's pronoun cards and
+sends the chosen teacher's instead. Weighed: rewriting the decks when a
+course chooses. Rejected because one deck can sit in courses that chose
+differently, and because the choice would then be undone by the next
+teacher who adds their own set to a module. The cost is that a deck sent
+under one course takes that course's choice where it is in two (as it
+already took that course's title), and that switching teacher gives
+students new cards, so progress on the old ones does not carry.
+
+The swap reads cards outside the deck, whose edits move no deck version, so
+a pronoun save now moves its owner's `fillsrev`, as a value's does, and the
+chosen teachers' handles go into the version's list.
+
+Numbers are not copied when shared — they are one document per teacher
+across every space, and two copies would drift — so sharing marks the
+document with the space (`spaces`), and a save keeps the mark. A system
+already used by a module of the space counts as shared, so nothing that
+reached a course before is missing from Material. Pronouns are copied, as a
+card moved into a space always was, and sharing again updates the copy by
+person rather than adding a second set. A new pronoun written into another
+teacher's shared set is saved as theirs (`forOwner`), so a set never splits
+between two owners.
+
+No new storage key: the course carries `wordSets`, the number system its
+`spaces`, and everything else is read from what exists.
+
+---
+
 ## A deck's numbers come from one person
 
 **2 November 2026** · `number-sources`, `set-deck-numbers` and `partsWaiting`
-in `server/api/courses.js`, `src/number-decks.ts`
+in `server/api/courses.js`, `src/number-modules.ts`
 
 A deck holds number *parts* (0 to 10, telling the hour), and the words come
 from a teacher's number system. The device was sent every system of every
@@ -7303,7 +7366,7 @@ its language, so a course with two teachers who had numbers gave each number
 twice. A deck now names one source, `numbersFrom`, defaulting to its owner;
 the server stamps each deck it sends with that person's system and clock ids,
 and the device files a system only into the decks that name it
-(`decksForSystem`).
+(`modulesForSystem`).
 
 Weighed: keeping "everyone's" and de-duplicating on the device. Rejected
 because two teachers' recordings of the same number are different answers,
@@ -7323,13 +7386,13 @@ Part of the spaces plan (`docs/PLAN-spaces.md`, stage 1).
 `server/api/courses.js`
 
 The plan (`docs/PLAN-spaces.md`, B3) asked for an org check in every
-action and a changed signature for `canEditDeck`. There are some sixty
+action and a changed signature for `canEditModule`. There are some sixty
 actions, and every one written by hand is one more place to forget. So
 the org is worked out once, after the caller is known, and kept in an
 `AsyncLocalStorage` for the rest of the request — per request rather than
 per process, because requests interleave. While it is set, `readCourse`,
-`readDeck`, `readCard` and `readUser` answer null for another org's record,
-`everyCourse` and `canEditDeck` see only this org, and the lists read
+`readModule`, `readCard` and `readUser` answer null for another org's record,
+`everyCourse` and `canEditModule` see only this org, and the lists read
 straight off an index are filtered with `inScope`. Another space's record
 looks like no record at all, and every action already knows what to do
 with that.
@@ -7944,7 +8007,7 @@ little padding so both names fit.
 
 ## One screen for putting cards in decks
 
-**9 November 2026** · `src/shared.tsx` (`DeckPickScreen`, `DeckSwitch`'s `onAdd`), `src/card-editor.tsx`, `src/spaces.tsx`
+**9 November 2026** · `src/shared.tsx` (`ModulePickScreen`, `ModuleSwitch`'s `onAdd`), `src/card-editor.tsx`, `src/spaces.tsx`
 
 A card being written chose its decks in a small sheet, which could pick
 only among decks that already existed. Selected cards chose theirs on a
@@ -7952,14 +8015,14 @@ full screen, which had New deck at the top. The owner asked for the card
 to work the same way, so a card written for a deck not yet made need not
 be left to make it.
 
-Both now open `DeckPickScreen`. The card's ticks are a draft, applied by
+Both now open `ModulePickScreen`. The card's ticks are a draft, applied by
 Done and thrown away by Cancel. The old sheet took each tap at once, and
 that immediacy is what this gives up. The draft is needed because a deck
 made on the screen is ticked in it before the card has said yes to
 anything. The deck is made in the card's language, read off the card as
 selected cards' decks read theirs off the selection.
 
-The other callers of `DeckSwitch` keep the sheet: a course's decks, Prep
+The other callers of `ModuleSwitch` keep the sheet: a course's decks, Prep
 mode's and Build a session's. In those places, making a deck isn't
 something being chosen, and a course's deck list saves each tap as it
 goes.
@@ -8630,7 +8693,7 @@ longer always the teacher's first photo.
 
 ## Personal sets, stage 4: the teacher's side, and the choices behind sets (0.632)
 
-**15 November 2026** · `SetSection`, `setDecksForTrial` in
+**15 November 2026** · `SetSection`, `setModulesForTrial` in
 `src/spaces.tsx`; `RecordingScreen` in `src/card-editor.tsx`; `setGaps` in
 `src/sets.ts`; `standInSets` and the trial index in
 `src/ArabicTrainer.tsx`; `tests/sets.test.mjs`, `tests/smoke.mjs`
@@ -8691,7 +8754,7 @@ that list's first word (`standInSets`); with no list, the name alone.
 
 ## A new deck's kind is chosen first, and fixed (0.633)
 
-**15 November 2026** · `NewDeck`, `NEW_KINDS`, `newDeck` and
+**15 November 2026** · `NewModule`, `NEW_KINDS`, `newModule` and
 `SetSection` in `src/spaces.tsx`; `tests/smoke.mjs`
 
 The owner's choice (1a, 2b, 3a, 4a, 5a, 6a): New deck opens a sheet with
@@ -9180,3 +9243,305 @@ to practise. The teacher was told "Imported N cards" and nothing more.
 
 **Revisit if** teachers import material they have already checked and the
 band reads as nagging: a "Publish them all" on it is the next step.
+## Personal sets are a space's feature, off until the App admin switches it on (0.683)
+
+A space's document carries `sets`, false when absent, so every space —
+those made before this release too — starts with personal sets off. Only
+`admin-update-org`, the App admin's, writes it; it rides on `orgCard`, so
+whoami's `org`/`orgs` and the address's `org-info` both carry it, and
+Teaching reads it off the space on screen (`shownSpace`), which for the
+App admin is the one at the address.
+
+Off hides Personal set from the New deck sheet and makes `save-set` refuse
+any set but `null` (`sets-off`). Since 0.684 (the owner's 1b) it also hides
+every deck that is already a set, in that space, from `my-decks` and
+`my-material` — `setsOffAmong` and `hidesSet`. Nothing is deleted on the
+server. On a device the set's cards leave the material as any withdrawn
+card does, so their progress, set answers included (`s[SET_KEY]` carries
+`updated`), goes into the drawer `foldCourses` keeps and comes back when the
+cards do. The cost is the drawer's own: it is pruned with the headstones,
+so a set switched off for longer than that comes back without its
+students' practice. A set's word lists are ordinary decks and stay.
+
+## Modules: one word for decks, units and personal sets (0.686)
+
+**The owner chose *module* as the word for anything a course learns
+from** — a deck, a path unit or a personal set — over set, collection,
+study, material, pack and learnable. "Deck" had been doing two jobs: the
+umbrella (the Decks tab, "Delete deck" on a unit) and the plain kind ("What
+kind of deck? Regular deck / Unit / Personal set"). Now:
+
+- Wherever the screen means any of the three, it says *module* (the
+  owner's 3a), on the student side too (4a): Progress, Prep mode, Build a
+  session, the help text.
+- The plain kind is **Deck** (1a); "Regular deck" is gone.
+- On one module's own screen the screen names its kind (2a):
+  `moduleKind` in `src/modules.ts` reads `unit === true` as a unit and a
+  `set` as a personal set, and everything else as a deck. The kind chooser
+  and the word lists a personal set draws from stay "deck", because there
+  it is the plain kind that is meant.
+- Server error codes (`no-deck`, `deck-locked`) are unchanged; only the
+  sentences the app shows for them changed.
+
+**Code and data (the owner's 5b).** The owner asked for the rename to
+reach the code too. That follows as its own change, so that this release
+is wording alone and can be checked as such.
+
+**The code rename, 0.687 (the owner's 1a of the follow-up).** The owner
+was offered three depths — code only, code and saved data, or nothing —
+and chose code only. Every name a programmer declares now says module:
+the type `Module` (and `ModuleDraft`, `PathModule`, …), components
+(`ModuleScreen`, `ModuleSwitch`, `NewModule`, …), functions
+(`createModule`, `attachModule`, `moduleQuality`), variables and
+parameters, and the files `module-quality.ts` and `number-modules.ts`.
+It was done with the TypeScript language service rather than by search
+and replace, so each name followed its own uses and nothing else.
+
+What stays "deck" is everything that leaves the code: the fields of what
+is sent and stored (`decks`, `deckId`, `deckIds`, `inDecks`,
+`decksWere`, `deckTitle`), the server's `deck:` records and its actions
+(`create-deck`, `attach-deck`), error codes (`no-deck`), backup files,
+the card filter's `deckMode` and the class names the stylesheet and the
+smoke harness hold on to (`at-deckpill`). Renaming those would have meant
+converting the live store, accepting both words from every old backup
+and from phones with changes queued offline, for no difference anyone
+using the app could see. Where a renamed variable meets such a field the
+code says so plainly — `{ deckId: moduleId }`. Comments still say "deck"
+where they did; they are prose, and many of them mean the plain kind.
+
+
+## A unit is placed from its own screen, in every course (0.688)
+
+**26 November 2026** · the unit block in `ModuleScreen`'s render in
+`src/spaces.tsx` (`unitCourses`, `checksIn`, `moveUnit`, `openForClass`);
+the unit label in Material's Modules list; `tests/smoke.mjs`
+
+The owner asked whether Material should get a Path tab, then chose to
+manage units in the Modules tab instead (1b, 2b, 3a): a plain "Unit" label
+on the tile, no kind filter, and the path controls on the unit's own
+screen. A unit's place is per course (`path` lives on the course), so the
+screen shows one block per course whose path holds the unit — the course
+it was opened from first — each with "Unit n of m", draft or published,
+Move earlier / Move later, Open or Close for the class, that course's
+checklist and Publish. It calls the same `move-unit`, `open-unit` and
+`publish-unit` actions as the course page's Path section, and writes back
+the course's `path`, `pathLive` and `opened` as the server returned them.
+No server change.
+
+The checklist for courses other than the one already read for `pathChecks`
+is worked out on render with `problemsIn`; a unit is on few courses, so it
+was not worth a memo. Remove from this course and Delete unit stay where
+they were (the Courses field and the screen's Delete), so nothing is
+offered twice on one screen. The list label does not show places, so a
+whole path in order is still read on the course page.
+
+
+## Teaching's Home and its To do (0.693)
+
+**27 November 2026** · `TeachSpace`, `TodoSection` and `CoursesPage` in
+`src/spaces.tsx`; `TeaArt` and `SpaceFrame` in `src/shared.tsx`;
+`tests/smoke.mjs`
+
+The owner asked to declutter Teaching (1a 2b 3a 4b 5a 6a 7a 8b 9a 10b
+11c). The Courses tab is labelled Home; its key stays `courses`, which a
+resumed session may hold. To do (`todo`, memoised beside `waitingOn`)
+gathers what used to be said in five places: the two `TopBanner`s (lost
+recordings, imported cards waiting), the two `.at-reviewbanner` lines over
+the Cards list (sentences to review, cards with more than one meaning),
+and each course's not-reaching note, which also stays on the course.
+`MeaningSplits` now renders on any tab, since its way in is on Home.
+
+**It reads the space's side only.** Those counts are worked out from the
+side on screen (`cards`, `reviewMap`), and students only ever get the
+space's cards, so To do is null while My space is on screen, and Home's
+tab sets the side back to the space. The last count is kept (`todoKept`)
+for the badge on Home while the teacher is in My space; it is stale only
+if a card is moved into the space from there, and is right again on
+reaching Home. Working out the sentence review for both sides at once
+would double the heaviest memo in the space for a number on a button.
+
+**Student reports stay out of it** (the owner's 6a): see "Reports from
+students are the administrator's alone".
+
+**The course screen's tabs** are the page `Tabs` Material uses: Course
+(name, language, student code, path, modules), People, Exercises
+(`PracticeSection`). `courseTab` resets to Course whenever another course
+opens.
+
+**The empty state** is `Empty` with `TeaArt`, a cup drawn in the logo's
+loops and colours, its dot in the page's ink.
+
+**Getting a course started (0.695).** The owner asked To do to stay out
+of the way until there is a course, then to say what a course is missing:
+a module, then cards. Read off the space's modules linked to each course
+on screen (units count; a number part counts as a card). Create a module
+opens `NewModule` with `namingFor` holding the course: no language asked,
+the course's used, and the deck attached to the course before it opens.
+Add cards opens the course's first module, whose own empty panel offers
+New card, Add existing cards and Import. A teacher in no course does not
+reach Teaching at all; the hidden case is an administrator, or courses
+all in languages switched off.
+
+## The sign-up key screen is shorter (0.698)
+
+A new student met seven things to read before their first question. The
+key step of `Onboarding` keeps the key's `CodeBox`, one `Help` pointing to
+Settings (where `AccountPanel` already shows the link and the handle), and
+the hidden username and password inputs that prompt a password manager.
+The `keyTicked` tick-box is gone; the button is always live and still calls
+`API.keySaved()` before `onDone`.
+
+## A selected tab is green, like everything chosen (0.699)
+
+0.685 made the selected tab in a page grey with a dark grey outline, partly
+so tabs would not read as a `Segmented`, whose chosen option is solid green.
+Side by side on a phone, that left tabs the one place where chosen was not
+the accent colour, and in the light theme the outline was the darkest line
+on the screen. The owner chose the bar's way of marking a section (1a): the
+accent on an 18% wash of it, with an accent outline. That keeps the
+distinction from a `Segmented` (a faint wash, not a solid fill) and drops
+`--tab-stroke`. Names are in ordinary lettering at the bar's 14px (2a), so
+four tabs on the narrowest phone step down to 11px rather than 9px; and the
+track's edge is the 2px everything else has (3a).
+
+## The selected tab's colours go back to grey (0.700)
+
+Having seen 0.699's green tab, the owner preferred the grey: the
+selected tab is `--raised` with a `--tab-stroke` outline and `--text` for
+its name, as 0.685 had it, and only its icon is in the accent. That keeps
+the reason 0.685 gave — a tab does not look like a `Segmented` — at the
+cost 0.699 named: tabs remain the one place where chosen is not green, and
+the outline is the darkest line on a light screen. 0.699's ordinary
+lettering and 2px track edge stay.
+
+## The end-of-session line is in plain words (0.703)
+
+The old lines only made sense to someone who knows how cards are spaced
+out. The five lines under the score on the session-complete screen keep
+their conditions and their order (`practice`, `session.due === 0`, some not
+due, all first-time right, otherwise); only the words changed.
+
+## A student's card page shows only what a student uses (0.704)
+
+The page was the teacher's readout shown to students, and its level rule
+was out of date. `Reader` gains `"student"`: everything `"both"` gets
+except `ReadKind`, the lede of "The card" and `ReadReference`. Only
+`CardScreen` passes it; the teacher's flagged-card screen keeps the default.
+`CardLadder`'s four rows became one four-part bar (`at-levelbar`, filled in
+`--jade`); `TenseLadder` is unchanged. "High priority" is renamed on the
+card screen only; filters, tiles and sessions keep the old words.
+
+## Progress shows three groups (0.705)
+
+Seven boxes, two of them (Cleared, Learnt) unexplained, answered "how am I
+doing?". `LADDER_TILES` is now three entries (`learning`, `cleared`,
+`done`), each with a one-line `note` where "Level N" was. `byBucket` is
+filled as before and gains a derived `learning` bucket (l1–l4 in order);
+the `all` bucket and tile went. Learning's list is grouped by `STATUS_RUNS`
+with `standingShort` as small print and no per-level bar, which would
+compare different climbs. One stacked `at-sharebar` above the tiles.
+
+## A teacher's first screen is Teaching (0.706)
+
+A teacher told to ask their teacher for a code assumes the invitation
+failed. `space` still starts from `loadTeaches()`; in `refreshCourses`,
+when the device had no stored answer (`teachesKey()` absent, read before
+`saveTeaches`) and the answer says they teach, Learning switches to
+Teaching — unless the person already chose (`pickedSpace`, set by
+`pickMode` and `goToSpace`), the page was opened with `?open=`, or the
+space is being tried. A stored "0" still opens Learning.
+
+## A course lists people by name, and its modules come first (0.707)
+
+Teachers could not tell students apart, and the thing they open a course
+for was at the bottom. `my-courses` adds `people` (handle → display name,
+one `namesOf` call for the whole answer) to each course the caller teaches
+or whose space they manage; never to a student, never stored. The People
+tab shows the name, the handle under it, and initials from the name. The
+Course tab's blocks are reordered: This course, Modules, Join code, Path,
+Word sets.
+
+## A course's Exercises tab shows the four presets; switches only under Custom (0.708)
+
+About 57 switches on one page, for a choice nearly every teacher makes with
+the preset. `PracticeSection` draws the same `Segmented` and saves the same
+way; under it one line per mode (`MODE_SAYS`). The rows of switches are
+drawn only when the mode is `custom`. Under a preset, switches left in
+`off` from an earlier Custom still apply (src/course-practice.ts is
+unchanged), and one `Help` line says how many.
+
+## The quality score waits until there is something to score, and is never red (0.709)
+
+A teacher's first module opened on 11 out of 100 in red. `qualityShown`
+in src/module-quality.ts: a score, and either a sentence (the `long` check
+applies exactly when there is one) or a recording (`recordings` has a share
+above 0). `QualityRing`, `QualityMark` and the module page's quality `Field`
+draw nothing below that; the ring's dash state is gone. `poor` is drawn in
+the neutral muted colour, never rose; `qualityTone` is unchanged.
+
+## New module no longer asks what kind (0.710)
+
+The first choice a teacher made was irreversible and needed two terms
+explained. `newModule()` sets the kind to "deck" and opens naming on both
+sides; the `PickSheet` of kinds and `NEW_KINDS` are gone. A unit is made
+from `PathSection`'s New unit, as it already could be. Personal sets, where
+`setsOn`, are a "New personal set" item in the Material list's `more` menu.
+A module's own screen still names its kind.
+
+## Cards and modules say who made them and who last changed them (0.711)
+
+With private drafting going away, "whose is this and who touched it?"
+needs an answer on the page. Authenticated writes that set `updated` on a
+card or module now also set `editedBy: mine` (save-card new, edit and
+pending, its module bumps, card-status, create-deck, rename-deck,
+lock-deck, set-deck-parts, save-set, set-deck-practise); migrations, sweeps
+and copies do not. `my-cards` and `my-decks` add `ownerName` and
+`editedByName` from one `namesOf` call. `madeLine` in card-facts.ts writes
+the line; `canEditModule` and `mayEditCard` are unchanged.
+
+## My space leaves Teaching (0.712)
+
+Material and My space were the same screen twice, and a new teacher had to
+choose between them before making anything. `TeachSpace` offers the
+`myspace` tab only while `hasPersonal` (a personal module or card); an
+effect moves a teacher off it once it empties. On the mine side nothing
+creates: no `onNew`, no Import, no empty-state `Nudge`; every way out stays.
+Its Word sets tab shows only with a personal pronoun card. The server, the
+`personalOnly` prop and every other mention of My space are unchanged.
+
+## One set of numbers and one of pronouns per language, for the whole school (0.713)
+
+A teacher met four ideas (my set, shared sets, sets by teacher, a chooser
+per course) for what is simply "the numbers". `schoolWordSet(kind, lang)`
+picks, among the sets `spaceWordSets()` lists for the acting space, the
+first written, with the same `firstWritten` order `reachingSets` uses.
+`wordSetPick` returns it (falling back to the earliest reaching the course)
+and no longer reads `course.wordSets`, which stays stored. `space-word-sets`
+adds `school`; `save-system` marks a teacher's numbers (and clock) with the
+space when it has none. `CourseWordSets` and its API wrappers are gone;
+`share-word-set`, `course-word-sets` and `set-course-word-set` still work.
+
+## Card lists: a grid and a table, and a tile's actions behind dots (0.714)
+
+A card list had four views — small grid, large grid, a line per card, a
+table of eleven columns — and every teacher's tile carried Edit and Delete
+buttons and a date. The owner asked for fewer views and less on each.
+Chosen (1a–6a): `ListView` is `"small" | "table"`, and a device left on
+`"large"` or `"list"` reads as the grid or the table; `CardRow` lost `word`,
+`meaning` and `lead`, which only the line drew. A teacher's tile and row put
+Edit and Delete (Edit and Remove on Manage cards) in a `MoreMenu`, as the
+module tile does; the tile has no date; the teacher's table is Word,
+Meaning, Kind, Modules, Status, with the missing-recording pill in Status.
+The cost is a tap more to edit or delete from a list, and the columns that
+went are reached through Filter and Sort rather than seen. Word-set tiles
+(numbers, pronouns) keep their single button: one action needs no menu.
+
+## My space is gone, and its content deleted (0.719)
+
+The owner's word, after 0.712 left the tab for teachers who still had
+material there: remove the tab and delete the content. `retireMySpace`
+runs `clearPersonal(store, handle, "")` for every user and every owner of a
+personal deck, at each start (`retireOnStart`, which logs and serves on a
+failure). Creating personal records through the server still works, for
+the tests and for old phones; whatever is made is deleted at the next
+start. The app offers no way in.
