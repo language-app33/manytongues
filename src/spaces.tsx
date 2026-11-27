@@ -3868,7 +3868,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
    Becoming the administrator — once, from Account settings
    ------------------------------------------------------------------ */
 
-export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) {
+export function ClaimAdmin({ onDone }: { onDone?: (claimed?: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
@@ -3903,7 +3903,7 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
               await API.claimAdmin(key.trim());
               reach.ok();
               setOpen(false);
-              onDone();
+              onDone?.();
             } catch (e) {
               if (!reach.caught(e, claim)) setError(API.explain(e));
             } finally {
@@ -6682,7 +6682,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   } | null>(null);
   const [naming, setNaming] = useState<"new" | null>(null);
   /* The course a new module is being made for, from To do on Home
-     (0.694): it is made in that course's language and put in it. */
+     (0.695): it is made in that course's language and put in it. */
   const [namingFor, setNamingFor] = useState<Course | null>(null);
   /* What kind of deck "New deck" makes: chosen on a sheet first, outside
      My space, where only a regular deck can be made (0.633). */
@@ -7428,7 +7428,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const todo: { key: string; icon: string; text: string; course?: string; module?: string }[] | null = useMemo(() => {
     if (mineSide || personalOnly) return null;
     const out: { key: string; icon: string; text: string; course?: string; module?: string }[] = [];
-    /* First, a course with nothing in it yet (0.694): no module, or
+    /* First, a course with nothing in it yet (0.695): no module, or
        modules with no card. Getting a course started comes before
        anything else on the list. */
     for (const c of onCourses) {
@@ -10444,7 +10444,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               languages={languages}
               busy={busy}
               error={error}
-              /* No To do until there is a course to teach (0.694). */
+              /* No To do until there is a course to teach (0.695). */
               top={todo && onCourses.length ? (
                 <TodoSection
                   items={todo}
@@ -11104,7 +11104,7 @@ export function StudentCourses({
   /** Your spaces, when Learning shows more than one: the courses go under
       a heading per space (memberships). */
   spaces?: { id: string; name: string }[];
-  modules: (Module & { courseId: string, courseTitle?: string })[];
+  modules: (Module & { courseId?: string, courseTitle?: string })[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;

@@ -9326,7 +9326,7 @@ opens.
 **The empty state** is `Empty` with `TeaArt`, a cup drawn in the logo's
 loops and colours, its dot in the page's ink.
 
-**Getting a course started (0.694).** The owner asked To do to stay out
+**Getting a course started (0.695).** The owner asked To do to stay out
 of the way until there is a course, then to say what a course is missing:
 a module, then cards. Read off the space's modules linked to each course
 on screen (units count; a number part counts as a card). Create a module
