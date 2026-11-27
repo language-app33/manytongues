@@ -178,6 +178,8 @@ const PLACES: Record<string, [string, string]> = {
   CoursesPage: [TEACH, "Teaching\u2019s Home, under To do, and a learner\u2019s Courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewModule: [TEACH, "Making a new module"],
+  OpenRow: [TEACH, "New module \u00b7 each kind, with its picture and what it is"],
+  CardTile: [PARTS, "A card's tile \u00b7 what stands for a missing meaning, a picture or a recording"],
   ExportScreen: [TEACH, "Exporting cards or modules"],
   ImportScreen: [TEACH, "Importing cards or modules"],
   LockMark: [TEACH, "A locked module's padlock"],

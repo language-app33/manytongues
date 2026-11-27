@@ -9,7 +9,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { formsOf, subFormsOf } from "../src/cards.ts";
+import { formsOf, standIn, subFormsOf } from "../src/cards.ts";
+import { ALT_SEP } from "../src/answers.ts";
 import { anotherMeaningOf } from "../src/meanings.ts";
 import { must, buildOnce } from "./helpers.mjs";
 import path from "node:path";
@@ -3175,4 +3176,26 @@ test("a card's words are cut after twenty characters for the table", () => {
      their spaces are 19 and stay whole; a fifth takes it past twenty. */
   assert.equal(clipped("كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ"), "كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ");
   assert.equal(clipped("كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ"), "كِتَابٌ كِتَابٌ كِتَابٌ كِتَابٌ…");
+});
+
+/* What stands in for a missing meaning on a teacher's tile (0.732): the
+   transliteration, else a picture, else a recording, else nothing. */
+test("standIn: a card with English needs none", () => {
+  assert.equal(standIn({ forms: [{ ar: "كتاب", en: "book", lat: "kitaab" }] }), null);
+});
+test("standIn: a card with a name needs none", () => {
+  assert.equal(standIn({ name: "to eat", forms: [{ ar: "أكل", en: "", lat: "akala" }] }), null);
+});
+test("standIn: no English, a transliteration: the first of them", () => {
+  assert.deepEqual(standIn({ forms: [{ ar: `مرحبا${ALT_SEP}أهلا`, en: "", lat: `marhaba${ALT_SEP}ahlan` }] }), { kind: "lat", text: "marhaba" });
+});
+test("standIn: no English nor transliteration, a picture", () => {
+  assert.deepEqual(standIn({ forms: [{ ar: "قطة", en: "", lat: "", images: ["h1"] }] }), { kind: "picture", text: "Picture" });
+});
+test("standIn: no English nor transliteration nor picture, a recording", () => {
+  assert.deepEqual(standIn({ forms: [{ ar: "قطة", en: "", lat: "", clips: ["c1"] }] }), { kind: "recording", text: "Recording" });
+  assert.deepEqual(standIn({ forms: [{ ar: "قطة", en: "", lat: "", slowClips: ["c2"] }] }), { kind: "recording", text: "Recording" });
+});
+test("standIn: none of these, nothing", () => {
+  assert.equal(standIn({ forms: [{ ar: "قطة", en: "", lat: "" }] }), null);
 });

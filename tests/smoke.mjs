@@ -334,6 +334,10 @@ const savedSets = [];
 /** @type {any[]} */
 const madeUnits = [];
 let teacherSets = false;
+/* 0.732's walks: one card a draft, for its badge on a tile and a row; and
+   a teacher with nothing waiting, for To do's slim caught-up band. */
+let draftOne = false;
+let teacherQuiet = false;
 /* A module of the teacher's own in My space (0.712), where a walk asks. */
 let teacherPersonal = false;
 /* What the deck screen's Lock asked the server to do. */
@@ -577,6 +581,9 @@ const fakeFetch = async (input, opts = {}) => {
         ],
       });
     }
+    if (action === "my-cards" && teacherQuiet) {
+      return json({ ok: true, cards: [{ ...phrase, decks: ["d1"] }] });
+    }
     if (action === "my-cards") {
       return json({
         ok: true,
@@ -585,7 +592,7 @@ const fakeFetch = async (input, opts = {}) => {
           /* A person in the personal set, a picture and a name (0.634). */
           ...(teacherSets ? [{ id: "k777777777777", owner: account.handle, lang: "ar-PS", rev: 1, updated: 1, decks: ["d5"],
             forms: [{ ar: "لان", en: "", lat: "lan", images: ["7".repeat(64)] }] }] : []),
-          { ...phrase, decks: ["d1"] },
+          { ...phrase, decks: ["d1"], ...(draftOne ? { status: "draft" } : {}) },
           { ...talk, decks: [] },
           { ...frameCard, decks: ["d2"] },
           { ...rafa, decks: [] },
@@ -2468,6 +2475,15 @@ if (/Build a session/.test(document.body.textContent)) {
   const said = tile ? (tile.textContent || "").replace(/\s+/g, " ") : document.body.textContent.slice(0, 160).replace(/\s+/g, " ");
   check("the student's Courses opens from the menu and counts each course's modules",
     !!tile && /[1-9]\d* modules?/.test(said) && !/Something broke/.test(document.body.textContent || ""), said);
+  /* Teaching's join became a button and a panel in 0.732; the learner's
+     stays the box it was, under its own heading. */
+  {
+    const joinBox = document.querySelector(".at-joinbox");
+    const heads = [...document.querySelectorAll(".at-sectionhead")].map((h) => (h.textContent || "").trim());
+    check("the learner's Courses page still has its join box, under Join a course",
+      !!joinBox && heads.includes("Join a course") && !!joinBox.querySelector('input[placeholder="Course code"]') && !document.querySelector(".at-joinmore"),
+      heads.join(" | ") || "(no headings)");
+  }
   check("and nothing threw opening it", errors.length === before, errors.slice(before, before + 3).join(" | "));
   click(document.querySelector(".at-screen .at-back, [aria-label='Back']"));
   await sleep(200);
@@ -2485,6 +2501,9 @@ if (/Build a session/.test(document.body.textContent)) {
   check("the student's cards are tiles from the library, not a copy of one",
     tiles.length > 0,
     tiles.length ? tiles[0].className : `no tile — ${document.body.textContent.slice(0, 80).replace(/\s+/g, " ")}`);
+  /* The teacher's grids changed in 0.732; the learner's did not. */
+  check("and none of the learner's tiles is drawn as the teacher's",
+    tiles.length > 0 && !tiles.some((t) => t.classList.contains("teach")), tiles.map((t) => t.className).join(" | "));
   /* The tile for a known card, found by the word itself rather than by
      being first in a list nothing here decides the order of — and matched
      whole, because "كتاب" sits inside "الكتاب كبير" and a substring match
@@ -13629,6 +13648,9 @@ const openPronounTables = async () => {
   const rows = [...document.querySelectorAll(".at-sheet .at-openrow")];
   const titles = rows.map((b) => (b.querySelector(".at-decktitle") || b).textContent || "").join(" | ");
   check("with personal sets off in the space, New module offers a deck and a unit only", titles === "Deck | Unit", titles || "no sheet");
+  check("each with its picture, and the deck independent of the others (0.732)",
+    rows.length === 2 && rows.every((b) => !!b.querySelector(".at-kindicon")) && /independent of your other decks/.test(rows[0].textContent || ""),
+    rows.map((b) => (b.textContent || "").trim()).join(" | ") || "no sheet");
   check("and the kinds sit in the spaced list of tiles", rows.length > 0 && rows.every((b) => !!b.parentElement && b.parentElement.classList.contains("at-decklist2")),
     rows.map((b) => (b.parentElement && b.parentElement.className) || "").join(", ") || "no rows");
   click(document.querySelector('.at-sheet button[aria-label="Close"]'));
@@ -13689,6 +13711,20 @@ const openPronounTables = async () => {
   await openSheet();
   check("New module asks what kind: a deck, a unit or a personal set",
     sheetRows().join(" | ") === "Deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  /* A picture on each kind, and the owner's descriptions (0.732). */
+  {
+    const kindRows = [...document.querySelectorAll(".at-sheet .at-openrow")];
+    const metaOf = (/** @type {RegExp} */ re) => ((kindRows.find((b) => re.test((b.querySelector(".at-decktitle") || b).textContent || "")) || document.createElement("i"))
+      .querySelector(".at-deckmeta") || {}).textContent || "";
+    check("and each kind has its picture",
+      kindRows.length === 3 && kindRows.every((b) => !!b.querySelector(".at-kindicon svg")),
+      kindRows.map((b) => (b.querySelector(".at-kindicon") ? "icon" : "none")).join(" | ") || "no rows");
+    check("and says what it is, in the owner's words",
+      metaOf(/^Deck/) === "Cards on one topic, independent of your other decks." &&
+        metaOf(/^Unit/) === "One lesson on a course's path. Each unit builds on the ones before it, so students do them in order." &&
+        metaOf(/^Personal set/) === "For words that are different for each student, like My family. Students answer about your pictures once, then practise their own words.",
+      [metaOf(/^Deck/), metaOf(/^Unit/), metaOf(/^Personal set/)].join(" | "));
+  }
   await pickKind(/^Deck/);
   check("choosing Deck opens Create deck", screenTitle() === "Create deck", screenTitle() || "no screen");
   backOut();
@@ -13822,6 +13858,11 @@ const openPronounTables = async () => {
   /* A picture of the set, edited: always a basic card, its English optional. */
   const personTile = [...document.querySelectorAll(".at-screen.cardform .at-cardtile, .at-screen.cardform .at-minicard, .at-screen.cardform .at-tile")]
     .find((t) => /لان/.test(t.textContent || ""));
+  /* No English: its transliteration in the meaning's place (0.732). */
+  check("a module's card with no English shows its transliteration in its place, on a teacher's tile",
+    !!personTile && personTile.classList.contains("teach") &&
+      ((personTile.querySelector(".at-minien.standin i") || {}).textContent || "") === "lan",
+    personTile ? `${personTile.className}: ${(personTile.textContent || "").trim()}` : "no tile");
   click(/** @type {any} */ (personTile));
   await sleep(600);
   click([...document.querySelectorAll('.at-fab[aria-label="Edit"]')].pop() || null);
@@ -13840,6 +13881,133 @@ const openPronounTables = async () => {
   r.unmount();
   host.remove();
   check("and nothing threw making decks of each kind, or on a set's section", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- Teaching's Home, simpler (0.732) ----
+   Join is a button at the foot of My courses, opening a panel with the
+   code box; a single course is not searched; and with nothing waiting,
+   To do is a slim band. */
+{
+  const before = errors.length;
+  teacherQuiet = true;
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /^Home/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const heads = [...frame().querySelectorAll(".at-sectionhead")].map((h) => (h.textContent || "").trim());
+  check("Teaching's Home has no Join a course as a teacher section",
+    heads.includes("My courses") && !heads.includes("Join a course as a teacher") && !frame().querySelector(".at-joinbox"),
+    heads.join(" | ") || "(no headings)");
+  const joinBtn = [...frame().querySelectorAll("button.at-joinmore")].find((b) => /Join another course/.test(b.textContent || ""));
+  check("a teacher with a course has Join another course at the foot of My courses",
+    !!joinBtn && !!joinBtn.closest('[data-el="courses-of-space"]'), joinBtn ? "outside My courses" : "(no button)");
+  check("with one course, there is no Search courses box",
+    !frame().querySelector('input[placeholder="Search courses"]') && !frame().querySelector('[data-el="courses-of-space"] .at-listbar'),
+    "a search box or an empty bar is drawn");
+  const quiet = frame().querySelector('[data-el="todo"] .at-empty2');
+  check("with nothing waiting, To do is the slim caught-up band",
+    !!quiet && quiet.classList.contains("slim") && /all caught up/.test(quiet.textContent || ""),
+    quiet ? quiet.className : ((frame().querySelector('[data-el="todo"]') || {}).textContent || "(no To do)").slice(0, 120));
+  click(joinBtn || null);
+  await sleep(300);
+  const sheet = document.querySelector(".at-sheet");
+  check("pressing it opens a panel with the Teacher code box",
+    !!sheet && /Join another course/.test(((sheet.querySelector(".at-modaltitle") || {}).textContent) || "") && !!sheet.querySelector('input[placeholder="Teacher code"]'),
+    sheet ? (sheet.textContent || "").slice(0, 120) : "(no panel)");
+  click(document.querySelector('.at-sheet button[aria-label="Close"]'));
+  await sleep(200);
+  check("and its cross closes it", !document.querySelector(".at-sheet"), "the panel is still open");
+  r.unmount();
+  host.remove();
+  teacherQuiet = false;
+  check("and nothing threw on Teaching's Home", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- the teacher's cards on a phone (0.732) ----
+   Two tiles a row, a draft's badge at a tile's foot, and the second view a
+   list rather than a table. The walk has a matchMedia that says no to
+   everything; here it says yes to a phone's width. */
+{
+  const before = errors.length;
+  draftOne = true;
+  const hadMedia = anyWindow.matchMedia;
+  anyWindow.matchMedia = anyGlobal.matchMedia = (/** @type {string} */ q) => ({
+    matches: q === "(max-width: 639px)", media: q,
+    addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {},
+  });
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /^Material$/.test((b.textContent || "").trim())) || null);
+  await sleep(400);
+  click([...frame().querySelectorAll("[role=tab]")].find((b) => /^Cards$/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const viewBtn = () => frame().querySelector(".at-listline .at-viewbtn");
+  if (frame().querySelector(".at-cardrows")) {
+    click(viewBtn());
+    await sleep(200);
+  }
+  const draftTile = frame().querySelector('.at-cardgrid .at-minicard[data-card="k222222222222"]');
+  check("a teacher's card tile is drawn as the teacher's",
+    !!draftTile && draftTile.classList.contains("teach"), draftTile ? draftTile.className : "(no tile)");
+  check("and a draft's tile still says Draft, at its foot",
+    !!draftTile && /^Draft$/.test(((draftTile.querySelector(".at-minimeta .at-statusbadge") || {}).textContent || "").trim()),
+    draftTile ? (draftTile.textContent || "").trim() : "(no tile)");
+  click(viewBtn());
+  await sleep(300);
+  check("on a phone the second view is a list, not a table",
+    !!frame().querySelector(".at-cardrows") && !frame().querySelector(".at-cardtable"),
+    frame().querySelector(".at-cardtable") ? "a table" : "(neither)");
+  check("and the view button calls it a list",
+    /^View: List — press for grid$/.test((viewBtn() || { getAttribute: () => "" }).getAttribute("aria-label") || ""),
+    (viewBtn() || { getAttribute: () => "(no button)" }).getAttribute("aria-label") || "");
+  const row = frame().querySelector('.at-cardrow[data-card="k222222222222"]');
+  const rowSaid = row ? (row.textContent || "").replace(/\s+/g, " ") : "";
+  check("a row shows the card's meaning, its module and its Draft badge",
+    !!row && /^the book is big$/i.test(((row.querySelector(".at-cardrow-meaning") || {}).textContent || "").trim()) &&
+      /Lesson 1/.test(((row.querySelector(".at-cardrow-sub") || {}).textContent) || "") && /Draft/.test(rowSaid),
+    rowSaid || "(no row)");
+  const loose = [...frame().querySelectorAll(".at-cardrow")].find((x) => /In no module/.test(x.textContent || ""));
+  check("and a card in no module says so", !!loose, "(no row says In no module)");
+  const screensWere = document.querySelectorAll(".at-screen").length;
+  click(row || null);
+  await sleep(500);
+  check("pressing a row opens the card", document.querySelectorAll(".at-screen").length > screensWere,
+    `${screensWere} screens before, ${document.querySelectorAll(".at-screen").length} after`);
+  backOut();
+  await sleep(300);
+  click(viewBtn());
+  await sleep(200);
+  r.unmount();
+  host.remove();
+  anyWindow.matchMedia = anyGlobal.matchMedia = hadMedia;
+  draftOne = false;
+  check("and nothing threw drawing the cards on a phone", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- who is speaking, on a recording (0.632) ----

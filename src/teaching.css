@@ -989,6 +989,10 @@ fieldset.at-cardlock:disabled input[type="checkbox"]:disabled { opacity:.55; }
    width of the list, under its toolbar. */
 .at-managefor { margin:0 0 var(--s3); font-weight:700; color: var(--text-soft); }
 .at-blockbtn { width:100%; justify-content:center; }
+/* "Join another course" at the foot of Teaching's My courses (0.732):
+   dashed and unfilled, as the other buttons that add one more are. */
+.at-joinmore { margin-top: var(--s3); border:2px dashed var(--faint); background:none; color: var(--muted); box-shadow:none; }
+.at-joinmore:hover { border-color: var(--muted); color: var(--text); }
 /* "Add existing cards" on a module's card list (0.728): where the cards
    go, said where there is room for it on one line, and the short form
    on a phone. Both are in the button; this picks one. */

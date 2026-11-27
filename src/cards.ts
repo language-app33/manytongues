@@ -32,6 +32,7 @@
  * test can reach and somewhere nothing can reach back into.
  */
 import type { Form } from "./types.ts";
+import { firstOfEach } from "./answers.ts";
 
 /*
  * Everything below takes `unknown` and narrows it here, as verbs.ts does
@@ -129,3 +130,26 @@ export const withLead = <T>(card: T, lead: Form): T =>
  * *all* of them, it wants formsOf.
  */
 export const subFormsOf = (card: unknown): Form[] => formsOf(card).slice(1);
+
+/**
+ * What stands in for a card's meaning on a tile when it has none (0.732,
+ * the owner's 11a): its transliteration, else what it is taught by — a
+ * picture or a recording. A card with a name or a meaning needs none, and
+ * a card with none of these gets none: a blank line says it plainly.
+ *
+ * One accepted answer of each kind, the way a tile reads them (firstOfEach
+ * in answers.ts, which imports nothing, so this module still reaches back
+ * into nothing that reads a card).
+ */
+export function standIn(card: unknown): { kind: "lat" | "picture" | "recording"; text: string } | null {
+  const named = card && typeof card === "object" ? (card as Record<string, unknown>).name : "";
+  if (typeof named === "string" && named.trim()) return null;
+  const lead = leadOf(card);
+  const first = firstOfEach(lead as any);
+  if (first.en.trim()) return null;
+  if (first.lat.trim()) return { kind: "lat", text: first.lat.trim() };
+  const some = (k: "images" | "clips" | "slowClips") => Array.isArray(lead[k]) && (lead[k] as unknown[]).length > 0;
+  if (some("images")) return { kind: "picture", text: "Picture" };
+  if (some("clips") || some("slowClips")) return { kind: "recording", text: "Recording" };
+  return null;
+}
