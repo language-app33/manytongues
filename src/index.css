@@ -1166,6 +1166,15 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-deckmain { flex:1 1 0; min-width:0; }
 .at-decktitle { font-size:18px; font-weight:800; overflow-wrap:anywhere; }
 .at-deckmeta { font-size:13px; color: var(--muted); margin-top:3px; }
+/* A tile's title with a badge after it (0.727): the badge follows the
+   name, and goes to the next line when a long name needs the width. */
+.at-decktitlerow { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.at-decktitlerow > .at-decktitle { min-width:0; }
+/* What kind of module a tile is — Deck, Unit or Personal set — in the
+   outline of a tag (.at-tag), made small (0.727, the owner's 4a). */
+.at-kindbadge { display:inline-flex; align-items:center; font-family: var(--ui); font-size:11px;
+  font-weight:800; line-height:1.2; white-space:nowrap; border-radius:999px; padding:3px 8px;
+  background: var(--tag-bg); border:1.5px solid var(--tag-line); color: var(--brass); }
 @media (max-width: 480px) {
   .at-deckrow2:has(> .at-deckacts > :nth-child(3)) { flex-wrap:wrap; }
   .at-deckrow2:has(> .at-deckacts > :nth-child(3)) > .at-deckmain { flex-basis:100%; }

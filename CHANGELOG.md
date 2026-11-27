@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.727 — 27 November 2026
+
+**Every module says what kind it is, by its name.** In Teaching › Material
+› Modules, each tile now has a small outlined badge right after the
+module's name: **Deck**, **Unit** or **Personal set**. The words "Unit"
+and "Personal set" are gone from the line under the name, which now says
+only what needs looking at, who can see the module, and its score. On a
+phone, a long name pushes the badge onto the next line. Other lists of
+modules, such as a course's, are unchanged for now.
+
 ## 0.726 — 27 November 2026
 
 **A module's courses change as you tap.** Opening a module in Teaching ›

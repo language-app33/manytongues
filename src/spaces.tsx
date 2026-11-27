@@ -11171,6 +11171,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   return (
                     <Tile
                       title={d.title}
+                      /* Every module says what kind it is, right after its
+                         name (0.727, the owner's 1a, 3a, 4a). */
+                      badge={<span className="at-kindbadge" data-el="module-kind">{moduleKindCap(d)}</span>}
                       /* One line under the name (0.715, the owner's 1c):
                          what in it needs looking at, who can see it, and
                          its quality score last (0.720, the owner's wish:
@@ -11199,13 +11202,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         ) : (
                           "Not in a course yet — nobody can see it"
                         );
+                        /* A module's kind is its badge, by the name (0.727):
+                           "Unit" and "Personal set" are off this line. */
                         const parts = [
-                          /* A unit says so (0.688, the owner's 1b): its place
-                             on each path is on its own screen. */
-                          isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
                           waiting ? <span key="w">{waiting}</span> : null,
                           lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
-                          !d.personal && d.set ? <span key="s">Personal set</span> : null,
                           <span key="r">{reach}</span>,
                           score !== null ? <span key="q" data-el="module-score">{`score: ${score}`}</span> : null,
                         ].filter(Boolean) as React.ReactElement[];

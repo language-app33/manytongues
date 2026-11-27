@@ -1657,8 +1657,12 @@ export function dateTime(ms?: Millis) {
 /* --- Tile ---------------------------------------------------------
    The deck and course tile. Lived in spaces.tsx, which meant the one
    library the docs point at did not actually hold it. */
-export function Tile({ title, meta, onOpen, actions, footer, note }: {
+export function Tile({ title, badge, meta, onOpen, actions, footer, note }: {
   title?: Node;
+  /** A small label right after the title, such as a module's kind
+      (0.727). It sits beside the title, not inside it, so the title's
+      text stays the name alone. */
+  badge?: Node;
   meta?: Node;
   onOpen?: () => void;
   actions?: Node;
@@ -1673,7 +1677,14 @@ export function Tile({ title, meta, onOpen, actions, footer, note }: {
     <div className="at-deckcard" onClick={onOpen} data-open={onOpen ? "" : undefined}>
       <div className="at-deckrow2">
         <div className="at-deckmain">
-          <div className="at-decktitle">{title}</div>
+          {badge ? (
+            <div className="at-decktitlerow">
+              <div className="at-decktitle">{title}</div>
+              {badge}
+            </div>
+          ) : (
+            <div className="at-decktitle">{title}</div>
+          )}
           {meta ? <div className="at-deckmeta">{meta}</div> : null}
           {note}
         </div>
