@@ -784,6 +784,14 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    button grows to share its row by default, which stretched this one
    across half the sheet — on the blank sheet and the tag sheet alike. */
 .at-sheettop .at-icon { flex:0 0 auto; width:44px; min-height:44px; padding:0; }
+/* Just the cross (0.737, the owner's 1b): no outline and no tile behind
+   it. The 44px square stays as the tap area; only its edges are no longer
+   drawn. With a mouse, the cross takes the accent colour on hover, since
+   there is no border left to light up. */
+.at-sheettop .at-icon { border:0; background:transparent; }
+@media (hover: hover) {
+  .at-sheettop .at-icon:hover { color: var(--accent); }
+}
 .at-sheet > .at-hint { margin:4px 0 12px; }
 .at-sheet > .at-input { width:100%; }
 
