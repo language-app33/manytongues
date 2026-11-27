@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.696 — 27 November 2026
+## 0.697 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
 card has a new Description box: on the Basic tab of a basic card, and on the
@@ -36,6 +36,43 @@ so a word with one is still asked.
 
 To check on a phone: how a long description wraps above the four choices,
 and with the keyboard open on the writing exercise.
+
+## 0.696 — 27 November 2026
+
+**One teacher's word set per course.** When two teachers had each written
+the pronouns (or the numbers) and both sets reached one course, its
+students were sent two of every pronoun, or two words for every number.
+Now each course uses one teacher's set of each kind.
+
+- **Choose on the course.** A course's page has a new **Word sets**
+  section with **Numbers from** and **Pronouns from**. Any teacher of the
+  course picks whose set its students get, whichever modules hold it.
+- **Until someone chooses**, a course uses the set that was written first
+  among those reaching it. Where more than one teacher's set reaches it,
+  the section says so and names whose students are getting.
+- **Material lists every teacher's shared sets.** Teaching › Material ›
+  Word sets shows your own sets first, then **Shared by other
+  teachers**, one tile each, such as "Pronouns · Rana". Any teacher can
+  open a shared set and edit it; a pronoun added to someone else's set
+  stays part of their set.
+- **Share from My space.** Teaching › My space › Word sets has
+  **Share with** *your space* under each set. Pronouns go in as a copy,
+  and sharing again brings that copy up to date. Numbers are not copied:
+  they stay one set, so an edit made in the space changes your own numbers
+  too. Pronouns written in Material are the space's already. Numbers used
+  by a module of the space count as shared.
+- **"Numbers from" has left the module's screen.** Whose numbers a module
+  uses is now the course's choice.
+
+**Trade-offs:** switching a course to another teacher's pronouns gives its
+students new pronoun cards, so their progress on the old ones does not
+carry over. A module used by two courses takes the choice of the first of
+them that a student is in.
+
+To check by hand: on a phone, with two teachers whose pronouns are both on
+one course, open the course as a student and check each pronoun comes
+once; then choose the other teacher on the course page and check the
+student gets theirs after a refresh.
 
 ## 0.695 — 27 November 2026
 

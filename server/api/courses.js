@@ -1142,7 +1142,9 @@ function materialVersion(courses, modules, fills = [], systems = []) {
       const withPath = path.length || live.length || opened.length ? row.concat([path.join(","), live.join(","), opened.join(",")]) : row;
       /* And its switches, where it has any (0.627): a teacher changing what
          is asked moves nothing else a device compares. */
-      return c.practice ? withPath.concat([JSON.stringify(c.practice)]) : withPath;
+      const withPractice = c.practice ? withPath.concat([JSON.stringify(c.practice)]) : withPath;
+      /* And whose word sets it uses (0.696), where a teacher chose. */
+      return c.wordSets ? withPractice.concat([JSON.stringify(c.wordSets)]) : withPractice;
     }),
     /* With the parts of the numbers it holds, which are not cards and so
        move neither its version nor its count — see set-deck-parts. And
@@ -2989,13 +2991,29 @@ async function handle(req) {
         return work;
       };
 
+      /* The decks of each course that holds one of these, for asking whose
+         numbers that course uses — see wordSetPick. */
+      /** @type {Map<string, Module>} */
+      const moduleById = new Map(modules.map((d) => [d.id, d]));
+      const besideIds = [...new Set(beside.flatMap((c) => c.decks || []))].filter((id) => !moduleById.has(id));
+      (await readManyJson(store, besideIds.map((id) => K.deck(id)))).forEach((d) => {
+        if (d) moduleById.set(d.id, d);
+      });
       for (const d of withParts) {
         const holding = courses.filter((c) => (c.decks || []).includes(d.id));
         const lang = d.lang || (holding[0] && holding[0].language) || "";
-        /* The one person whose numbers the deck uses (0.541): its own
-           choice, or its owner. Every teacher's used to count, which sent
-           students each number once per teacher. */
-        const whose = [d.numbersFrom || d.owner].filter(Boolean);
+        /* Whose numbers the deck's students get: the one set each course
+           holding it uses (0.696), and its owner's where no course holds
+           it yet. Every teacher's used to count, which sent students each
+           number once per teacher. */
+        /** @type {string[]} */
+        const whose = [];
+        for (const c of holding) {
+          const decks = liveDecksOf(c, (c.decks || []).map((id) => moduleById.get(id)).filter(Boolean));
+          const { handle } = await wordSetPick(c, "numbers", decks, loadCard);
+          if (handle) whose.push(handle);
+        }
+        if (!whose.length && d.owner) whose.push(d.owner);
         /** @type {Set<string>} */
         const open = new Set();
         for (const ids of await Promise.all(whose.map((h) => opens(h, lang)))) for (const id of ids) open.add(id);
@@ -3007,6 +3025,146 @@ async function handle(req) {
           }),
         );
       }
+      return out;
+    }
+
+    /* ================= word sets in a space, and on a course (0.696) =================
+
+       A word set — a language's numbers, its pronouns — is written by one
+       teacher. Shared with a space, it is listed in the space's Material
+       beside every other teacher's, and any teacher there may edit it. A
+       course uses one teacher's set of each kind, chosen on the course; so
+       two teachers' versions of "he" never reach the same students. See
+       DECISIONS.md, "One word set per course". */
+
+    /** @param {any} c */
+    const isPronounRec = (c) => !!c && c.category === "pronoun" && !!String(c.person || "");
+
+    /** The decks of a course its students get: a path unit only where it is published. */
+    const liveDecksOf = (/** @type {Course} */ course, /** @type {any[]} */ decks) =>
+      decks.filter((d) => d && (course.decks || []).includes(d.id) && (!d.unit || isLiveIn(course, d.id)));
+
+    /** @type {Map<string, Promise<any>>} */
+    const numbersHeld = new Map();
+    /** One person's numbers in one language, read once a request. */
+    const numbersOf = (/** @type {string} */ owner, /** @type {string} */ lang) => {
+      const at = `${owner} ${lang}`;
+      if (!numbersHeld.has(at)) {
+        numbersHeld.set(at, (async () => {
+          const index = await systemIndex(owner);
+          return index.numbers[lang] ? readJson(store, K.numSys(String(index.numbers[lang]))) : null;
+        })());
+      }
+      return /** @type {Promise<any>} */ (numbersHeld.get(at));
+    };
+
+    /**
+     * Whose sets of one kind reach a course now, the earliest written first.
+     *
+     * Numbers reach it through a deck that holds number parts, from that
+     * deck's owner (or the teacher it named before 0.696); pronouns through
+     * their cards in its decks. The first is what the course uses until a
+     * teacher chooses (6a): it is the set its students had first.
+     * @param {Course} course
+     * @param {"numbers" | "pronouns"} kind
+     * @param {any[]} decks  The course's decks its students get.
+     * @param {(id: string) => Promise<any>} cardOf
+     * @returns {Promise<{ handle: string, at: number }[]>}
+     */
+    async function reachingSets(course, kind, decks, cardOf) {
+      const lang = course.language || "";
+      /** @type {Map<string, number>} */
+      const first = new Map();
+      const note = (/** @type {string} */ h, /** @type {number} */ t) => {
+        if (h && (!first.has(h) || t < Number(first.get(h)))) first.set(h, t);
+      };
+      if (kind === "numbers") {
+        for (const d of decks) {
+          if (!(d.parts || []).length) continue;
+          const h = d.numbersFrom || d.owner;
+          const sys = await numbersOf(h, d.lang || lang);
+          if (sys) note(h, Number(sys.created) || 0);
+        }
+      } else {
+        for (const d of decks) {
+          for (const id of d.cardIds || []) {
+            const c = await cardOf(id);
+            if (isPronounRec(c) && !c.personal && (!lang || c.lang === lang)) note(c.owner, Number(c.created) || 0);
+          }
+        }
+      }
+      return [...first]
+        .map(([handle, at]) => ({ handle, at }))
+        .sort((a, b) => a.at - b.at || a.handle.localeCompare(b.handle));
+    }
+
+    /**
+     * Whose set of one kind a course's students get: the teacher chosen on
+     * the course, or else the earliest of those reaching it.
+     * @param {Course} course
+     * @param {"numbers" | "pronouns"} kind
+     * @param {any[]} decks
+     * @param {(id: string) => Promise<any>} cardOf
+     */
+    async function wordSetPick(course, kind, decks, cardOf) {
+      const chosen = String(((/** @type {any} */ (course).wordSets || {})[kind]) || "");
+      const reaching = await reachingSets(course, kind, decks, cardOf);
+      return { handle: chosen || (reaching[0] ? reaching[0].handle : ""), chosen: !!chosen, reaching };
+    }
+
+    /**
+     * Every word set shared with the space this request acts in, by teacher.
+     *
+     * Pronouns are shared as cards of the space, so a teacher's pronoun
+     * cards here are their set. Numbers are one document per teacher, which
+     * is shared by being marked with the space — or by its owner already
+     * having a deck of the space that holds number parts, which is how
+     * numbers reached a space before sharing existed.
+     */
+    async function spaceWordSets() {
+      const courses = (await everyCourse(store)).filter((c) => orgOf(c) === acting);
+      const decks = here(await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id))))
+        .filter((d) => d && orgOf(d) === acting && !d.personal);
+      const people = [...new Set(courses.flatMap((c) => c.teachers || []).concat(decks.map((d) => d.owner)))].filter(Boolean);
+      /** @type {{ owner: string, lang: string, cards: any[] }[]} */
+      const pronouns = [];
+      /** @type {{ owner: string, lang: string, numbers: any, times: any }[]} */
+      const numbers = [];
+      for (const h of people) {
+        /** @type {string[]} */
+        const ids = (await readJson(store, K.myCards(h))) || [];
+        const rows = (await readManyJson(store, ids.map((id) => K.card(id)))).filter(
+          (c) => c && inScope(c) && isPronounRec(c) && !c.personal && orgOf(c) === acting && c.owner === h,
+        );
+        /** @type {Map<string, any[]>} */
+        const byLang = new Map();
+        for (const c of rows) byLang.set(String(c.lang || ""), (byLang.get(String(c.lang || "")) || []).concat([c]));
+        for (const [lang, cards] of byLang) pronouns.push({ owner: h, lang, cards });
+        const index = await systemIndex(h);
+        for (const [lang, id] of Object.entries(index.numbers)) {
+          const sys = await readJson(store, K.numSys(String(id)));
+          if (!sys) continue;
+          const used = decks.some((d) => d.owner === h && (d.parts || []).length && (!d.lang || d.lang === lang));
+          if (!(sys.spaces || []).includes(acting) && !used) continue;
+          const times = index.times[lang] ? await readJson(store, K.timeSys(String(index.times[lang]))) : null;
+          numbers.push({ owner: h, lang, numbers: sys, times });
+        }
+      }
+      return { pronouns, numbers, courses };
+    }
+
+    /** Whether this person teaches in the space this request acts in. */
+    const teachesHere = async () =>
+      iManage || (await everyCourse(store)).some((c) => orgOf(c) === acting && isTeacher(c, mine));
+
+    /** Display names for handles, the departed named as everywhere else. */
+    async function namesOf(/** @type {string[]} */ handles) {
+      const list = [...new Set(handles.filter(Boolean))];
+      const rows = await readManyJson(store, list.map((h) => K.user(h)));
+      /** @type {Record<string, string>} */
+      const out = {};
+      list.forEach((h, i) => (out[h] = rows[i] ? rows[i].displayName : h));
+      await nameTheGone(out, list);
       return out;
     }
 
@@ -3303,6 +3461,11 @@ async function handle(req) {
               break;
             }
           }
+          /* A pronoun shared with the space is any of its teachers' to
+             correct (0.696), as the space's other material is. */
+          if (!allowed && isPronounRec(existing) && !existing.personal && orgOf(existing) === acting) {
+            allowed = await teachesHere();
+          }
           if (!allowed) return json({ error: "not-yours" }, 403);
         }
       }
@@ -3574,7 +3737,7 @@ async function handle(req) {
                  description's English, where the teacher wrote one — see
                  src/description.ts. On the card's own word, and only on a
                  word or phrase: a sentence or a scene has none. Absent
-                 where empty, which is every form written before 0.696. */
+                 where empty, which is every form written before 0.697. */
               ...(fi === 0 && takesDescription(card) ? storedDescription(f) : {}),
             })),
           /* Which word cards this one teaches by containing them. A phrase
@@ -4081,12 +4244,22 @@ async function handle(req) {
         if (body.personal === true && !iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
           return json({ error: "not-teaching" }, 403);
         }
+        /* A pronoun written into another teacher's shared set (0.696) is
+           theirs, so the set stays one teacher's: whose set a course uses
+           is chosen by teacher. Only into a set they have in this space. */
+        let owner = mine;
+        const forOwner = String(body.forOwner || "");
+        if (forOwner && forOwner !== mine && body.personal !== true && isPronounRec(fields)) {
+          const theirs = (await spaceWordSets()).pronouns.some((p) => p.owner === forOwner && p.lang === fields.lang);
+          if (!theirs || !(await teachesHere())) return json({ error: "not-yours" }, 403);
+          owner = forOwner;
+        }
         saved = {
           id: newId,
           org: acting,
           /* Personal or not is decided here, once (0.545). */
           ...(body.personal === true ? { personal: true } : {}),
-          owner: mine,
+          owner,
           ...fields,
           /* The card screen makes every card a draft, and an import makes
              it Ready for review: nobody sees it until it is published. A
@@ -4101,7 +4274,7 @@ async function handle(req) {
            written whole, two cards made at once cost one of them its place
            in it — and a card missing from here is a card that is on disk
            and in nobody's collection. */
-        await updateJson(store, K.myCards(mine), (list) => (list || []).concat([newId]));
+        await updateJson(store, K.myCards(owner), (list) => (list || []).concat([newId]));
       }
       /* Save and publish: what was just written goes out to students in
          the same step, as card-status "published" would put it — a draft
@@ -4360,7 +4533,12 @@ async function handle(req) {
          the scene's decks are not this card's, and it is this teacher's
          revision that tells their students' devices to fetch the scene's
          lines again. */
-      if (liveMoved && (fillsOf(saved).length || wasFilling || isSentence(saved))) await bumpFills(saved.owner || "");
+      /* And a pronoun, because a course may send its students this
+         teacher's pronouns in place of the ones its decks hold (0.696) —
+         decks this card is not in, whose versions do not move. */
+      if (liveMoved && (fillsOf(saved).length || wasFilling || isSentence(saved) || isPronounRec(saved))) {
+        await bumpFills(saved.owner || "");
+      }
       await taught();
       /* `trimmed` only where something was — an ordinary save says nothing,
          and the client has nothing to report. */
@@ -4783,58 +4961,10 @@ async function handle(req) {
       return json({ ok: true, deck: next });
     }
 
-    /*
-     * Whose numbers a deck uses (0.541).
-     *
-     * A deck holding number parts is filled from one person's numbers and
-     * clock: its own choice, or its owner's. number-sources lists who may be
-     * chosen — the owner and every teacher with a number system in the
-     * deck's language — and set-deck-numbers records the choice.
-     */
-    async function numberSources(/** @type {Module} */ module) {
-      const courses = await everyCourse(store);
-      const holding = courses.filter((c) => (c.decks || []).includes(module.id));
-      const lang = module.lang || (holding[0] && holding[0].language) || "";
-      const handles = [...new Set([module.owner].concat(courses.flatMap((c) => c.teachers || [])).filter(Boolean))];
-      const out = [];
-      for (const h of handles) {
-        const index = await systemIndex(h);
-        if (!index.numbers[lang]) continue;
-        const u = await readUser(store, h);
-        out.push({ handle: h, displayName: (u && u.displayName) || h, numbers: true, times: !!index.times[lang] });
-      }
-      const owner = out.filter((x) => x.handle === module.owner);
-      const rest = out.filter((x) => x.handle !== module.owner).sort((a, b) => a.displayName.localeCompare(b.displayName));
-      return owner.concat(rest);
-    }
-
-    if (action === "number-sources") {
-      const module = await readModule(store, url.searchParams.get("deck") || "");
-      if (!module) return json({ error: "no-deck" }, 404);
-      if (!(await canEditModule(store, module, mine, iManage))) return json({ error: "not-yours" }, 403);
-      return json({ ok: true, sources: await numberSources(module), chosen: module.numbersFrom || module.owner });
-    }
-
-    if (action === "set-deck-numbers") {
-      const module = await readModule(store, String(body.deckId || ""));
-      if (!module) return json({ error: "no-deck" }, 404);
-      if (!(await canEditModule(store, module, mine, iManage))) return json({ error: "not-yours" }, 403);
-      const from = String(body.from || "");
-      if (!(await numberSources(module)).some((x) => x.handle === from)) return json({ error: "bad-source" }, 400);
-      const next = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
-        if (!fresh) return null;
-        const { numbersFrom: _was, ...rest } = /** @type {any} */ (fresh);
-        return {
-          ...rest,
-          ...(from === fresh.owner ? null : { numbersFrom: from }),
-          version: (fresh.version || 1) + 1,
-          updated: Date.now(),
-        };
-      });
-      await taught();
-      const waiting = next ? (await partsWaiting([next], await everyCourse(store))).get(next.id) : null;
-      return json({ ok: true, numbersFrom: from, partsWaiting: waiting || [] });
-    }
+    /* Whose numbers a deck used was chosen on the deck from 0.541 to 0.688;
+       it is the course's choice now (0.696, 4a) — see set-course-word-set.
+       A deck's old `numbersFrom` is still read, as the set that deck
+       brings to a course where nobody has chosen. */
 
     /* ================= My space (0.545) ================= */
 
@@ -5397,7 +5527,15 @@ async function handle(req) {
       if (!wanted.languageId) return json({ error: "no-language" }, 400);
 
       const keyOf = kind === "times" ? K.timeSys : K.numSys;
-      const index = await systemIndex(mine);
+      /* Whose numbers these are: the caller's own, or (0.696) a set another
+         teacher shared with this space, which any teacher of it may edit —
+         saved as theirs, so it stays the one set its courses chose. */
+      const whose = String(body.owner || "") || mine;
+      if (whose !== mine) {
+        const shared = (await spaceWordSets()).numbers.some((x) => x.owner === whose && x.lang === wanted.languageId);
+        if (!shared || !(await teachesHere())) return json({ error: "not-yours" }, 403);
+      }
+      const index = await systemIndex(whose);
       const known = kind === "times" ? index.times : index.numbers;
       let id = String(known[wanted.languageId] || "");
       const existing = id ? await readJson(store, keyOf(id)) : null;
@@ -5427,7 +5565,7 @@ async function handle(req) {
 
       if (!id) {
         id = `${kind === "times" ? "t" : "n"}${randomBytes(6).toString("hex")}`;
-        await updateJson(store, K.mySystems(mine), (current) => {
+        await updateJson(store, K.mySystems(whose), (current) => {
           const now = current && typeof current === "object" ? current : {};
           const slot = { ...(now[kind] && typeof now[kind] === "object" ? now[kind] : {}) };
           slot[wanted.languageId] = id;
@@ -5438,7 +5576,10 @@ async function handle(req) {
       const saved = {
         ...wanted,
         id,
-        owner: mine,
+        owner: whose,
+        /* The spaces it is shared with (0.696), which the editor neither
+           sends nor knows about. */
+        ...(existing && Array.isArray(existing.spaces) && existing.spaces.length ? { spaces: existing.spaces } : {}),
         rev: held + 1,
         created: Number(existing && existing.created) || Date.now(),
         updated: Date.now(),
@@ -5507,6 +5648,145 @@ async function handle(req) {
       return json({ ok: true, deleted: id });
     }
 
+    /* ---- word sets in a space, and on a course (0.696) — see spaceWordSets ---- */
+
+    /* Every teacher's sets shared with this space, for Material's Word sets
+       screen: pronouns as their cards, numbers as their documents. */
+    if (action === "space-word-sets") {
+      if (!(await teachesHere())) return json({ error: "not-teaching" }, 403);
+      const { pronouns, numbers } = await spaceWordSets();
+      const names = await namesOf(pronouns.map((p) => p.owner).concat(numbers.map((n) => n.owner)));
+      return json({
+        ok: true,
+        pronouns: pronouns.map((p) => ({
+          owner: p.owner,
+          name: names[p.owner] || p.owner,
+          lang: p.lang,
+          cards: p.cards.map((c) => ({ ...teacherView(c), decks: c.inDecks || [] })),
+        })),
+        numbers: numbers.map((n) => ({ owner: n.owner, name: names[n.owner] || n.owner, lang: n.lang, numbers: n.numbers, times: n.times })),
+      });
+    }
+
+    /*
+     * A teacher's own set into the space's Material (0.696, 1a).
+     *
+     * Pronouns are copied, as a card is: the space gets cards of its own,
+     * and the teacher's My space set stays theirs. Sharing again brings the
+     * space's copy up to date, a pronoun at a time, so a teacher has one set
+     * in the space however often they share. Numbers are one document per
+     * teacher and are not copied: marked with the space, they are listed
+     * there and its teachers may edit them.
+     */
+    if (action === "share-word-set") {
+      if (!(await teachesHere())) return json({ error: "not-teaching" }, 403);
+      const kind = body.kind === "pronouns" ? "pronouns" : "numbers";
+      const lang = String(body.lang || "");
+      if (!lang) return json({ error: "no-language" }, 400);
+      if (kind === "numbers") {
+        const index = await systemIndex(mine);
+        if (!index.numbers[lang]) return json({ error: "no-system" }, 404);
+        const keys = [K.numSys(String(index.numbers[lang]))].concat(index.times[lang] ? [K.timeSys(String(index.times[lang]))] : []);
+        for (const key of keys) {
+          await updateJson(store, key, (/** @type {any} */ s) =>
+            s && !(s.spaces || []).includes(acting) ? { ...s, spaces: (s.spaces || []).concat([acting]) } : null);
+        }
+        await taught();
+        return json({ ok: true, kind, lang });
+      }
+      /** @type {string[]} */
+      const ids = (await readJson(store, K.myCards(mine))) || [];
+      const rows = (await readManyJson(store, ids.map((id) => K.card(id)))).filter(
+        (c) => c && inScope(c) && isPronounRec(c) && c.lang === lang && c.owner === mine,
+      );
+      const personal = rows.filter((c) => c.personal);
+      if (!personal.length) return json({ error: "nothing-to-share" }, 400);
+      /** @type {Map<string, any>} */
+      const inSpace = new Map(rows.filter((c) => !c.personal && orgOf(c) === acting).map((c) => [String(c.person), c]));
+      /** @type {string[]} */
+      const made = [];
+      /** @type {Set<string>} */
+      const touchedModules = new Set();
+      for (const p of personal) {
+        const { personal: _p, inDecks: _d, pending: _w, id: _i, org: _o, rev: _r, created: _c, ...words } = /** @type {any} */ (p);
+        const there = inSpace.get(String(p.person));
+        if (there) {
+          await updateJson(store, K.card(there.id), (/** @type {any} */ c) =>
+            c ? { ...c, ...words, owner: c.owner, rev: (c.rev || 1) + 1, updated: Date.now() } : null);
+          for (const did of there.inDecks || []) touchedModules.add(did);
+        } else {
+          const id = `k${randomBytes(6).toString("hex")}`;
+          await writeJson(store, K.card(id), { ...words, id, org: acting, owner: mine, rev: 1, inDecks: [], created: Date.now(), updated: Date.now() });
+          made.push(id);
+        }
+      }
+      if (made.length) await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat(made));
+      /* A deck holding a pronoun that changed is a deck whose students
+         fetch again. */
+      for (const did of touchedModules) {
+        await updateJson(store, K.deck(did), (/** @type {any} */ d) =>
+          d ? { ...d, version: (d.version || 1) + 1, updated: Date.now() } : null);
+      }
+      await bumpFills(mine);
+      await taught();
+      return json({ ok: true, kind, lang, made: made.length, updated: personal.length - made.length });
+    }
+
+    /* Whose set of each kind a course uses, and whose it could (3a, 5a):
+       every set shared with the space in the course's language, and any
+       already reaching the course. `using` is who its students get now;
+       `chosen` says whether a teacher chose it or it is the earliest of
+       those reaching it (6a). */
+    if (action === "course-word-sets") {
+      const course = await readCourse(store, url.searchParams.get("course") || "");
+      if (!course) return json({ error: "not-found" }, 404);
+      if (!iManage && !isTeacher(course, mine)) return json({ error: "not-yours" }, 403);
+      const lang = course.language || "";
+      const decks = liveDecksOf(course, await readManyJson(store, (course.decks || []).map((id) => K.deck(id))));
+      const { pronouns, numbers } = await spaceWordSets();
+      /** @type {Record<string, any>} */
+      const sets = {};
+      for (const kind of /** @type {("numbers" | "pronouns")[]} */ (["numbers", "pronouns"])) {
+        const pick = await wordSetPick(course, kind, decks, loadCard);
+        const shared = (kind === "numbers" ? numbers : pronouns).filter((x) => x.lang === lang).map((x) => x.owner);
+        const options = [...new Set(shared.concat(pick.reaching.map((r) => r.handle)).concat(pick.handle ? [pick.handle] : []))];
+        sets[kind] = { options, using: pick.handle, chosen: pick.chosen, reaching: pick.reaching.map((r) => r.handle) };
+      }
+      const names = await namesOf(Object.values(sets).flatMap((s) => s.options));
+      for (const s of Object.values(sets)) s.options = s.options.map((/** @type {string} */ h) => ({ handle: h, name: names[h] || h }));
+      return json({ ok: true, sets });
+    }
+
+    /* A teacher of the course chooses whose set of a kind it uses; "" goes
+       back to the earliest reaching it. */
+    if (action === "set-course-word-set") {
+      const course = await readCourse(store, String(body.courseId || ""));
+      if (!course) return json({ error: "not-found" }, 404);
+      if (!iManage && !isTeacher(course, mine)) return json({ error: "not-yours" }, 403);
+      const kind = body.kind === "pronouns" ? "pronouns" : body.kind === "numbers" ? "numbers" : "";
+      if (!kind) return json({ error: "bad-kind" }, 400);
+      const from = String(body.from || "");
+      if (from) {
+        const lang = course.language || "";
+        const decks = liveDecksOf(course, await readManyJson(store, (course.decks || []).map((id) => K.deck(id))));
+        const pick = await wordSetPick(course, kind, decks, loadCard);
+        const { pronouns, numbers } = await spaceWordSets();
+        const ok = (kind === "numbers" ? numbers : pronouns).some((x) => x.owner === from && x.lang === lang)
+          || pick.reaching.some((r) => r.handle === from);
+        if (!ok) return json({ error: "bad-source" }, 400);
+      }
+      const next = await updateJson(store, K.course(course.id), (/** @type {any} */ fresh) => {
+        if (!fresh) return null;
+        const wordSets = { ...(fresh.wordSets || {}) };
+        if (from) wordSets[kind] = from;
+        else delete wordSets[kind];
+        const { wordSets: _was, ...rest } = fresh;
+        return Object.keys(wordSets).length ? { ...rest, wordSets } : rest;
+      });
+      await taught();
+      return json({ ok: true, course: next });
+    }
+
     if (action === "my-material") {
       const known = String(url.searchParams.get("version") || "");
       /** @type {string[]} */
@@ -5566,9 +5846,11 @@ async function handle(req) {
           moduleRows
             .map((/** @type {any} */ d) => d.owner)
             .concat(courseRows.flatMap((/** @type {any} */ c) => c.teachers || []))
-            /* And whoever a deck takes its numbers from (0.541), who may
-               teach none of these courses. */
+            /* And whoever a deck took its numbers from before 0.696, and
+               whoever a course chose a word set from since, who may teach
+               none of these courses. */
             .concat(moduleRows.map((/** @type {any} */ d) => d.numbersFrom || ""))
+            .concat(courseRows.flatMap((/** @type {any} */ c) => Object.values(c.wordSets || {}).map(String)))
             .filter(Boolean)
         ),
       ];
@@ -5645,17 +5927,25 @@ async function handle(req) {
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
       await nameTheGone(nameOf, ownerHandles);
 
+      /* Whose numbers each course uses (0.696): one teacher's for the whole
+         course, so two modules of it never send two versions of a number. */
+      /** @type {Map<string, string>} */
+      const numbersFor = new Map();
+      for (const c of courseRows) {
+        const pick = await wordSetPick(c, "numbers", liveDecksOf(c, moduleRows), loadCard);
+        numbersFor.set(c.id, pick.handle);
+      }
       const modules = [];
       for (const d of moduleRows) {
         const course = moduleToCourse.get(d.id);
         const link = (d.courses || []).find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
         const cardIds = await moduleCardIds(d);
         /* Which number system and clock fill this deck's number parts: the
-           chosen person's, in the deck's language (0.541). null when that
+           course's chosen teacher's, in the deck's language. null when that
            person has none, so the device files nothing rather than
            everything. */
         const numLang = d.lang || course.language || "";
-        const numIndex = await systemIndex(d.numbersFrom || d.owner);
+        const numIndex = await systemIndex(numbersFor.get(course.id) || d.numbersFrom || d.owner);
         modules.push({
           ...d,
           numbersSystemId: numIndex.numbers[numLang] || null,
@@ -5681,6 +5971,53 @@ async function handle(req) {
         const c = cardRows[i];
         if (c && inScope(c) && isPublished(c)) cardById.set(id, studentView(c));
       });
+      /*
+       * One teacher's pronouns to a course (0.696).
+       *
+       * A deck holds the pronouns as their cards, and two teachers' decks in
+       * one course used to send their students two of every pronoun. Now
+       * each deck holding pronouns sends the set the course uses instead:
+       * the teacher chosen on the course, or the earliest written of those
+       * reaching it. A deck is sent under one course (see moduleToCourse),
+       * so that course's choice is the one it takes.
+       */
+      for (const c of courseRows) {
+        const lang = c.language || "";
+        const live = liveDecksOf(c, modules);
+        const pick = await wordSetPick(c, "pronouns", live, async (id) => cardById.get(id) || null);
+        if (!pick.handle) continue;
+        /** @type {string[] | null} */
+        let theirs = null;
+        for (const d of modules) {
+          if (d.courseId !== c.id) continue;
+          const held = d.cardIds.filter((/** @type {string} */ id) => {
+            const card = cardById.get(id);
+            return isPronounRec(card) && !card.personal && (!lang || card.lang === lang);
+          });
+          if (!held.length) continue;
+          /* Already that teacher's, as it is in every course nobody shared
+             another set into: nothing to swap, nothing more to read. */
+          if (held.every((/** @type {string} */ id) => cardById.get(id).owner === pick.handle)) continue;
+          if (!theirs) {
+            /** @type {string[]} */
+            const ids = (await readJson(store, K.myCards(pick.handle), EVENTUAL)) || [];
+            const rows = await readManyJson(store, ids.map((id) => K.card(id)), EVENTUAL);
+            theirs = [];
+            for (const card of rows) {
+              if (!card || !inScope(card) || !isPublished(card) || card.personal || !isPronounRec(card)) continue;
+              if (orgOf(card) !== orgOf(c) || (lang && card.lang !== lang)) continue;
+              cardById.set(card.id, studentView(card));
+              theirs.push(card.id);
+            }
+          }
+          /* Where the chosen teacher has no pronouns any more, the deck keeps
+             what it holds rather than sending none. */
+          if (!theirs.length) continue;
+          const drop = new Set(held);
+          d.cardIds = d.cardIds.filter((/** @type {string} */ id) => !drop.has(id)).concat(theirs);
+          d.cardCount = d.cardIds.length;
+        }
+      }
       /*
        * The values a deck's phrases need, sent with it.
        *

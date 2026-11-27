@@ -14427,7 +14427,7 @@ export default function ArabicTrainer() {
      being shown two hints. Without a meaning to give, the nudge is the
      pronunciation, as it always was. */
   /* A description's English is English, so a course that shows none
-     offers none behind the nudge either (0.696). */
+     offers none behind the nudge either (0.697). */
   const hintHidden = !!(spec && spec.hintField === "descEn" && englishModeFor(exercise ? String(exercise.id || "") : "") === "hidden");
   const hintValue = !phraseHint && !hintHidden && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
   const hintAt = phraseHint || hintValue;
@@ -16998,7 +16998,7 @@ export default function ArabicTrainer() {
                     ) : spec.promptField === "desc" ? (
                       /* A description, in the language itself: a phrase
                          in the script, set the way a phrase with a gap
-                         is (0.696). */
+                         is (0.697). */
                       <Field value={item.desc} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field

@@ -144,12 +144,12 @@ test("records made in a space carry it; older ones read as Main", async () => {
 const crossing = () => /** @type {[string, any][]} */ ([
   ["course-decks", { params: { course: b.course.id } }],
   ["deck-cards", { params: { deck: b.deck.id } }],
-  ["number-sources", { params: { deck: b.deck.id } }],
+  ["course-word-sets", { params: { course: b.course.id } }],
   ["rename-deck", { body: { deckId: b.deck.id, title: "Mine now" } }],
   ["lock-deck", { body: { deckId: b.deck.id, locked: true } }],
   ["set-deck-parts", { body: { deckId: b.deck.id, parts: ["numbers:0-10"] } }],
   ["save-set", { body: { deckId: b.deck.id, set: { lists: [] } } }],
-  ["set-deck-numbers", { body: { deckId: b.deck.id, from: main.teacher.handle } }],
+  ["set-course-word-set", { body: { courseId: b.course.id, kind: "numbers", from: main.teacher.handle } }],
   ["delete-deck", { body: { deckId: b.deck.id } }],
   ["attach-deck", { body: { deckId: b.deck.id, courseId: main.course.id } }],
   ["detach-deck", { body: { deckId: b.deck.id, courseId: b.course.id } }],
@@ -262,8 +262,8 @@ test("export takes nothing from another space", async () => {
  */
 const PLACED = {
   crossed: [
-    "course-decks", "deck-cards", "number-sources", "rename-deck", "lock-deck", "set-deck-parts",
-    "set-deck-numbers", "delete-deck", "attach-deck", "detach-deck", "save-card", "card-status",
+    "course-decks", "deck-cards", "course-word-sets", "rename-deck", "lock-deck", "set-deck-parts",
+    "set-course-word-set", "delete-deck", "attach-deck", "detach-deck", "save-card", "card-status",
     "review-card", "delete-card", "delete-cards", "join-course", "my-courses", "my-decks", "my-cards",
     "my-material", "my-reports", "dismiss-reports", "admin-overview", "admin-reissue-key",
     "admin-delete-user", "admin-delete-course", "admin-rename-course", "admin-course-language",
@@ -297,6 +297,8 @@ const PLACED = {
     "admin-add-member",
     /* 0.578: removing from a space, and suspending across the app. */
     "admin-remove-member", "admin-suspend-app", "admin-lift-app",
+    /* 0.696: word sets shared with a space, tried in word-sets.test.mjs. */
+    "space-word-sets", "share-word-set",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",

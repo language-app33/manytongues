@@ -584,7 +584,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "ar",
   },
   /* The word for its description, written in the language itself by the
-     teacher — "where you buy bread" — and chosen out of four (0.696). The
+     teacher — "where you buy bread" — and chosen out of four (0.697). The
      meaning without English: what "English → choose" asks, asked in the
      language. On the second level with it, for the same reason. The
      description's English, where the teacher wrote one, is behind the
