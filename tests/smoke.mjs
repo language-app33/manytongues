@@ -291,7 +291,7 @@ let withPath = false;
 let pathOrder = ["u1", "u2"];
 /** @type {any[]} */
 const movedUnits = [];
-/** What the course's Exercises tab asked the server to save (0.734). @type {any[]} */
+/** What the course's Exercises tab asked the server to save (0.735). @type {any[]} */
 const practiceSaves = [];
 /** Lesson 1's name as the stub server holds it, and the renames it was sent (0.732). */
 let lessonOneTitle = "Lesson 1";
@@ -5218,7 +5218,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     `${savedCards.length - savesBefore} saved · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
   click(cardEdit());
   await sleep(400);
-  /* Its description folded to one row while it has none (0.734), and
+  /* Its description folded to one row while it has none (0.735), and
      written here so the card is saved with one. */
   const descBlock = () => /** @type {any} */ (document.querySelector('.at-screen.cardform [data-el="editor-description"]'));
   const descEnBox = () => /** @type {any} */ (document.querySelector('.at-screen.cardform input[aria-label="Description in English"]'));
@@ -5866,7 +5866,7 @@ const openPronounTables = async () => {
     !document.querySelector('[role="radiogroup"][aria-label="What kind of card is this?"]') &&
       !!advancedTick() && !advancedTick().checked && tabNames().join("|") === "Basic|Exercises",
     `${tabNames().join("|")} · box ${advancedTick() ? (advancedTick().checked ? "ticked" : "unticked") : "missing"}`);
-  /* Since 0.734 (the owner's 8a) one line under it says what it is for. */
+  /* Since 0.735 (the owner's 8a) one line under it says what it is for. */
   check("the box is the first thing in This card, above the card's name, with one line saying what it is for",
     !!advancedBox() && advancedBox().closest(".at-formblock") === thisCardBlock() &&
       !!cardNameField() && !!(advancedBox().compareDocumentPosition(cardNameField()) & 4) &&
@@ -5877,7 +5877,7 @@ const openPronounTables = async () => {
   check("whose Basic tab holds the word itself",
     [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Content$/.test((n.textContent || "").trim())),
     "(no word)");
-  /* ---- the Basic tab while writing (0.734, the owner's 9a and 10a) ----
+  /* ---- the Basic tab while writing (0.735, the owner's 9a and 10a) ----
      No bare + beside the script or English heading: another answer is a
      worded link under the box once it has something in it. And
      Description is one row with Add until it is wanted. */
@@ -9569,7 +9569,7 @@ const openPronounTables = async () => {
   const order = () => [...frame.querySelectorAll(".at-cardgrid .at-tilewrap")].map((t) => (t.textContent || "").slice(0, 40)).join(" | ");
   const sheetLabels = (/** @type {string} */ sheet) =>
     [...document.querySelectorAll(`${sheet} .at-filterlabel`)].map((s) => (s.textContent || "").trim());
-  /* Since 0.734 (the owner's 1a) "Sort by" is rows with a mark — real
+  /* Since 0.735 (the owner's 1a) "Sort by" is rows with a mark — real
      radios, so this answers the row's own input — and "Order" is one
      two-part switch under them. */
   const seg = (/** @type {string} */ group, /** @type {RegExp} */ re) =>
@@ -9702,7 +9702,7 @@ const openPronounTables = async () => {
     (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
     (sheetFoot(".at-filtersheet") || {}).textContent || "(no button)");
 
-  /* ---- chips, and no "Any" (0.734, the owner's 2a and 3a) ----
+  /* ---- chips, and no "Any" (0.735, the owner's 2a and 3a) ----
      Every group is chips; nothing lit is what narrows nothing, so there is
      no "Any" to press, and a lit chip pressed again lets go. */
   const chipName = (/** @type {Element} */ b) => {
@@ -9848,7 +9848,7 @@ const openPronounTables = async () => {
   await sleep(250);
   check("and fills-none leaves the values out",
     tiles() === all - values, `${tiles()} ordinary, ${values} values, ${all} in all`);
-  /* No "Any card" since 0.734: the lit side pressed again lets go. */
+  /* No "Any card" since 0.735: the lit side pressed again lets go. */
   click(blankSide(/^Fills none$/));
   await sleep(250);
   check("and pressing the lit side again shows every card again, with no side lit",
@@ -13839,7 +13839,7 @@ const openPronounTables = async () => {
     await sleep(300);
     check("a course's Exercises tab shows the presets, without the switches one by one",
       /With translation/.test(panel()) && !/Match the pairs/.test(panel()), panel().slice(0, 200));
-    /* Since 0.734 (the owner's 6a and 7a): four rows, each explaining
+    /* Since 0.735 (the owner's 6a and 7a): four rows, each explaining
        itself; under a preset a fixed "What this asks" over four folded
        groups with their counts, read-only; under Custom sliding switches. */
     const tabPanel = () => /** @type {any} */ (courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || document.createElement("div"));

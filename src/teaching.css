@@ -1086,7 +1086,7 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-checklist li { margin-bottom:4px; }
 
 /* A course's exercises (0.627): the four rows saying what each does, then
-   what the choice asks. Since 0.734 (the owner's 6a and 7a) a preset shows
+   what the choice asks. Since 0.735 (the owner's 6a and 7a) a preset shows
    it a folded group at a time, read-only; Custom shows every exercise with
    its own sliding switch. */
 .at-practice-warn { margin:8px 0 0; color: var(--rose); font-size:14px; font-weight:600; }

@@ -185,7 +185,7 @@ chooses one of a few rather than acting (0.691): a card's status
 The groups a list's Filter panel holds. `groups, note, onClear`
 
 A group is `{ key, label, value, quiet, onChange, options }` and draws a
-`ChipPick` (0.734): each group full width, one under another, its choices
+`ChipPick` (0.735): each group full width, one under another, its choices
 rounded chips. `quiet` names the value that counts as not narrowing — that
 option is **not drawn**, since nothing lit already says it, and pressing the
 lit chip goes back to it. `narrowing(groups)` counts the groups away from
@@ -197,7 +197,7 @@ says while it narrows ("Without recordings"; its `label` otherwise), and
 
 It is only the pickers: the button, the panel they open in and the chips
 under the bar belong to `ItemList`'s `filter` (0.728). The Sort panel no
-longer uses it: since 0.734 it is a `RadioGroup` ("Sort by") and one
+longer uses it: since 0.735 it is a `RadioGroup` ("Sort by") and one
 `Segmented` in ordinary letters ("Order"), built from `ItemList`'s `sort`.
 
 ### `ChipPick` — 6 uses
@@ -220,7 +220,7 @@ On or off, as one sliding switch. `on, onChange(on), label, disabled`
 
 `role="switch"` with `aria-checked`; `label` names it. A 46×28 track inside
 a button padded to a 44px target. Used on a course's Exercises tab under
-Custom, where it replaced an Off / On `Segmented` (0.734); that pair was used
+Custom, where it replaced an Off / On `Segmented` (0.735); that pair was used
 nowhere else.
 
 ### `RadioGroup` — 2 uses
@@ -492,7 +492,7 @@ its play buttons resolve to "missing" rather than fetching.
   group, key, download, verify, play, pause, view, select, school, copy,
   refresh, mic, remove, chevronDown, chevronUp, soundOff, flag, menu, help,
   theme, language, lock`.
-  Use these rather than glyph characters. `filter` (a funnel, 0.734) is for
+  Use these rather than glyph characters. `filter` (a funnel, 0.735) is for
   a button that narrows a list; `tune` (the sliders) is for settings — a
   course's Exercises tab, a card's Advanced tab, the admin space.
 - **`plural(n, noun)`** — `plural(3, "card")` → `"3 cards"`. Use it instead of

@@ -735,7 +735,7 @@ button {
 .at-sheetfoot > .at-btn { width:100%; }
 /* In a sheet the pickers are the sheet's own, not a panel inside it. */
 .at-sheetbody > .at-filterbar { padding:0; border:0; background:none; }
-/* The Sort panel's Order (0.734, the owner's 1a): the one switch under the
+/* The Sort panel's Order (0.735, the owner's 1a): the one switch under the
    rows, full width, in ordinary letters rather than the track's capitals. */
 .at-sortorder { margin-top:16px; }
 .at-sortorder .at-seg { text-transform:none; letter-spacing:0; font-size:15px; font-weight:700; }
@@ -1104,7 +1104,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    any is. */
 .at-toolbar .at-filterbtn { position:relative; font-family: var(--ui); font-size:14px; font-weight:700; }
 .at-toolbar .at-filterbtn > .at-filtercount { position:absolute; top:-6px; right:-6px; }
-/* Green while any filter is on (0.734): the same green as a lit chip in
+/* Green while any filter is on (0.735): the same green as a lit chip in
    the panel, so green says one thing — this list is narrowed. */
 .at-filterbtn.on { border-color: var(--jade); color: var(--jade); background: var(--jade-bg); }
 .at-filterbtn.on > .at-filtercount { background: var(--jade); color: var(--onjade); }
@@ -1251,7 +1251,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
 /* A three-dots button with no outline (0.720, the owner's wish, on a
    module's tile): the icon alone, the 44px it can be pressed in kept. */
-.at-morebtn.bare { border-color: transparent; }
+.at-morebtn.bare, .at-morebtn.bare.on { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
 .at-reachtext b { color: var(--ink); font-weight:700; }
 /* A card shown rather than edited: label on the left, value on the right,
@@ -1978,7 +1978,7 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
    its own to go on, it collapsed to nothing and its options spilled out
    over each other. A column gives it the group's width to work with, and
    the bar wraps the groups. */
-/* Every group full width, one under another (0.734, the owner's 2a): its
+/* Every group full width, one under another (0.735, the owner's 2a): its
    chips wrap across the panel rather than squeezing into a column. */
 .at-filtergroup { display:flex; flex-direction:column; align-items:stretch; gap:8px;
   flex:1 1 100%; min-width:0; }
@@ -3680,6 +3680,12 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* And the first of them has nothing above it to be ruled off from, as the
    editor's first block has none. */
 .at-screen.cardform .at-screeninner > .at-section:first-child { border-top:0; }
+/* A section that follows the screen's opening words — the Numbers lede
+   above Parts, Check a number's above The number — keeps room above its
+   rule, as much as the head leaves above those words, so the rule has room
+   either side. The band's own margin zeroed it and the rule sat on the
+   last line of the lede (0.734). */
+.at-screen.cardform .at-screeninner > :not(.at-section) + .at-section { margin-top:18px; }
 .at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
   font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
   color: var(--ink); }
@@ -3961,7 +3967,7 @@ p.at-pathhome { cursor:default; font-weight:700; }
 .at-pathunitstate i { font-style:normal; opacity:.75; }
 .at-unithead { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
 
-/* --- Switch: on or off, sliding (0.734, the owner's 7a) ---
+/* --- Switch: on or off, sliding (0.735, the owner's 7a) ---
    The track is 46×28; the button around it is padded to a 44px target so
    a thumb does not have to find the track itself. */
 .at-switch { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
@@ -3980,5 +3986,5 @@ p.at-pathhome { cursor:default; font-weight:700; }
 }
 
 /* Another accepted answer, as a worded link under the last box on a card's
-   Basic tab (0.734, the owner's 9a). */
+   Basic tab (0.735, the owner's 9a). */
 .at-addanswer { align-self:flex-start; margin-top:8px; font-weight:700; font-size:15px; min-height:32px; }

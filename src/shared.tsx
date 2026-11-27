@@ -115,7 +115,7 @@ const ICONS: Record<string, string> = {
     "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
   edit:
     "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
-  /* A funnel: Filter, everywhere (0.734, the owner's 4a). `tune` stays for
+  /* A funnel: Filter, everywhere (0.735, the owner's 4a). `tune` stays for
      settings: the Exercises tab, a card's Advanced tab. */
   filter: "M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39c.51-.66.04-1.61-.79-1.61H5.04c-.83 0-1.3.95-.79 1.61z",
   tune:
@@ -2456,7 +2456,7 @@ export function narrowing(groups?: FilterGroup[]): number {
 }
 
 /**
- * Chips to pick from (0.734, the owner's 2a and 3a). One of a few, or
+ * Chips to pick from (0.735, the owner's 2a and 3a). One of a few, or
  * several: rounded, in ordinary letters, wrapping as they need.
  *
  * One at a time (`onChange`): the option that means "none" (`quiet`) is not
@@ -2513,7 +2513,7 @@ export function ChipPick({ options, value, quiet, onChange, chosen, onToggle, la
  * the disclosure belongs to ItemList, which draws the button and is the
  * only thing that can know which panel is open.
  *
- * Built from ChipPick since 0.734: it was Segmented, with an "Any" option
+ * Built from ChipPick since 0.735: it was Segmented, with an "Any" option
  * lit green in every group, so a list narrowing nothing looked as busy as
  * one narrowed three ways.
  */
@@ -2542,7 +2542,7 @@ export function FilterBar({ groups, note, onClear }: {
       {live.map((g) => (
         <div className="at-filtergroup" key={g.key}>
           <span className="at-filterlabel">{g.label}</span>
-          {/* Chips, every group full width (0.734, the owner's 2a and 3a):
+          {/* Chips, every group full width (0.735, the owner's 2a and 3a):
               no "Any" to press, since nothing lit is what narrows nothing,
               so green says one thing — this is narrowing the list. */}
           {g.custom || (
@@ -2791,7 +2791,7 @@ function SortSheet({ sort, onClose }: { sort: ListSort; onClose: () => void }) {
   return (
     <PickSheet title="Sort" className="at-footsheet at-sortsheet" onClose={onClose}>
       {/* Rows with a mark for what to sort by, and one two-part switch
-          under them for which way, in ordinary letters (0.734, the
+          under them for which way, in ordinary letters (0.735, the
           owner's 1a). Still a draft until Apply. */}
       <div className="at-sheetbody">
         <RadioGroup
@@ -5286,7 +5286,7 @@ export function RadioGroup<T extends string>({ options, value, onChange, label, 
 }
 
 /**
- * On or off, as one sliding switch (0.734, the owner's 7a). It replaced an
+ * On or off, as one sliding switch (0.735, the owner's 7a). It replaced an
  * OFF / ON pair on a course's Exercises tab, the only place that pair was
  * used: two words for one fact read as two things to choose between.
  */

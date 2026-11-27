@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.734 — 27 November 2026
+## 0.735 — 27 November 2026
 
 **Simpler Sort and Filter panels, a course's Exercises tab, and a card's
 Basic tab while it is written**, as chosen on the page of mock-ups.
@@ -74,6 +74,18 @@ Basic tab while it is written**, as chosen on the page of mock-ups.
 
 - On a real phone: that the Filter panel scrolls smoothly with its Show
   button in view, and that the sliding switches are easy to hit.
+
+## 0.734 — 27 November 2026
+
+**Two tidy-ups on the teacher screens.**
+
+- **Numbers:** the line between the introduction and Parts sat right on
+  the last line of the introduction. It now has the same room above it as
+  the line under the screen's title. Check a number gets the same room
+  above The number.
+- **A module's screen:** the three dots at the top right are the dots
+  alone, with no outline round them, as on a module's tile. They stay that
+  way while their panel is open.
 
 ## 0.733 — 27 November 2026
 

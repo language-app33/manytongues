@@ -257,7 +257,7 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
       ))}
       {/* Headed (the Basic tab), another answer is a worded link under the
           last box once it has something in it, not a bare + in the heading
-          (0.734, the owner's 9a): a + beside "English" read as adding a
+          (0.735, the owner's 9a): a + beside "English" read as adding a
           language, and an empty second box was never what was meant. */}
       {headed && !locked && String(list[list.length - 1] || "").trim() !== "" && (
         <button
@@ -652,7 +652,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
         </React.Fragment>
       ))}
       {/* Headed, another spelling is a worded link under the last one once
-          it is written (0.734, the owner's 9a), as English's is. */}
+          it is written (0.735, the owner's 9a), as English's is. */}
       {headed && !locked && String((rows[rows.length - 1] || { text: "" }).text || "").trim() !== "" && (
         <button
           type="button"
@@ -7012,7 +7012,7 @@ function BasicBlock({ lang, scene, sentence = false, word, talk, advanced, canUn
         options={[{
           id: "advanced",
           title: "Build an advanced card",
-          /* One line saying what it is for (0.734, the owner's 8a). */
+          /* One line saying what it is for (0.735, the owner's 8a). */
           note: canUntick
             ? "For several forms, a sentence with blanks, a verb table or a conversation."
             : "A sentence or a scene is always an advanced card.",
@@ -10886,7 +10886,7 @@ function DescriptionBlock({ word, lang, alone, className = "at-formblock at-mt5"
   /* Read with none written, nothing: an empty section only said what a
      teacher could add (0.732). */
   const locked = useContext(Locked);
-  /* Being written with none yet, one row with Add (0.734, the owner's
+  /* Being written with none yet, one row with Add (0.735, the owner's
      10a): a section of two optional boxes was a lot to wade past for
      something most cards never have. Decided once, when the block first
      draws, so emptying the boxes while typing does not fold them away

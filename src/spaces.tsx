@@ -2007,12 +2007,12 @@ const MODE_LABEL: Record<PracticeMode, string> = {
   none: "No translation",
   custom: "Custom",
 };
-/* What each preset does (0.708); since 0.734 always under its own row, so
+/* What each preset does (0.708); since 0.735 always under its own row, so
    a teacher reads all four before a tap that changes what students get. */
 const MODE_SAYS: Record<PracticeMode, string> = {
   with: "Students see English in questions and answers.",
   little: "Students see English only where a card needs it.",
-  /* "only" since 0.734 (the owner's wording): this is the whole of what
+  /* "only" since 0.735 (the owner's wording): this is the whole of what
      students get, not a list of extras. */
   none: "No English: only pictures, sound and the language itself.",
   custom: "Choose each exercise yourself.",
@@ -2183,7 +2183,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
   const now: CoursePractice = readPractice(course.practice) || { mode: "with", off: [] };
   const [asking, setAsking] = useState<{ next: CoursePractice; n: number } | null>(null);
   const [showUntaught, setShowUntaught] = useState(false);
-  /* Which groups are open under a preset (0.734): all shut to begin with,
+  /* Which groups are open under a preset (0.735): all shut to begin with,
      and shut again when the preset changes, so what opens is what was
      asked about under this one. */
   const [opened, setOpened] = useState<Set<number>>(() => new Set());
@@ -2223,7 +2223,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
         </span>
       </div>
       {/* Four rows, each saying what it does, with a mark on the chosen
-          one (0.734, the owner's 6a): every tap changes what students get,
+          one (0.735, the owner's 6a): every tap changes what students get,
           so each choice explains itself before it is made. */}
       <RadioGroup
         name={`practice-mode-${course.id}`}
@@ -2255,7 +2255,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           {untaught.map((c) => <li key={c.id}>{word(c)}</li>)}
         </ul>
       )}
-      {/* Under a preset, what it asks, a group at a time (0.734, the
+      {/* Under a preset, what it asks, a group at a time (0.735, the
           owner's 7a): a fixed label over the four groups, each folded with
           its count, opening to read — the preset decides, so no switches. */}
       {now.mode !== "custom" && (
@@ -2314,7 +2314,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
         </div>
       )}
       {/* Under Custom every group open, each exercise one sliding switch
-          (0.734, the owner's 7a; it was an OFF / ON pair). */}
+          (0.735, the owner's 7a; it was an OFF / ON pair). */}
       {now.mode === "custom" && byLevel.map(([level, types]) => {
         const on = types.filter((t) => switchOf(now, t) !== "off").length;
         return (
@@ -7792,7 +7792,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           subtypes: NO_CARD_FILTER.subtypes,
           sceneKinds: NO_CARD_FILTER.sceneKinds,
         })),
-      /* Chips, several at once (0.734, the owner's 3a): words and
+      /* Chips, several at once (0.735, the owner's 3a): words and
          sentences, without the scenes. A kind's subtypes are offered under
          it once it is lit, and only then — "verbs" says nothing about a
          sentence. Nothing lit narrows nothing, so no line says so. */
@@ -10105,7 +10105,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* No Edit and no Save (0.732, the owner's 1a): the name is renamed
            by its pencil, and Export and Delete wait behind three dots. */
         action={
+          /* The dots alone, no outline (0.734, the owner's wish), as on
+             a module's tile. */
           <MoreMenu
+            bare
             label={`More for this ${kindW}`}
             title={d.title}
             items={[

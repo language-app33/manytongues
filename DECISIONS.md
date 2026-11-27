@@ -9718,7 +9718,7 @@ learner's Courses page and card grids look and behave as before.
   key handling rather than copying it, and `useNarrow` says no where there
   is no `matchMedia`, so the smoke walk keeps checking the table.
 
-## Chips for filters, rows for Sort, the funnel, and the Exercises tab (0.734)
+## Chips for filters, rows for Sort, the funnel, and the Exercises tab (0.735)
 
 The owner chose each of these on a page of mock-ups (answers 1a, 2a, 3a,
 4a, 6a, 7a, 8a, 9a, 10a).

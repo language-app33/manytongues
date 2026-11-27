@@ -796,7 +796,7 @@ export function ComponentGallery() {
       <Row
         name="FilterBar"
         what="The pickers a list's Sort or Filter panel holds: how to order it, or what to leave out."
-        note="What the Filter panel holds since 0.734: each group full width, its choices ChipPick chips, with no Any — the group's `quiet` option is not drawn, and pressing the lit chip goes back to it. ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips under the bar. narrowing() counts the groups away from `quiet`, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the chips, for a choice a few chips cannot say. Sort no longer uses this: its panel is RadioGroup rows and a Segmented Order."
+        note="What the Filter panel holds since 0.735: each group full width, its choices ChipPick chips, with no Any — the group's `quiet` option is not drawn, and pressing the lit chip goes back to it. ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips under the bar. narrowing() counts the groups away from `quiet`, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the chips, for a choice a few chips cannot say. Sort no longer uses this: its panel is RadioGroup rows and a Segmented Order."
       >
         <V label="two groups" wide>
           <FilterBar
@@ -940,7 +940,7 @@ export function ComponentGallery() {
       <Row
         name="ChipPick"
         what="Rounded chips in ordinary letters, wrapping as they need: one of a few, or several."
-        note="The Filter panel's choices (0.734). One at a time: value, onChange and `quiet`, the value meaning none, which is not drawn — pressing the lit chip goes back to it. Several: chosen and onToggle(value, wasOn). An option's note (a count) is drawn small after its label. label is what a screen reader says for the group."
+        note="The Filter panel's choices (0.735). One at a time: value, onChange and `quiet`, the value meaning none, which is not drawn — pressing the lit chip goes back to it. Several: chosen and onToggle(value, wasOn). An option's note (a count) is drawn small after its label. label is what a screen reader says for the group."
       >
         <V label="one at a time, quiet left out" wide>
           <ChipPick
@@ -973,7 +973,7 @@ export function ComponentGallery() {
       <Row
         name="Switch"
         what="On or off, as one sliding switch."
-        note="A course's Exercises tab under Custom (0.734), where it replaced an OFF / ON pair. role=switch with aria-checked; label names it. The button is padded to a 44px target around a 46×28 track."
+        note="A course's Exercises tab under Custom (0.735), where it replaced an OFF / ON pair. role=switch with aria-checked; label names it. The button is padded to a 44px target around a 46×28 track."
       >
         <V label="press it">
           <Switch on={switched} onChange={setSwitched} label="Match the pairs" />
