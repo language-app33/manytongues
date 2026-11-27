@@ -9571,3 +9571,19 @@ or a personal set is attached to it. The sheet is drawn at the frame's
 level, beside `MeaningSplits`, so it opens from Home as well as Material.
 "New personal set" left the Material list's `more` menu: one place to
 choose a kind. `PathSection`'s New unit stays.
+
+## Empty boxes get their button (0.724, 0.726)
+
+A course's empty Modules box gained Create a module (0.724), as To do has.
+A sweep of every empty box then found six that said what to do with no
+button to do it; the owner chose 1a, 2a, 3b, 4c, 5b, 6b. So a module's
+Courses now sits outside the `at-cardlock` fieldset and saves on tap
+(`saveModuleCourse`), as the course screen's `toggleModule` does; while
+editing it also patches the draft, as `saveBuiltins` does, so Save neither
+undoes nor repeats it. The cost: a module's courses are no longer part of
+the edit that Cancel throws away. People's empty Students box copies the
+student code, and the admin's empty Modules tab says teachers make
+modules. Left as they were, by choice: the student's Cards and Progress
+tabs with no course (Home has Join a course), the "languages switched on"
+empties, and the sentence-card picker, where a button would leave a
+half-written card.
