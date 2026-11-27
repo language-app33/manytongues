@@ -770,7 +770,7 @@ export function explain(err: unknown): string {
       "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",
       "not-allowed": "That administrator key isn't right.",
-      "not-yours": "That module belongs to another teacher.",
+      "not-yours": "Only the person who made this, an administrator, or a teacher of a course it is in can change it.",
       "not-teaching": "You aren't teaching that course.",
       "no-deck": "That module no longer exists.",
       "deck-locked": "That module is locked. Unlock it in its settings first.",

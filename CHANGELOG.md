@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.711 — 27 November 2026
+
+**Cards and modules say who made them and who last changed them.** A card's
+page and a module's page now carry one line, for example "Made by Tala ·
+last changed by Rana, Nov 26". Who may change what has not moved: the person
+who made it, an administrator, and any teacher of a course it is in. When
+someone else tries, the message now says exactly that. Cards and modules
+changed before this release show the date of the last change but not who
+made the change.
+
 ## 0.710 — 27 November 2026
 
 **New module is one step.** In Teaching › Material, New module now goes

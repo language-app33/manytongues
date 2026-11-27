@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { CORPUS } from "./card-corpus.mjs";
 import {
+  madeLine,
   CARD_FACTS,
   NOT_SHOWN,
   factRules,
@@ -350,4 +351,18 @@ test("a card's page leaves out the grammar its language never asks, where nobody
   assert.deepEqual(fields({ ...saved, number: "plural", register: "elder" }, LANGUAGES["vi"]), ["number", "register"]);
   /* And without a language, everything held, as before. */
   assert.deepEqual(fields(saved, undefined), ["number", "human"]);
+});
+
+/* ---- who made a card and who last changed it (0.711) ---- */
+
+test("madeLine says who made a card and who last changed it", () => {
+  const day = (/** @type {number} */ t) => `day${t}`;
+  assert.equal(madeLine({ owner: "me-1", editedBy: "me-1", updated: 5 }, "me-1", day),
+    "Made by you · last changed by you, day5");
+  assert.equal(madeLine({ owner: "tala-1", ownerName: "Tala", updated: 7 }, "me-1", day),
+    "Made by Tala · last changed day7");
+  assert.equal(madeLine({ owner: "tala-1", ownerName: "Tala", editedBy: "rana-2", editedByName: "Rana", updated: 9 }, "me-1", day),
+    "Made by Tala · last changed by Rana, day9");
+  assert.equal(madeLine({ editedBy: "rana-2", updated: 3 }, "me-1", day), "last changed by rana-2, day3");
+  assert.equal(madeLine({}, "me-1", day), "");
 });

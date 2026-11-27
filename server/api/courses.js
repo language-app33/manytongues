@@ -2809,6 +2809,7 @@ async function handle(req) {
         courses: [],
         cardIds: [],
         updated: Date.now(),
+        editedBy: mine,
       };
       await writeJson(store, K.deck(id), module);
       await indexAdd(store, "decks", id);
@@ -3420,7 +3421,19 @@ async function handle(req) {
          teacher hears about it — and a device that still has one can send
          it again. */
       const missingClips = await clipsMissing(store, cards.flatMap(clipsOfCard));
-      return jsonTagged(req, { ok: true, cards: cards.map((c) => ({ ...teacherView(c), decks: holding[c.id] || [] })), missingClips });
+      /* Who made each card and who last changed it, by name (0.711): one
+         look-up for the whole answer. */
+      const cardNames = await namesOf(cards.flatMap((c) => [c.owner || "", c.editedBy || ""]));
+      return jsonTagged(req, {
+        ok: true,
+        cards: cards.map((c) => ({
+          ...teacherView(c),
+          decks: holding[c.id] || [],
+          ...(c.owner ? { ownerName: cardNames[c.owner] || c.owner } : null),
+          ...(c.editedBy ? { editedByName: cardNames[c.editedBy] || c.editedBy } : null),
+        })),
+        missingClips,
+      });
     }
 
     if (action === "save-card") {
@@ -4237,6 +4250,8 @@ async function handle(req) {
              would fall back into Main. */
           ...(existing.org ? { org: existing.org } : {}),
           updated: Date.now(),
+          /* Who changed it last (0.711). */
+          editedBy: mine,
         };
       } else {
         const newId = `k${randomBytes(6).toString("hex")}`;
@@ -4269,6 +4284,7 @@ async function handle(req) {
           rev: 1,
           created: now,
           updated: now,
+          editedBy: mine,
         };
         /* Added to whatever the list holds when the write lands. Read and
            written whole, two cards made at once cost one of them its place
@@ -4396,6 +4412,7 @@ async function handle(req) {
             cardCount: now.length,
             version: (base.version || 1) + 1,
             updated: Date.now(),
+            editedBy: mine,
           };
         });
         if (record) moduleRecords.push(record);
@@ -4694,7 +4711,7 @@ async function handle(req) {
         } else {
           next = { ...c, pending: { ...pending, status: to } };
         }
-        return { next: { ...next, rev: (c.rev || 1) + 1, updated: Date.now() } };
+        return { next: { ...next, rev: (c.rev || 1) + 1, updated: Date.now(), editedBy: mine } };
       };
       const first = statusOf(card);
       if ("error" in first) return json({ error: first.error }, 400);
@@ -4722,7 +4739,7 @@ async function handle(req) {
       if (seenByStudents(was) !== seenByStudents(next)) {
         for (const did of holding) {
           await updateJson(store, K.deck(did), (/** @type {any} */ d) =>
-            d ? { ...d, version: (d.version || 1) + 1, updated: Date.now() } : null,
+            d ? { ...d, version: (d.version || 1) + 1, updated: Date.now(), editedBy: mine } : null,
           );
         }
         if (fillsOf(was).length || fillsOf(next).length || isSentence(was) || isSentence(next)) {
@@ -4844,12 +4861,17 @@ async function handle(req) {
       const shown = rows.filter((d) => !hidesSet(off, d) && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
       /* And which of its number parts reach nobody yet — see partsWaiting. */
       const waiting = await partsWaiting(shown, courses);
+      /* Who made each one and who last changed it, by name (0.711): one
+         look-up for the whole answer. */
+      const deckNames = await namesOf(shown.flatMap((d) => [d.owner, d.editedBy || ""]));
       const modules = shown.map((d) => ({
         ...d,
         courses: linksOf(d, courses),
         cardCount: (d.cardIds || []).length,
         mine: d.owner === mine,
         ...(waiting.has(d.id) ? { partsWaiting: waiting.get(d.id) } : null),
+        ...(d.owner ? { ownerName: deckNames[d.owner] || d.owner } : null),
+        ...(d.editedBy ? { editedByName: deckNames[d.editedBy] || d.editedBy } : null),
       }));
       return jsonTagged(req, { ok: true, decks: modules });
     }
@@ -4866,7 +4888,7 @@ async function handle(req) {
          filed into it, a course it was added to. The same for every change
          to a deck below. */
       await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) =>
-        fresh ? { ...fresh, title, updated: Date.now() } : null
+        fresh ? { ...fresh, title, updated: Date.now(), editedBy: mine } : null
       );
       await taught();
       return json({ ok: true, title });
@@ -4886,7 +4908,7 @@ async function handle(req) {
       await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { locked: _was, ...rest } = fresh;
-        return { ...(locked ? { ...rest, locked: true } : rest), updated: Date.now() };
+        return { ...(locked ? { ...rest, locked: true } : rest), updated: Date.now(), editedBy: mine };
       });
       await taught();
       return json({ ok: true, locked });
@@ -4920,7 +4942,7 @@ async function handle(req) {
       const next = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { parts: _was, ...rest } = fresh;
-        return { ...rest, ...(parts.length ? { parts } : null), updated: Date.now() };
+        return { ...rest, ...(parts.length ? { parts } : null), updated: Date.now(), editedBy: mine };
       });
       await taught();
       /* And which of them reach nobody yet, so the deck can say so at once. */
@@ -4955,7 +4977,7 @@ async function handle(req) {
         if (!fresh) return null;
         const { set: _was, ...rest } = /** @type {any} */ (fresh);
         const set = body.set === null ? null : readSet(body.set, fresh.id);
-        return { ...rest, ...(set ? { set } : null), updated: Date.now() };
+        return { ...rest, ...(set ? { set } : null), updated: Date.now(), editedBy: mine };
       });
       await taught();
       return json({ ok: true, deck: next });
@@ -4974,7 +4996,7 @@ async function handle(req) {
       if (!module || !module.personal || module.owner !== mine) return json({ error: "not-yours" }, 403);
       const practise = !!body.practise;
       await updateJson(store, K.deck(module.id), (/** @type {any} */ f) =>
-        f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now() } : null
+        f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now(), editedBy: mine } : null
       );
       return json({ ok: true, practise });
     }

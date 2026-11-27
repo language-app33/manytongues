@@ -80,7 +80,7 @@ import { emptySet, pairText, readSet, setGaps } from "./sets.ts";
 import type { SetConfig } from "./sets.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
-import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
+import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, madeLine, pickedCardIds } from "./card-facts.ts";
 import type { PronounGroup } from "./card-facts.ts";
 import { linkReport, pairsIn } from "./context-links.ts";
 import { anotherMeaningOf, anotherWordDraft, carryWordChanges, meaningsOnCard, splitByMeaning } from "./meanings.ts";
@@ -8265,6 +8265,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <CardEditor
         key={`${editing.opened || ""}`}
         card={editing.card}
+        /* Who made it and who last changed it (0.711); saved cards only. */
+        made={editing.card && editing.card.id ? madeLine(editing.card, account.handle, shortDate) : ""}
         lang={editLang || LANGUAGES[DEFAULT_LANGUAGE]}
         modules={modulesIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inModules={editing.decks}
@@ -9993,6 +9995,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   })()}
                 </span>
               </div>
+              {/* Who made it and who last changed it (0.711). */}
+              {madeLine(d, account.handle, shortDate) ? <Help>{madeLine(d, account.handle, shortDate)}</Help> : null}
               <fieldset className="at-cardlock" disabled={!editing}
 >
                 <Field label={<>{KindW} name<span className="at-reqstar" aria-hidden="true" /></>}>
@@ -11230,7 +11234,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                                     confirmWord: d.title,
                                     body: (
                                       <>
-                                        {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what={moduleKind(d)} /> : null}
+                                        {d.owner !== account.handle ? <OthersWork name={d.ownerName} what={moduleKind(d)} /> : null}
                                         <p>
                                           Its {plural(d.cardCount || 0, "card")} go with
                                           it, out of every course and out of the apps of everyone

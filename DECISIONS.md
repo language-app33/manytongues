@@ -9487,3 +9487,14 @@ sides; the `PickSheet` of kinds and `NEW_KINDS` are gone. A unit is made
 from `PathSection`'s New unit, as it already could be. Personal sets, where
 `setsOn`, are a "New personal set" item in the Material list's `more` menu.
 A module's own screen still names its kind.
+
+## Cards and modules say who made them and who last changed them (0.711)
+
+With private drafting going away, "whose is this and who touched it?"
+needs an answer on the page. Authenticated writes that set `updated` on a
+card or module now also set `editedBy: mine` (save-card new, edit and
+pending, its module bumps, card-status, create-deck, rename-deck,
+lock-deck, set-deck-parts, save-set, set-deck-practise); migrations, sweeps
+and copies do not. `my-cards` and `my-decks` add `ownerName` and
+`editedByName` from one `namesOf` call. `madeLine` in card-facts.ts writes
+the line; `canEditModule` and `mayEditCard` are unchanged.

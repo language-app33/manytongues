@@ -3541,6 +3541,34 @@ test("a teacher of neither the deck nor the course cannot attach one to the othe
   })();
 });
 
+test("a card says who last changed it, by name, to the teacher who made it (0.711)", () => {
+  return (async () => {
+    const boss = await anAdmin("Tala");
+    const coTeacher = await someone("Rana");
+    await teaching(coTeacher.handle);
+    const { id: moduleId, cardId } = await aModule(boss.key, "Shared lesson");
+    const course = await aCourse(boss.key, "Taught by both");
+    await api("/api/courses?action=attach-deck", {
+      method: "POST", key: boss.key, body: { deckId: moduleId, courseId: course.id },
+    });
+    await api("/api/courses?action=assign-teacher", {
+      method: "POST", key: boss.key, body: { courseId: course.id, handle: coTeacher.handle },
+    });
+    const before = (await api("/api/courses?action=my-cards", { key: boss.key })).json.cards
+      .find((/** @type {any} */ c) => c.id === cardId);
+    const edit = await api("/api/courses?action=save-card", {
+      method: "POST", key: coTeacher.key,
+      body: { card: { ...before, forms: [{ ...(before.forms || [])[0], en: "a corrected meaning" }] } },
+    });
+    assert.equal(edit.status, 200, edit.text);
+    const after = (await api("/api/courses?action=my-cards", { key: boss.key })).json.cards
+      .find((/** @type {any} */ c) => c.id === cardId);
+    assert.equal(after.editedBy, coTeacher.handle);
+    assert.equal(after.editedByName, "Rana");
+    assert.equal(after.ownerName, "Tala");
+  })();
+});
+
 /* ---- which decks a course holds: one answer, whoever asks ----
  *
  * The link is kept on the course and on the deck, and the two came apart:
