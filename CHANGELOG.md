@@ -8,9 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-## 0.695 — 27 November 2026
+## 0.696 — 27 November 2026
 
 **A word can have a description, in the language itself.** A word or phrase
 card has a new Description box: on the Basic tab of a basic card, and on the
@@ -38,8 +36,22 @@ so a word with one is still asked.
 
 To check on a phone: how a long description wraps above the four choices,
 and with the keyboard open on the writing exercise.
-=======
-=======
+
+## 0.695 — 27 November 2026
+
+**To do helps you get a course started.** In Teaching › Home:
+
+- **A course with no modules** shows "*Arabic 101* has no modules yet.
+  Create one so your students have something to practise." **Create a
+  module** opens the new-module screen, and the module you save is put in
+  that course, in the course's language.
+- **A course whose modules have no cards** shows "*Lesson 1* in
+  *Arabic 101* has no cards yet. Add some so your students have something
+  to practise." **Add cards** opens the module, where you can make a new
+  card, add ones you already have, or import.
+- These come first in To do and count towards the number on Home.
+- **To do is hidden until you have a course** to teach.
+
 ## 0.694 — 27 November 2026
 
 **Courses opens again for students.** Learning › You › Courses showed
@@ -51,7 +63,6 @@ of every screen that loads on demand, so a rename missed on one side
 fails the build instead of the screen; it found one more such slip, in
 claiming super admin from Settings, which is mended too.
 
->>>>>>> origin/beta
 ## 0.693 — 27 November 2026
 
 **Teaching opens on Home, with To do at the top.** The first tab in
@@ -111,7 +122,6 @@ three dots open, instead of a small list hanging from the button. The
 current choice is edged in colour and ticked. Unpublish and Discard changes
 are in red and still ask first. Each person in the filter shows how many
 modules they made. The menu behind your initials is unchanged.
->>>>>>> origin/beta
 
 ## 0.690 — 26 November 2026
 

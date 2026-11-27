@@ -1726,8 +1726,8 @@ export function verifyBackup(file: any) {
  * an empty To do reads as done rather than as broken.
  */
 function TodoSection({ items, actionsOf }: {
-  items: { key: string; icon: string; text: string; course?: string }[];
-  actionsOf: (item: { key: string; icon: string; text: string; course?: string }) => Node;
+  items: { key: string; icon: string; text: string; course?: string; module?: string }[];
+  actionsOf: (item: { key: string; icon: string; text: string; course?: string; module?: string }) => Node;
 }) {
   return (
     <section className="at-section at-coursesection" data-el="todo">
@@ -6681,6 +6681,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     signed?: Record<string, number | null>;
   } | null>(null);
   const [naming, setNaming] = useState<"new" | null>(null);
+  /* The course a new module is being made for, from To do on Home
+     (0.695): it is made in that course's language and put in it. */
+  const [namingFor, setNamingFor] = useState<Course | null>(null);
   /* What kind of deck "New deck" makes: chosen on a sheet first, outside
      My space, where only a regular deck can be made (0.633). */
   const [choosingKind, setChoosingKind] = useState(false);
@@ -7422,9 +7425,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * badge on Home while the teacher is in My space, whose cards students
    * never see.
    */
-  const todo: { key: string; icon: string; text: string; course?: string }[] | null = useMemo(() => {
+  const todo: { key: string; icon: string; text: string; course?: string; module?: string }[] | null = useMemo(() => {
     if (mineSide || personalOnly) return null;
-    const out: { key: string; icon: string; text: string; course?: string }[] = [];
+    const out: { key: string; icon: string; text: string; course?: string; module?: string }[] = [];
+    /* First, a course with nothing in it yet (0.695): no module, or
+       modules with no card. Getting a course started comes before
+       anything else on the list. */
+    for (const c of onCourses) {
+      const held = allModules.filter((d) => !d.personal && (d.courses || []).some((l) => l.courseId === c.id));
+      if (!held.length)
+        out.push({ key: `start:${c.id}`, icon: "folder", course: c.id,
+          text: `${c.title} has no modules yet. Create one so your students have something to practise.` });
+      else if (!held.some((d) => (d.cardIds || []).length + (d.parts || []).length > 0))
+        out.push({ key: `fill:${c.id}`, icon: "cards", course: c.id, module: held[0].id,
+          text: held.length === 1
+            ? `${held[0].title} in ${c.title} has no cards yet. Add some so your students have something to practise.`
+            : `The modules in ${c.title} have no cards yet. Add some so your students have something to practise.` });
+    }
     if (lostCards > 0)
       out.push({ key: "lost", icon: "mic", text: lostCards === 1
         ? "A recording is missing on 1 card. Record it again so students can hear it."
@@ -8124,10 +8141,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         kind={newKind}
         courses={courses.map((c) => ({ id: c.id, title: c.title }))}
         choices={choicesOn}
-        mustAsk={mustAskOn}
-        initialLang={knownOn.length === 1 ? soleLangOn : ""}
+        mustAsk={mustAskOn && !namingFor}
+        initialLang={namingFor ? (namingFor.language as LangId) : knownOn.length === 1 ? soleLangOn : ""}
         busy={busy}
-        onClose={() => setNaming(null)}
+        onClose={() => { setNaming(null); setNamingFor(null); }}
         onSave={(title, lang, courseId) =>
           run(
             async () => {
@@ -8135,9 +8152,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                  deck made, then marked as a set (0.633). */
               const r: any = newKind === "unit"
                 ? await API.createUnit(courseId, title)
-                : await API.createModule(title, "", lang || soleLangOn, mineSide);
+                : await API.createModule(title, "", namingFor ? (namingFor.language as LangId) : lang || soleLangOn, mineSide);
               if (newKind === "set" && r && r.deck && r.deck.id) await API.saveSet(r.deck.id, emptySet());
+              /* Made from To do for a course: put in that course. */
+              if (namingFor && newKind === "deck" && r && r.deck && r.deck.id) await API.attachModule(r.deck.id, namingFor.id);
               setNaming(null);
+              setNamingFor(null);
               await refresh();
               if (newKind === "unit") setUnitCourse(courseId);
               if (r && r.deck && r.deck.id) setOpenModule(r.deck.id);
@@ -10372,7 +10392,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }}
       /* How many things To do holds, on Home's own button, so they are
          seen from every tab (0.693, the owner's 5a). */
-      counts={todoCount > 0 && !personalOnly ? { courses: todoCount } : undefined}
+      counts={todoCount > 0 && !personalOnly && onCourses.length ? { courses: todoCount } : undefined}
       error={error}
       busy={busy}
     >
@@ -10424,7 +10444,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               languages={languages}
               busy={busy}
               error={error}
-              top={todo ? (
+              /* No To do until there is a course to teach (0.695). */
+              top={todo && onCourses.length ? (
                 <TodoSection
                   items={todo}
                   actionsOf={(item) => {
@@ -10450,6 +10471,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       </>;
                     if (item.key === "meanings")
                       return <Button size="sm" variant="primary" onClick={() => setSplitting(true)}>Review</Button>;
+                    if (item.key.startsWith("start:")) {
+                      const c = onCourses.find((x) => x.id === item.course);
+                      return <Button size="sm" variant="primary" icon="add" onClick={() => {
+                        setSide("space");
+                        setNewKind("deck");
+                        setNamingFor(c || null);
+                        setNaming("new");
+                      }}>Create a module</Button>;
+                    }
+                    if (item.module) {
+                      const m = item.module;
+                      return <Button size="sm" variant="primary" icon="add" onClick={() => {
+                        const d = allModules.find((x) => x.id === m);
+                        if (d && isPathUnit(d)) setUnitCourse(item.course || null);
+                        setOpenModule(m);
+                      }}>Add cards</Button>;
+                    }
                     if (item.course)
                       return <Button size="sm" variant="primary" onClick={() => setCourseView(item.course)}>Open the course</Button>;
                     return null;

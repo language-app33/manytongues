@@ -3690,7 +3690,7 @@ export function initialForms(
       /* Its pictures — see ImageScreen. Only where it has some. */
       ...(Array.isArray(word.images) && word.images.length ? { images: word.images } : null),
       /* And its description and that description's English, where it has
-         one (0.695) — read back, or the next save would drop them. */
+         one (0.696) — read back, or the next save would drop them. */
       ...storedDescription(word),
       /* Whether the card's own word is asked about. Carried only where it
          is off, which is what the field means everywhere else too. */
@@ -10744,7 +10744,7 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
 type CardTab = "overview" | "content" | "exercises" | "settings";
 
 /*
- * The word's description, in the language itself (0.695) — see
+ * The word's description, in the language itself (0.696) — see
  * src/description.ts. On the Basic tab of a basic card and the Advanced tab
  * of an advanced word or phrase; never on a sentence or a scene. Written on
  * the card's own word, the same form both tabs write, so ticking "Build an
