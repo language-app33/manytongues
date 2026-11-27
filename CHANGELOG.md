@@ -8,6 +8,13 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.703 — 27 November 2026
+
+**The line at the end of a session is in plain words.** A session with no
+mistakes now says "All correct. These words will come back less often now."
+in place of "Clean run. Every gap just got longer." The other end-of-session
+lines are reworded the same way.
+
 ## 0.702 — 27 November 2026
 
 **A card's words no longer look like headings when you are only reading

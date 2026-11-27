@@ -4123,6 +4123,9 @@ check("no console errors during the session", errors.length === 0, errors.slice(
       !!keep && !!done && keep.parentElement === done.parentElement &&
         !!(keep.compareDocumentPosition(done) & 4) && /primary/.test(keep.className) && !/primary/.test(done.className),
       `keep:${!!keep} done:${!!done} ${keep ? keep.className : ""}`);
+    /* The line above is in plain words (0.703). */
+    check("the end of a session does not talk about gaps",
+      !/Every gap/.test(document.body.textContent || ""), (document.body.textContent || "").slice(0, 200));
     if (keep) {
       click(keep);
       await sleep(300);

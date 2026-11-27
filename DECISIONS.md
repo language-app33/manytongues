@@ -9413,3 +9413,10 @@ the reason 0.685 gave — a tab does not look like a `Segmented` — at the
 cost 0.699 named: tabs remain the one place where chosen is not green, and
 the outline is the darkest line on a light screen. 0.699's ordinary
 lettering and 2px track edge stay.
+
+## The end-of-session line is in plain words (0.703)
+
+The old lines only made sense to someone who knows how cards are spaced
+out. The five lines under the score on the session-complete screen keep
+their conditions and their order (`practice`, `session.due === 0`, some not
+due, all first-time right, otherwise); only the words changed.

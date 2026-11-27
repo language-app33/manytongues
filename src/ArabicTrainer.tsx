@@ -17871,7 +17871,7 @@ export default function ArabicTrainer() {
                 <Stat value={`${tally.first} / ${tally.asked}`} big />
                 <Help>
                   {practice
-                    ? "Your schedule is untouched, apart from anything marked Again."
+                    ? "Extra practice. Your schedule hasn't changed, apart from anything you marked Again."
                     : /*
                        * Which kind of session this was.
                        *
@@ -17884,12 +17884,12 @@ export default function ArabicTrainer() {
                        * your schedule.
                        */
                     session.due === 0
-                    ? "None of these were due, so your schedule has barely moved. The practice still counts."
+                    ? "None of these were due yet, so they will come back when planned. The practice still counts."
                     : session.items && session.due && session.due < session.items
-                    ? `${session.items - session.due} of these weren't due yet and have barely moved.`
+                    ? `${session.items - session.due} of these weren't due yet, so they will come back when planned.`
                     : tally.first === tally.asked
-                    ? "Clean run. Every gap just got longer."
-                    : `${tally.asked - tally.first} lapsed and will come back shortly.`}
+                    ? "All correct. These words will come back less often now."
+                    : `${tally.asked - tally.first} to try again. They will come back soon.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
                 {/* Another session started exactly as this one was, on top
