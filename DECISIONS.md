@@ -9460,3 +9460,12 @@ or whose space they manage; never to a student, never stored. The People
 tab shows the name, the handle under it, and initials from the name. The
 Course tab's blocks are reordered: This course, Modules, Join code, Path,
 Word sets.
+
+## A course's Exercises tab shows the four presets; switches only under Custom (0.708)
+
+About 57 switches on one page, for a choice nearly every teacher makes with
+the preset. `PracticeSection` draws the same `Segmented` and saves the same
+way; under it one line per mode (`MODE_SAYS`). The rows of switches are
+drawn only when the mode is `custom`. Under a preset, switches left in
+`off` from an earlier Custom still apply (src/course-practice.ts is
+unchanged), and one `Help` line says how many.

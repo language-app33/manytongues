@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.708 — 27 November 2026
+
+**A course's Exercises tab fits on one screen.** It now shows the four
+choices (With translation, Little translation, No translation, Custom) and
+one line saying what the chosen one does. The long list of individual
+switches appears only when Custom is chosen. Nothing about what students
+are asked has changed. Trade-off: to switch a single exercise off, a teacher
+now chooses Custom first; switches set earlier still apply, and the tab says
+how many are off.
+
 ## 0.707 — 27 November 2026
 
 **A course lists its people by name.** The People tab now shows each

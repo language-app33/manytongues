@@ -517,6 +517,11 @@ const fakeFetch = async (input, opts = {}) => {
        course hands out, which is what makes them worth trying an exercise
        on: one has a recording and one does not, and one is a phrase that
        teaches the other. */
+    /* A course's exercises chosen (0.708): saved as asked, and handed back. */
+    if (action === "set-course-practice") {
+      const body = JSON.parse(opts.body || "{}");
+      return json({ ok: true, course: { id: body.courseId, practice: body.practice } });
+    }
     if (action === "my-courses" && withPath) {
       return json({
         ok: true,
@@ -13146,7 +13151,27 @@ const openPronounTables = async () => {
   const modulesPart = (modulesBlock && modulesBlock.textContent) || "";
   check("a unit is not among the course's ordinary decks", /Lesson 1/.test(modulesPart) && !/Greetings unit|Family unit/.test(modulesPart),
     modulesPart.replace(/\s+/g, " ").slice(0, 200));
-  click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);
+  /* The Exercises tab (0.708): the four presets and a line; the switches
+     one by one only under Custom. */
+  {
+    const courseScreen = (pathBlock && pathBlock.closest(".at-screen")) || document.body;
+    const tabNamed = (/** @type {string} */ n) => [...courseScreen.querySelectorAll("[role=tab]")]
+      .find((t) => (t.textContent || "").trim() === n);
+    const panel = () => ((courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || {}).textContent || "");
+    click(tabNamed("Exercises") || null);
+    await sleep(300);
+    check("a course's Exercises tab shows the presets, without the switches one by one",
+      /With translation/.test(panel()) && !/Match the pairs/.test(panel()), panel().slice(0, 200));
+    click([...courseScreen.querySelectorAll('[role=tabpanel][aria-label="exercises"] button')]
+      .find((b) => (b.textContent || "").trim() === "Custom") || null);
+    await sleep(500);
+    check("and Custom shows them", /Match the pairs/.test(panel()), panel().slice(0, 200));
+    click(tabNamed("Course") || null);
+    await sleep(300);
+  }
+  /* Found again: the Course tab was drawn afresh. */
+  const pathAgain = [...document.querySelectorAll('[data-el="course-path"]')].pop();
+  click(pathAgain ? pathAgain.querySelector('[data-el="path-unit"] button') : null);
   await sleep(600);
   const unitScreen = [...document.querySelectorAll(".at-screen.cardform")].pop();
   const unitText = unitScreen ? (unitScreen.textContent || "").replace(/\s+/g, " ") : "";

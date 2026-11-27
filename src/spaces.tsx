@@ -1930,6 +1930,13 @@ const MODE_LABEL: Record<PracticeMode, string> = {
   none: "No translation",
   custom: "Custom",
 };
+/* What each preset does, in one line under the choice (0.708). */
+const MODE_SAYS: Record<PracticeMode, string> = {
+  with: "Students see English in questions and answers.",
+  little: "Students see English only where a card needs it.",
+  none: "No English: pictures, sound and the language itself.",
+  custom: "Choose each exercise yourself.",
+};
 
 /*
  * A personal set's own section, on its deck screen (0.632; since 0.633
@@ -2140,10 +2147,13 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
         onChange={(mode) => mode !== now.mode && ask({ mode, off: now.off })}
       />
       </div>
-      {now.mode !== "custom" ? (
-        <Help>English exercises are switched off by this choice. The others are yours to set.</Help>
-      ) : (
-        <Help>Every exercise is yours to set.</Help>
+      {/* What the chosen preset does, in a line (0.708). */}
+      <Help>{MODE_SAYS[now.mode]}</Help>
+      {/* Switches set under an earlier Custom choice still apply. */}
+      {now.mode !== "custom" && now.off.length > 0 && (
+        <Help>
+          {`${now.off.length} ${now.off.length === 1 ? "exercise is" : "exercises are"} switched off from an earlier Custom choice. Choose Custom to see or change them.`}
+        </Help>
       )}
       {now.mode === "none" && untaught.length > 0 && (
         <p className="at-practice-warn">
@@ -2158,7 +2168,8 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           {untaught.map((c) => <li key={c.id}>{word(c)}</li>)}
         </ul>
       )}
-      {byLevel.map(([level, types]) => (
+      {/* The switches one by one, only under Custom (0.708). */}
+      {now.mode === "custom" && byLevel.map(([level, types]) => (
         <div key={level} className="at-practice-level">
           <div className="at-practice-levelname">{LEVEL_NAME[level] || `Level ${level}`}</div>
           {types.map((t) => {
