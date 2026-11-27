@@ -538,7 +538,7 @@ test("every token the stylesheet uses is a token the stylesheet defines", () => 
 });
 
 test("the selected tab is marked in the accent colour, outlined and tinted", () => {
-  /* 0.698 (the owner's 1a): chosen is the accent colour everywhere — the
+  /* 0.699 (the owner's 1a): chosen is the accent colour everywhere — the
      bar at the foot, a Segmented, a picked tile — so a selected tab is too.
      The outline is what says which tab is current at a glance; the wash is
      the bar's, faint, so a tab does not read as a Segmented's solid fill. */

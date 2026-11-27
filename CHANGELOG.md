@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.698 — 27 November 2026
+## 0.699 — 27 November 2026
 
 **Tabs inside a page now look like the rest of the app.** The tabs at the
 top of a page or a card — Modules / Cards / Word sets in Material, Basic /
@@ -20,10 +20,20 @@ chosen, rather than with a grey box and a dark grey outline.
   tint. It is still lighter than a Settings switch's solid green, so a tab
   and a setting don't look like the same control.
 - Tab names are written in ordinary lettering at the size of the bar's
-  names, instead of small spaced capitals. On a narrow phone with four or
-  five tabs they still shrink to fit.
+  names, instead of small spaced capitals. On a narrow phone with four tabs
+  they shrink to fit.
 - The track around the tabs has the same edge as every card, button and box
   near it.
+
+## 0.698 — 27 November 2026
+
+**Signing up asks for less.** The screen after you choose your name now
+shows your sign-in key, one Copy button and one line about keeping it safe.
+The sign-in link and your handle are no longer repeated there; both are in
+Settings. The tick-box is gone: the button works straight away.
+
+To check by hand: on a phone, that the password manager still offers to
+save the key when the button is pressed.
 
 ## 0.697 — 27 November 2026
 

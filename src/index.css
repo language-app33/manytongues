@@ -454,7 +454,7 @@ button {
 /* Tabs inside a page (0.685): one track the parts share equally, each its
    icon over its name. What the card screen's tabs were, now every set in a
    page; the bar at the foot draws its own (.at-docktabs).
-   0.698 (the owner's 1a, 2a, 3a): the current tab is marked the way the
+   0.699 (the owner's 1a, 2a, 3a): the current tab is marked the way the
    bar at the foot marks its section — the accent colour on a faint wash of
    it — with an accent outline, so it reads as chosen in the app's one
    colour for chosen while staying apart from a Segmented's solid fill. The

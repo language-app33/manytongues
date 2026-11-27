@@ -9382,7 +9382,16 @@ New card, Add existing cards and Import. A teacher in no course does not
 reach Teaching at all; the hidden case is an administrator, or courses
 all in languages switched off.
 
-## A selected tab is green, like everything chosen (0.698)
+## The sign-up key screen is shorter (0.698)
+
+A new student met seven things to read before their first question. The
+key step of `Onboarding` keeps the key's `CodeBox`, one `Help` pointing to
+Settings (where `AccountPanel` already shows the link and the handle), and
+the hidden username and password inputs that prompt a password manager.
+The `keyTicked` tick-box is gone; the button is always live and still calls
+`API.keySaved()` before `onDone`.
+
+## A selected tab is green, like everything chosen (0.699)
 
 0.685 made the selected tab in a page grey with a dark grey outline, partly
 so tabs would not read as a `Segmented`, whose chosen option is solid green.
