@@ -13213,7 +13213,7 @@ const openPronounTables = async () => {
   const cardsNow = [...document.querySelectorAll(".at-deckcard")];
   const tiles = cardsNow.map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const tileOf = (/** @type {RegExp} */ re) => tiles.find((t) => re.test(t)) || "";
-  /* Since 0.727 every module's kind is a badge right after its name, and
+  /* Since 0.728 every module's kind is a badge right after its name, and
      the line under the name no longer starts with "Unit". */
   const tileNamed = (/** @type {RegExp} */ re) =>
     cardsNow.find((t) => re.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
@@ -13492,7 +13492,7 @@ const openPronounTables = async () => {
   backOut();
   await sleep(400);
   const setTile = [...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Our family/.test(t.textContent || ""));
-  /* Since 0.727 in its badge, by the name, and no longer in the line under it. */
+  /* Since 0.728 in its badge, by the name, and no longer in the line under it. */
   check("a set's tile has a Personal set badge, and its line does not say it again",
     !!setTile && ((setTile.querySelector('[data-el="module-kind"]') || {}).textContent || "") === "Personal set"
       && !/Personal set/.test((setTile.querySelector(".at-deckmain > .at-reach") || {}).textContent || ""),

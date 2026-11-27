@@ -1660,7 +1660,7 @@ export function dateTime(ms?: Millis) {
 export function Tile({ title, badge, meta, onOpen, actions, footer, note }: {
   title?: Node;
   /** A small label right after the title, such as a module's kind
-      (0.727). It sits beside the title, not inside it, so the title's
+      (0.728). It sits beside the title, not inside it, so the title's
       text stays the name alone. */
   badge?: Node;
   meta?: Node;
@@ -6583,9 +6583,11 @@ export interface ModuleWords {
   none: string;
   /** The button once something is chosen. */
   another: string;
+  /** The sheet's first row, where `onCreate` is given. */
+  create: string;
 }
 
-export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = moduleSize, saving, onAdd, disabled = false }: {
+export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = moduleSize, saving, onAdd, onCreate, solid = false, disabled = false }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -6621,6 +6623,14 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
       button calls it, and is there even with no decks yet: making the
       first one is what that screen is for. */
   onAdd?: () => void;
+  /** Making a new one from the sheet: its first row, which closes the
+      sheet and hands over — a course's modules make one on the way
+      (0.727, the owner's 3a). */
+  onCreate?: () => void;
+  /** The add button as the solid green button an empty box offers, while
+      nothing is chosen — the dotted outline belongs beside pills, which an
+      empty box has none of (0.727, the owner's 2a). */
+  solid?: boolean;
   /** Nothing can be chosen or taken off here for now — Build a session's
       "All cards" box, ticked, stands in for both of its pickers. What was
       chosen stays shown, greyed, so unticking the box gives it back. */
@@ -6641,6 +6651,7 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
     note: `A student sees this ${of} only where it is in a module their course uses.`,
     none: `You have no modules yet. Make one under Modules, then this ${of} can go in it.`,
     another: "Another module",
+    create: "Create a new module",
     ...words,
   };
 
@@ -6690,7 +6701,18 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
             yet: what it makes is what stands beside it. Its words are the
             whole invitation while the card is in nothing, and shorten to
             the bare offer once the row can speak for itself. */}
-        {(all.length > 0 || onAdd) && (
+        {(all.length > 0 || onAdd) && solid && !inThese.length ? (
+          <Button
+            size="sm"
+            variant="primary"
+            icon="add"
+            aria-expanded={onAdd ? undefined : open}
+            disabled={disabled}
+            onClick={() => !disabled && (onAdd ? onAdd() : setOpen(true))}
+          >
+            {say.first}
+          </Button>
+        ) : (all.length > 0 || onAdd) && (
           <button
             className="at-deckadd"
             aria-expanded={onAdd ? undefined : open}
@@ -6727,6 +6749,21 @@ export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", w
             />
           )}
           <div className="at-deckpicks">
+            {/* First, above the search's answers, so it is in view however
+                long the list: a new one is made with the kind asked, as New
+                module does, and lands where this sheet puts things. */}
+            {onCreate && (
+              <button
+                className="at-deckpick new"
+                onClick={() => {
+                  setOpen(false);
+                  onCreate();
+                }}
+              >
+                <Icon name="add" size={18} />
+                <span className="at-tickbody"><b>{say.create}</b></span>
+              </button>
+            )}
             {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
             {listed.map((d) => {
               const on = chosen.includes(d.id);

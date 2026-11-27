@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.727 — 27 November 2026
+## 0.728 — 27 November 2026
 
 **Every module says what kind it is, by its name.** In Teaching › Material
 › Modules, each tile now has a small outlined badge right after the
@@ -17,6 +17,20 @@ and "Personal set" are gone from the line under the name, which now says
 only what needs looking at, who can see the module, and its score. On a
 phone, a long name pushes the badge onto the next line. Other lists of
 modules, such as a course's, are unchanged for now.
+
+## 0.727 — 27 November 2026
+
+**An empty course offers one button, not two.** In a course's Modules
+section, with no modules in it yet:
+
+- If you already have modules, the box offers only **Add a module**, a
+  green button like every other empty box's. Its list now starts with
+  **Create a new module**.
+- If you have none, it offers only **Create a module**.
+
+**Create a new module** asks what kind, as New module does. The new module
+is put in the course and opens, ready for cards. The same row is in the list
+behind **Another module** once the course has modules.
 
 ## 0.726 — 27 November 2026
 
