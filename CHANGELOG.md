@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.713 — 27 November 2026
+
+**Numbers and pronouns belong to the school, one set per language.**
+Teaching › Material › Word sets now shows one Numbers and one Pronouns for
+each language. Any teacher of the school can open and correct them, and
+every course uses them. There is no longer a list of sets by teacher, no
+Share step for numbers written in Material, and no "Numbers from / Pronouns
+from" choice on a course's page. Where two teachers had each written a set,
+the one written first is now the school's.
+
+**Trade-off:** in a course that had chosen the other teacher's pronouns,
+students now get the school's pronoun cards, so their progress on the old
+pronoun cards does not carry over. The other teacher's set is not deleted.
+
+To check by hand: in a school where two teachers wrote pronouns, open a
+course as a student and check each pronoun comes once.
+
 ## 0.712 — 27 November 2026
 
 **My space is being retired from Teaching.** Teachers now make everything in

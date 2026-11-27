@@ -410,26 +410,14 @@ export const myCards = () => call("my-cards");
 export type WordSetKind = "numbers" | "pronouns";
 export type SharedPronouns = { owner: string; name: string; lang: string; cards: Card[] };
 export type SharedNumbers = { owner: string; name: string; lang: string; numbers: unknown; times: unknown };
-export const spaceWordSets = (): Promise<{ ok: true; pronouns: SharedPronouns[]; numbers: SharedNumbers[] }> =>
+/** The school's set of each kind, by language (0.713): the owner's handle. */
+export type SchoolSets = { numbers: Record<string, string>; pronouns: Record<string, string> };
+export const spaceWordSets = (): Promise<{ ok: true; pronouns: SharedPronouns[]; numbers: SharedNumbers[]; school?: SchoolSets }> =>
   call("space-word-sets");
 /* A teacher's own set into the space's Material: pronouns as a copy, which
    sharing again brings up to date; numbers by marking them shared. */
 export const shareWordSet = (kind: WordSetKind, lang: LangId): Promise<{ ok: true; made?: number; updated?: number }> =>
   call("share-word-set", { body: { kind, lang } });
-export type CourseWordSet = {
-  options: { handle: string; name: string }[];
-  /** Whose set its students get now. */
-  using: string;
-  /** Whether a teacher chose it, rather than its being the earliest reaching the course. */
-  chosen: boolean;
-  /** Whose sets reach it through its modules. */
-  reaching: string[];
-};
-export const courseWordSets = (courseId: string): Promise<{ ok: true; sets: Record<WordSetKind, CourseWordSet> }> =>
-  call("course-word-sets", { params: { course: courseId } });
-/* "" goes back to the earliest reaching the course. */
-export const setCourseWordSet = (courseId: string, kind: WordSetKind, from: string) =>
-  call("set-course-word-set", { body: { courseId, kind, from } });
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
 /**

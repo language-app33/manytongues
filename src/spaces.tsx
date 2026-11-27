@@ -6712,10 +6712,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const [setOwner, setSetOwner] = useState<string | null>(null);
   /* Every teacher's word sets shared with the space, for Material's Word
      sets screen (0.696) — fetched as it opens, and again after a save. */
-  const [spaceSets, setSpaceSets] = useState<{ pronouns: API.SharedPronouns[]; numbers: API.SharedNumbers[] } | null>(null);
+  const [spaceSets, setSpaceSets] = useState<{ pronouns: API.SharedPronouns[]; numbers: API.SharedNumbers[]; school: API.SchoolSets } | null>(null);
   const loadSpaceSets = useCallback(async () => {
     const r = await API.spaceWordSets();
-    setSpaceSets({ pronouns: r.pronouns || [], numbers: r.numbers || [] });
+    setSpaceSets({ pronouns: r.pronouns || [], numbers: r.numbers || [], school: r.school || { numbers: {}, pronouns: {} } });
   }, []);
   /* A teacher's own set on its way into the space's Material, awaiting a yes. */
   const [sharing, setSharing] = useState<WordSet | null>(null);
@@ -8845,83 +8845,68 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ))}
       </div>
     );
-    /* Material: the teacher's own sets first — pronouns written here are
-       the space's already, and their numbers can be shared from here too —
-       then one tile per other teacher's shared set. */
+    /* Material (0.713): one tile per kind and language, the school's set —
+       the first written in the space, whoever wrote it, which any teacher
+       here can correct — or the teacher's own where the space has none. */
     const sharedTiles = (langId: LangId) => {
       if (!spaceSets) return null;
       const lang = languages[langId];
-      const numbersShared = spaceSets.numbers.some((x) => x.lang === langId && x.owner === account.handle);
-      const yours = (
+      const rows: { key: string; title: string; meta: string; by: string; open: () => void }[] = [];
+      for (const own of wordSetsOf(langId, account.handle)) {
+        const owner = spaceSets.school[own.kind === "numbers" ? "numbers" : "pronouns"][langId] || "";
+        if (!owner || owner === account.handle) {
+          rows.push({ key: own.kind, title: own.name, meta: wordSetLine(own), by: "", open: own.open });
+          continue;
+        }
+        if (own.kind === "numbers") {
+          const n = spaceSets.numbers.find((x) => x.lang === langId && x.owner === owner);
+          if (!n || !composerFor(langId)) continue;
+          const sys = readNumberSystem(n.numbers);
+          const clock = n.times ? readTimeSystem(n.times) : null;
+          /* Counted as the teacher's own are, over every part the language
+             has — its numbers and its clock — so two tiles never disagree. */
+          const parts = numberPartsOf(langId);
+          const open = new Set(
+            rangeChecks(composerFor(langId), sys, timeComposerFor(langId), clock && sys && clock.numberSystemId === sys.id ? clock : null)
+              .filter((c) => c.open).map((c) => c.range.id),
+          );
+          const written = parts.filter((r) => open.has(r.id)).length;
+          rows.push({
+            key: "numbers",
+            title: "Numbers",
+            meta: written === parts.length ? `All ${plural(parts.length, "range")} written` : `${written} of ${plural(parts.length, "range")} written`,
+            by: n.name,
+            open: () => {
+              setSetOwner(owner);
+              setNumbering(langId);
+            },
+          });
+        } else if (lang && hasPronouns(lang)) {
+          const p = spaceSets.pronouns.find((x) => x.lang === langId && x.owner === owner);
+          if (!p) continue;
+          const total = personsOf(verbOf(lang)).length;
+          const decks = new Set(p.cards.flatMap((c) => c.decks || [])).size;
+          rows.push({
+            key: "pronouns",
+            title: "Pronouns",
+            meta: `${p.cards.length >= total ? `All ${plural(total, "pronoun")} written` : `${p.cards.length} of ${plural(total, "pronoun")} written`} · ${decks ? `in ${plural(decks, "module")}` : "in no module yet"}`,
+            by: p.name,
+            open: () => {
+              setSetOwner(owner);
+              setPronouning(langId);
+            },
+          });
+        }
+      }
+      return (
         <div className="at-decklist2">
-          {wordSetsOf(langId, account.handle).map((s) => (
-            <div key={s.kind}>
-              <OpenRow
-                title={s.name}
-                meta={wordSetLine(s)}
-                onOpen={s.open}
-                label={several ? `${s.name}, ${langName(langId)}` : undefined}
-              />
-              {s.kind === "numbers" && !numbersShared && systems && systems.numbers.some((n) => n.languageId === langId) ? (
-                <div className="at-mt2 at-mb3">
-                  <Help>Not shared with {spaceName} yet: other teachers can&apos;t see these or choose them for a course.</Help>
-                  <Button size="sm" icon="upload" disabled={busy} onClick={() => setSharing(s)}>{`Share with ${spaceName}`}</Button>
-                </div>
-              ) : null}
+          {rows.map((t) => (
+            <div key={t.key}>
+              <OpenRow title={t.title} meta={t.meta} onOpen={t.open} label={several ? `${t.title}, ${langName(langId)}` : undefined} />
+              {t.by ? <Help>{`Started by ${t.by}.`}</Help> : null}
             </div>
           ))}
         </div>
-      );
-      const tiles: { key: string; title: string; meta: string; open: () => void }[] = [];
-      for (const n of spaceSets.numbers.filter((x) => x.lang === langId && x.owner !== account.handle && !!composerFor(langId))) {
-        const sys = readNumberSystem(n.numbers);
-        const clock = n.times ? readTimeSystem(n.times) : null;
-        /* Counted as the teacher's own are, over every part the language
-           has — its numbers and its clock — so two tiles never disagree. */
-        const parts = numberPartsOf(langId);
-        const open = new Set(
-          rangeChecks(composerFor(langId), sys, timeComposerFor(langId), clock && sys && clock.numberSystemId === sys.id ? clock : null)
-            .filter((c) => c.open).map((c) => c.range.id),
-        );
-        const written = parts.filter((r) => open.has(r.id)).length;
-        tiles.push({
-          key: `numbers ${n.owner}`,
-          title: `Numbers · ${n.name}`,
-          meta: written === parts.length ? `All ${plural(parts.length, "range")} written` : `${written} of ${plural(parts.length, "range")} written`,
-          open: () => {
-            setSetOwner(n.owner);
-            setNumbering(langId);
-          },
-        });
-      }
-      for (const p of spaceSets.pronouns.filter((x) => x.lang === langId && x.owner !== account.handle && !!lang && hasPronouns(lang))) {
-        const total = personsOf(verbOf(lang)).length;
-        const decks = new Set(p.cards.flatMap((c) => c.decks || [])).size;
-        tiles.push({
-          key: `pronouns ${p.owner}`,
-          title: `Pronouns · ${p.name}`,
-          meta: `${p.cards.length >= total ? `All ${plural(total, "pronoun")} written` : `${p.cards.length} of ${plural(total, "pronoun")} written`} · ${decks ? `in ${plural(decks, "module")}` : "in no module yet"}`,
-          open: () => {
-            setSetOwner(p.owner);
-            setPronouning(langId);
-          },
-        });
-      }
-      return (
-        <>
-          {yours}
-          <Section title="Shared by other teachers">
-            {tiles.length ? (
-              <div className="at-decklist2">
-                {tiles.map((t) => (
-                  <OpenRow key={t.key} title={t.title} meta={t.meta} onOpen={t.open} label={several ? `${t.title}, ${langName(langId)}` : undefined} />
-                ))}
-              </div>
-            ) : (
-              <Help>No other teacher has shared a word set in {langName(langId)} yet.</Help>
-            )}
-          </Section>
-        </>
       );
     };
     const tiles = mineSide ? ownTiles : sharedTiles;
@@ -8935,9 +8920,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           </Help>
         ) : (
           <Help className="at-mb3">
-            Your word sets for {spaceName}, and below them the sets other teachers have shared here.
-            Any teacher can open a shared set and edit it. Each course chooses whose set of each kind
-            its students get.
+            {`One set of each for every language, used by all of ${spaceName}'s courses. Any teacher here can correct them.`}
           </Help>
         )}
         {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
@@ -10556,16 +10539,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
             {pathSection}
 
-            <CourseWordSets
-              key={c.id}
-              course={c}
-              lang={languages[c.language as LangId] || null}
-              onOpenSets={() => {
-                setCourseView(null);
-                setSide("space");
-                setTab("wordsets");
-              }}
-            />
 
             </div>
             )}
@@ -11449,99 +11422,6 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
       <Help>Fetching what is written for {name}…</Help>
       {error ? <Notice kind="warn">{error}</Notice> : null}
     </Screen>
-  );
-}
-
-/*
- * Whose word sets a course uses (0.696; 3a, 5a, 6a, 7a).
- *
- * One teacher's set of each kind, so two teachers' versions of a pronoun
- * or a number never reach the same students. Any teacher of the course
- * chooses, out of the sets shared with the space and any already reaching
- * the course. Until somebody does, the course uses the earliest written of
- * those reaching it, and where there is more than one the screen says so.
- */
-function CourseWordSets({ course, lang, onOpenSets }: { course: { id: string; language?: string }; lang: Lang | null; onOpenSets: () => void }) {
-  const [sets, setSets] = useState<Record<API.WordSetKind, API.CourseWordSet> | null>(null);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState<API.WordSetKind | null>(null);
-  const loadReach = useReach();
-  const saveReach = useReach();
-  const load = useCallback((): Promise<void> =>
-    API.courseWordSets(course.id).then(
-      (r) => {
-        loadReach.ok();
-        setError("");
-        setSets(r.sets);
-      },
-      (e) => setError(loadReach.caught(e, load) ? LOAD_UNREACHED : API.explain(e)),
-    ), [course.id, loadReach]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  const kinds: { kind: API.WordSetKind; name: string; label: string }[] = [];
-  if (lang && composerFor(lang.id)) kinds.push({ kind: "numbers", name: "numbers", label: "Numbers from" });
-  if (lang && hasPronouns(lang)) kinds.push({ kind: "pronouns", name: "pronouns", label: "Pronouns from" });
-  if (!kinds.length) return null;
-  async function choose(kind: API.WordSetKind, from: string): Promise<void> {
-    setSaving(kind);
-    try {
-      await API.setCourseWordSet(course.id, kind, from);
-      saveReach.ok();
-      await load();
-    } catch (e) {
-      if (!saveReach.caught(e, () => choose(kind, from))) setError(API.explain(e));
-    } finally {
-      setSaving(null);
-    }
-  }
-  return (
-    <div className="at-formblock">
-      <div className="at-formhead">
-        <span className="at-formnum">Word sets</span>
-        <span className="at-formrole">
-          Whose numbers and pronouns this course&apos;s students get: one teacher&apos;s of each, whichever module they are in.
-        </span>
-      </div>
-      {error ? <Notice kind="error">{error}</Notice> : null}
-      {!sets && !error ? <Help>Fetching the word sets…</Help> : null}
-      {sets ? kinds.map(({ kind, name, label }) => {
-        const s = sets[kind];
-        const nameOf = (h: string) => (s.options.find((o) => o.handle === h) || { name: h }).name;
-        if (!s.options.length) {
-          return (
-            <Field key={kind} label={label}>
-              <Help>No teacher has shared {name} with the space yet.</Help>
-            </Field>
-          );
-        }
-        return (
-          <div key={kind}>
-            {!s.chosen && s.reaching.length > 1 ? (
-              <div className="at-mb3">
-                <Nudge icon={kind === "numbers" ? "hash" : "person"} tone="attention">
-                  {`${plural(s.reaching.length, "teacher")}' ${name} reach this course through its modules. Its students get ${nameOf(s.using)}'s, written first, until you choose.`}
-                </Nudge>
-              </div>
-            ) : null}
-            <Field label={label} lede={s.chosen ? undefined : s.using ? `Not chosen yet: students get ${nameOf(s.using)}'s.` : "Not chosen yet."}>
-              <RadioGroup
-                name={`word-set-${kind}-${course.id}`}
-                label={label}
-                quiet
-                value={s.chosen ? s.using : ""}
-                options={s.options.map((o) => ({ value: o.handle, label: o.name }))}
-                onChange={(h) => {
-                  if (saving) return;
-                  void choose(kind, h);
-                }}
-              />
-            </Field>
-          </div>
-        );
-      }) : null}
-      <Button size="sm" icon="view" onClick={onOpenSets}>See the shared word sets</Button>
-    </div>
   );
 }
 

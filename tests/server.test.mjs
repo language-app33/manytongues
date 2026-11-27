@@ -158,10 +158,11 @@ async function api(pathname, opts = {}) {
 }
 
 /** @param {string} pathname @param {any} [opts] */
-async function raw(pathname, { method = "GET", key, token, body } = {}) {
+async function raw(pathname, { method = "GET", key, token, body, org } = {}) {
   /** @type {Record<string, string>} */
   const headers = { "content-type": "application/json" };
   if (key) headers["x-key"] = key;
+  if (org) headers["x-org"] = org;
   if (token) headers["x-sync-token"] = token;
   const res = await fetch(`${origin}${pathname}`, {
     method,
@@ -3245,19 +3246,27 @@ test("a backup of the cards made and restored by the app carries the numbers", a
  */
 test("a deck says which of its number parts reach nobody yet", async () => {
   const teacher = await anAdmin("Rafa");
-  const course = await aCourse(teacher.key, "Testing");
-  await api("/api/courses?action=assign-teacher", {
+  /* In a space of its own (0.713): a space's numbers are the first written
+     there, and other tests in this file write numbers in Main. */
+  const space = (await api("/api/courses?action=admin-create-org", {
+    method: "POST", key: teacher.key, body: { name: "Rafa's school", slug: "rafa-school", adminName: "Rafa B" },
+  })).json.org.id;
+  const inSpace = (/** @type {string} */ p, /** @type {any} */ o = {}) => api(p, { ...o, org: space });
+  const course = (await inSpace("/api/courses?action=create-course", {
+    method: "POST", key: teacher.key, body: { title: "Testing", language: "ar-PS" },
+  })).json.course;
+  await inSpace("/api/courses?action=assign-teacher", {
     method: "POST", key: teacher.key, body: { courseId: course.id, handle: teacher.handle },
   });
-  const module = (await api("/api/courses?action=create-deck", {
+  const module = (await inSpace("/api/courses?action=create-deck", {
     method: "POST", key: teacher.key, body: { title: "Numbers", lang: "ar-PS" },
   })).json.deck;
-  await api("/api/courses?action=attach-deck", {
+  await inSpace("/api/courses?action=attach-deck", {
     method: "POST", key: teacher.key, body: { deckId: module.id, courseId: course.id },
   });
   const waitingNow = async () => {
-    const mine = (await api("/api/courses?action=my-decks", { key: teacher.key })).json.decks;
-    const seen = overviewOf(await api("/api/courses?action=admin-overview", { key: teacher.key })).decks;
+    const mine = (await inSpace("/api/courses?action=my-decks", { key: teacher.key })).json.decks;
+    const seen = overviewOf(await inSpace("/api/courses?action=admin-overview", { key: teacher.key })).decks;
     const asTeacher = must(mine.find((/** @type {any} */ d) => d.id === module.id), "the deck").partsWaiting;
     assert.deepEqual(must(seen.find((d) => d.id === module.id), "the deck").partsWaiting, asTeacher,
       "the administrator is told the same");
@@ -3267,7 +3276,7 @@ test("a deck says which of its number parts reach nobody yet", async () => {
   /* No numbers written at all: every part waits, and the answer to
      setting them says so straight away. */
   const all = ["numbers:0-9", "numbers:10-19", "numbers:20-99", "numbers:100-999", "numbers:1000+"];
-  const set = await api("/api/courses?action=set-deck-parts", {
+  const set = await inSpace("/api/courses?action=set-deck-parts", {
     method: "POST", key: teacher.key, body: { deckId: module.id, parts: all },
   });
   assert.deepEqual(set.json.partsWaiting, all);
@@ -3277,7 +3286,7 @@ test("a deck says which of its number parts reach nobody yet", async () => {
   const golden = JSON.parse(readFileSync(new URL("./golden/ar-PS.numbers.json", import.meta.url), "utf8")).system;
   const { "unit.7": _seven, ...short } = golden.lexemes;
   const save = (/** @type {number} */ rev, /** @type {any} */ lexemes) =>
-    api("/api/courses?action=save-system", {
+    inSpace("/api/courses?action=save-system", {
       method: "POST", key: teacher.key, body: { kind: "numbers", system: { ...golden, id: "", rev, lexemes } },
     });
   assert.equal((await save(0, short)).status, 200);
@@ -3291,7 +3300,7 @@ test("a deck says which of its number parts reach nobody yet", async () => {
      its old name waits until every part it became is ready. */
   const { connector: _and, ...noAnd } = golden.lexemes;
   assert.equal((await save(2, noAnd)).status, 200);
-  await api("/api/courses?action=set-deck-parts", {
+  await inSpace("/api/courses?action=set-deck-parts", {
     method: "POST", key: teacher.key, body: { deckId: module.id, parts: ["numbers:0-9", "numbers:11-99"] },
   });
   assert.deepEqual(await waitingNow(), ["numbers:11-99"]);

@@ -3059,6 +3059,12 @@ async function handle(req) {
       return /** @type {Promise<any>} */ (numbersHeld.get(at));
     };
 
+    /** The one order sets are put in: the earliest written first, and on a
+        tie the handle that sorts first. Used by reachingSets and by
+        schoolWordSet (0.713). */
+    const firstWritten = (/** @type {{ handle: string, at: number }} */ a, /** @type {{ handle: string, at: number }} */ b) =>
+      a.at - b.at || a.handle.localeCompare(b.handle);
+
     /**
      * Whose sets of one kind reach a course now, the earliest written first.
      *
@@ -3096,7 +3102,7 @@ async function handle(req) {
       }
       return [...first]
         .map(([handle, at]) => ({ handle, at }))
-        .sort((a, b) => a.at - b.at || a.handle.localeCompare(b.handle));
+        .sort(firstWritten);
     }
 
     /**
@@ -3110,7 +3116,36 @@ async function handle(req) {
     async function wordSetPick(course, kind, decks, cardOf) {
       const chosen = String(((/** @type {any} */ (course).wordSets || {})[kind]) || "");
       const reaching = await reachingSets(course, kind, decks, cardOf);
-      return { handle: chosen || (reaching[0] ? reaching[0].handle : ""), chosen: !!chosen, reaching };
+      /* The school's set (0.713): one per kind and language in a space, the
+         first written. A course's stored choice is no longer read; where
+         the space has no set of the kind, the earliest reaching it. */
+      const school = orgOf(course) === acting ? await schoolWordSet(kind, course.language || "") : null;
+      return { handle: school || (reaching[0] ? reaching[0].handle : ""), chosen: !!chosen, reaching };
+    }
+
+    /** @type {Promise<Awaited<ReturnType<typeof spaceWordSets>>> | null} */
+    let spaceSetsHeld = null;
+    /**
+     * The school's set of one kind in one language (0.713): of the sets
+     * spaceWordSets lists for the space this request acts in, the one
+     * written first — numbers by their document's `created`, pronouns by
+     * the earliest `created` among the teacher's pronoun cards there — or
+     * null where there is none. Read once a request.
+     * @param {"numbers" | "pronouns"} kind
+     * @param {string} lang
+     * @returns {Promise<string | null>}
+     */
+    async function schoolWordSet(kind, lang) {
+      if (!spaceSetsHeld) spaceSetsHeld = spaceWordSets();
+      const { pronouns, numbers } = await spaceSetsHeld;
+      const rows = kind === "numbers"
+        ? numbers.filter((n) => n.lang === lang).map((n) => ({ handle: n.owner, at: Number(n.numbers && n.numbers.created) || 0 }))
+        : pronouns.filter((p) => p.lang === lang).map((p) => ({
+          handle: p.owner,
+          at: Math.min(...p.cards.map((c) => Number(c.created) || 0)),
+        }));
+      rows.sort(firstWritten);
+      return rows.length ? rows[0].handle : null;
     }
 
     /**
@@ -5632,6 +5667,20 @@ async function handle(req) {
        */
       await writeJson(store, keyOf(id), saved);
       await writeJson(store, K.sysSigned(id), { rev: saved.rev, at: Date.now(), by: mine, system: saved });
+      /* Numbers written where the space has none become the school's
+         (0.713), with no Share step: marked with the space as share-word-set
+         marks them, the clock with them. */
+      if (whose === mine && (await teachesHere()) && !(await schoolWordSet("numbers", wanted.languageId))) {
+        const now = await systemIndex(mine);
+        const lang = wanted.languageId;
+        if (now.numbers[lang]) {
+          const keys = [K.numSys(String(now.numbers[lang]))].concat(now.times[lang] ? [K.timeSys(String(now.times[lang]))] : []);
+          for (const key of keys) {
+            await updateJson(store, key, (/** @type {any} */ s) =>
+              s && !(s.spaces || []).includes(acting) ? { ...s, spaces: (s.spaces || []).concat([acting]) } : null);
+          }
+        }
+      }
       await taught();
       return json({ ok: true, system: saved, signed: saved.rev });
     }
@@ -5691,8 +5740,20 @@ async function handle(req) {
       if (!(await teachesHere())) return json({ error: "not-teaching" }, 403);
       const { pronouns, numbers } = await spaceWordSets();
       const names = await namesOf(pronouns.map((p) => p.owner).concat(numbers.map((n) => n.owner)));
+      /* The school's set of each kind, by language (0.713). */
+      /** @type {{ numbers: Record<string, string>, pronouns: Record<string, string> }} */
+      const school = { numbers: {}, pronouns: {} };
+      for (const lang of new Set(numbers.map((n) => n.lang))) {
+        const h = await schoolWordSet("numbers", lang);
+        if (h) school.numbers[lang] = h;
+      }
+      for (const lang of new Set(pronouns.map((p) => p.lang))) {
+        const h = await schoolWordSet("pronouns", lang);
+        if (h) school.pronouns[lang] = h;
+      }
       return json({
         ok: true,
+        school,
         pronouns: pronouns.map((p) => ({
           owner: p.owner,
           name: names[p.owner] || p.owner,

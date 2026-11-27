@@ -9508,3 +9508,15 @@ effect moves a teacher off it once it empties. On the mine side nothing
 creates: no `onNew`, no Import, no empty-state `Nudge`; every way out stays.
 Its Word sets tab shows only with a personal pronoun card. The server, the
 `personalOnly` prop and every other mention of My space are unchanged.
+
+## One set of numbers and one of pronouns per language, for the whole school (0.713)
+
+A teacher met four ideas (my set, shared sets, sets by teacher, a chooser
+per course) for what is simply "the numbers". `schoolWordSet(kind, lang)`
+picks, among the sets `spaceWordSets()` lists for the acting space, the
+first written, with the same `firstWritten` order `reachingSets` uses.
+`wordSetPick` returns it (falling back to the earliest reaching the course)
+and no longer reads `course.wordSets`, which stays stored. `space-word-sets`
+adds `school`; `save-system` marks a teacher's numbers (and clock) with the
+space when it has none. `CourseWordSets` and its API wrappers are gone;
+`share-word-set`, `course-word-sets` and `set-course-word-set` still work.
