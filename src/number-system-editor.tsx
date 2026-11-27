@@ -321,7 +321,7 @@ export function NumberSystemEditor({
 
   if (!composer) {
     return (
-      <Screen title="Number system" onBack={onClose}>
+      <Screen title={`Numbers · ${lang.name}`} onBack={onClose}>
         <Notice kind="warn">
           Nobody has written down how {lang.name} builds its numbers yet, so there is nothing to
           fill in. Everything else about the language still works.
@@ -571,7 +571,7 @@ export function NumberSystemEditor({
     /* Nothing on this screen is edited, so it has no Save: each part, the
        clock and the numbers written out by hand open on a screen of their
        own, and are saved there. */
-    <Screen title="Number system" onBack={leave(onClose)} className="cardform">
+    <Screen title={`Numbers · ${lang.name}`} onBack={leave(onClose)} className="cardform">
       {sharedNote ? <Help>{sharedNote}</Help> : null}
       <NumbersTab
         lang={lang}
@@ -583,15 +583,15 @@ export function NumberSystemEditor({
         connecting={
           connecting.length
             ? connecting.every((s) => s.optional || written(draft, s))
-              ? "ready"
-              : "not written yet"
+              ? "Ready"
+              : "Not written yet"
             : null
         }
         time={
           timeComposer
             ? hourReady
-              ? "ready"
-              : "waiting on the numbers that go with a feminine word"
+              ? "Ready"
+              : "Needs the numbers that go with a feminine word first"
             : null
         }
         onOpen={setPart}
@@ -643,9 +643,10 @@ function PartBlock({ title, role, children }: { title: string; role?: React.Reac
 /**
  * Where one part stands, in a few words a tile can carry.
  *
- * "ready", or what it is waiting for — and where that is a word another
- * part holds, which part: 11 to 99 cannot be said without seven, and the
- * box for seven is on 0 to 10's screen, not this one. Counting has a line
+ * "Ready", how many of its own words are still to write, or which other
+ * part it needs first: 11 to 99 cannot be said without seven, and the
+ * box for seven is on 0 to 10's screen, not this one. One plain line
+ * since 0.732 (the owner's 7a), where it used to name the words. Counting has a line
  * of its own — see countingStatus — because it never holds a part back.
  */
 export function partStatus(
@@ -654,7 +655,7 @@ export function partStatus(
   homes: Map<string, string>,
   labels: Map<string, string>,
 ): string {
-  if (check.open) return "ready";
+  if (check.open) return "Ready";
   const stops = blocking(check.warnings as never) as { code: string; slot?: string; detail?: string }[];
   const partLabel = (id: string) => {
     if (id === CONNECTING) return "Connecting words";
@@ -664,20 +665,12 @@ export function partStatus(
   const missing = [...new Set(stops.map((w) => w.slot || "").filter(Boolean))];
   const borrowed = missing.filter((slot) => homes.get(slot) && homes.get(slot) !== check.range.id);
   const own = missing.filter((slot) => !borrowed.includes(slot));
-  const named = (slots: string[]) =>
-    slots.length > 2
-      ? `${slots.slice(0, 2).map((s) => labels.get(s) || s).join(", ")} and ${slots.length - 2} more`
-      : slots.map((s) => labels.get(s) || s).join(" and ");
-  if (borrowed.length) {
-    const first = homes.get(borrowed[0]) || "";
-    const there = borrowed.filter((s) => homes.get(s) === first);
-    return `waiting on ${partLabel(first)}: ${named(there)}`;
-  }
-  if (own.length) return `waiting on ${named(own)}`;
+  if (borrowed.length) return `Needs ${partLabel(homes.get(borrowed[0]) || "")} first`;
+  if (own.length) return `${plural(own.length, "word")} still to write`;
   /* Nothing of its own missing, and still shut: an earlier part is, and
      the parts open in order. */
   const before = checks.find((c) => !c.open && c.range.kind === "numbers" && c !== check);
-  return before ? `waiting on ${before.range.label}` : waitingOn(check.warnings);
+  return before ? `Needs ${before.range.label} first` : waitingOn(check.warnings);
 }
 
 /**
@@ -693,7 +686,9 @@ export function countingStatus(check: RangeCheck, labels: Map<string, string>): 
   const counting = check.counting;
   if (!counting) return null;
   if (counting.open) return "Counting: ready";
-  if (!check.open) return "Counting: once the numbers are ready";
+  /* Nothing until the part's own numbers are: its own line says what they
+     need, and this would only say it again (0.732). */
+  if (!check.open) return null;
   const stops = blocking(counting.warnings as never) as { code: string; slot?: string; detail?: string }[];
   if (stops.some((w) => w.detail === "no nouns to count")) return "Counting: waiting on a noun card";
   const faces = [...new Set(
@@ -727,14 +722,16 @@ function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, 
   /* The parts that hold a question about two words, in their own order. */
   const asking = parts.filter((c) => twoWords.some((q) => q.n >= c.range.from && q.n <= c.range.to));
   const yours = Object.keys(draft.overrides).length;
+  /* The next part worth writing, marked "Start here"; a part that needs
+     another first is drawn fainter (0.732, the owner's 7a). */
+  const statusOf = (c: RangeCheck) => partStatus(c, checks, homes, labels);
+  const next = parts.find((c) => !c.open && /still to write$/.test(statusOf(c)));
 
   return (
     <>
       <Help>
-        Write the words {lang.name} builds its numbers out of and the app makes the rest. Open a
-        part to write its words: with zero to nine written the app can ask anything up to nine,
-        and so on up. <b>Nothing here has to be finished</b> — whatever is written works, and
-        each part says what it is still waiting for.
+        Write a few words and the app builds every number from them. Any part you finish works
+        straight away.
       </Help>
 
       {asking.length ? (
@@ -752,33 +749,38 @@ function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, 
 
       <Section title="Parts" className="at-mt5">
         <div className="at-numparts">
-          {parts.map((check) => (
-            <Tile
-              key={check.range.id}
-              title={check.range.label}
-              meta={
-                <span className="at-numstates">
-                  <span className="at-numstate" data-open={check.open ? "" : undefined}>
-                    {partStatus(check, checks, homes, labels)}
-                  </span>
-                  {countingStatus(check, labels) ? (
-                    <span
-                      className="at-numstate"
-                      data-open={check.counting && check.counting.open ? "" : undefined}
-                    >
-                      {countingStatus(check, labels)}
+          {parts.map((check) => {
+            const status = statusOf(check);
+            const tile = (
+              <Tile
+                key={check.range.id}
+                title={check.range.label}
+                badge={check === next ? <span className="at-statusbadge">Start here</span> : undefined}
+                meta={
+                  <span className="at-numstates">
+                    <span className="at-numstate" data-open={check.open ? "" : undefined}>
+                      {status}
                     </span>
-                  ) : null}
-                </span>
-              }
-              onOpen={() => onOpen(check.range.id)}
-            />
-          ))}
+                    {countingStatus(check, labels) ? (
+                      <span
+                        className="at-numstate"
+                        data-open={check.counting && check.counting.open ? "" : undefined}
+                      >
+                        {countingStatus(check, labels)}
+                      </span>
+                    ) : null}
+                  </span>
+                }
+                onOpen={() => onOpen(check.range.id)}
+              />
+            );
+            return /^Needs /.test(status) ? <div className="at-numwait" key={check.range.id}>{tile}</div> : tile;
+          })}
           {connecting !== null ? (
             <Tile
               title="Connecting words"
               meta={
-                <span className="at-numstate" data-open={connecting === "ready" ? "" : undefined}>
+                <span className="at-numstate" data-open={connecting === "Ready" ? "" : undefined}>
                   {connecting}
                 </span>
               }
@@ -789,7 +791,7 @@ function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, 
             <Tile
               title="Telling the time"
               meta={
-                <span className="at-numstate" data-open={time === "ready" ? "" : undefined}>
+                <span className="at-numstate" data-open={time === "Ready" ? "" : undefined}>
                   {time}
                 </span>
               }
@@ -799,7 +801,7 @@ function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, 
         </div>
       </Section>
 
-      <Section title="When the app gets one wrong" className="at-mt5">
+      <Section title="Fix a number" className="at-mt5">
         <div className="at-numparts">
           <Tile
             title="Correct how a number is said"

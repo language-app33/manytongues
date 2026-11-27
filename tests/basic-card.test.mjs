@@ -5,7 +5,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { basicCard, droppedByBasic, opensAdvanced } from "../src/basic-card.ts";
+import { basicCard, droppedByBasic, onlyWords, opensAdvanced } from "../src/basic-card.ts";
+import { ALT_SEP } from "../src/answers.ts";
 
 const word = (/** @type {Record<string, any>} */ more = {}) => ({ id: "w", lang: "vi", forms: [{ ar: "nhà", lat: "", en: "house" }], ...more });
 
@@ -70,4 +71,19 @@ test("grammar is not on a basic card: a card that says some opens as advanced, a
   }
   assert.ok(droppedByBasic(/** @type {any} */ ({ forms: [told] }), "", "word").includes("the grammar"));
   assert.equal(hasGrammar(basicCard(/** @type {any} */ ({ forms: [told] }), told).forms[0]), false);
+});
+
+/* 0.732: a card being read hides its Content block only where the card
+   drawn at its top already says all of it. */
+test("a plain word says no more than the card at the top; a recording, a picture or a second answer does", () => {
+  assert.equal(onlyWords({ ar: "بيت", lat: "beit", en: "house" }), true);
+  assert.equal(onlyWords({ ar: "بيت", lat: "", en: "" }), true);
+  assert.equal(onlyWords({ ar: "بيت", lat: "beit", en: "house", answers: [{ text: "بيت", lat: "beit" }], clips: [] }), true,
+    "as the server stores one: its one spelling also as an answer");
+  assert.equal(onlyWords({ ar: "بيت", en: "house", answers: [{ text: "بيت" }, { text: "دار" }] }), false, "a second answer");
+  assert.equal(onlyWords({ ar: "بيت", en: "house", clips: ["c1"] }), false, "a recording");
+  assert.equal(onlyWords({ ar: "بيت", en: "house", slowClips: ["s1"] }), false, "a slow recording");
+  assert.equal(onlyWords({ ar: "بيت", en: "house", images: ["i1"] }), false, "a picture");
+  assert.equal(onlyWords({ ar: `بيت${ALT_SEP}دار`, en: "house" }), false, "a second spelling");
+  assert.equal(onlyWords({ ar: "بيت", en: `house${ALT_SEP}home` }), false, "a second English");
 });

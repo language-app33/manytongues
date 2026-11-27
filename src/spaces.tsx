@@ -4966,17 +4966,20 @@ type WordSet = {
   name: string;
   written: number;
   total: number;
-  /** What `written` and `total` count: "range" for numbers, "pronoun". */
+  /** What `written` and `total` count: "part" for numbers, "pronoun". */
   unit: string;
   decks: number;
   open: () => void;
 };
 /** "9 of 12 ranges written · in 2 decks", as a word set's tile says it. */
 function wordSetLine(s: WordSet): string {
+  /* "Not started" rather than "0 of 11 written" (0.732, the owner's 7a). */
   const done = s.written === s.total
     ? `All ${plural(s.total, s.unit)} written`
+    : s.written === 0
+    ? "Not started"
     : `${s.written} of ${plural(s.total, s.unit)} written`;
-  return `${done} · ${s.decks ? `in ${plural(s.decks, "module")}` : "in no module yet"}`;
+  return `${done} · ${s.decks ? `in ${plural(s.decks, "module")}` : "not in a module yet"}`;
 }
 /* A row that opens something, drawn as a deck's tile is: a real button, so
    it answers a keyboard and a screen reader the way a tap does. */
@@ -6771,9 +6774,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The open deck, being edited: null while it is only read. */
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
   const [discardingModule, setDiscardingModule] = useState(false);
-  /* The deck's own "Manage cards" page, and the picker it opens to add
+  /* The picker a deck's screen opens to add
      cards the teacher already has: what is ticked, held until Done. */
-  const [managing, setManaging] = useState(false);
   const [adding, setAdding] = useState<{ ids: string[]; parts: string[]; pronouns: boolean } | null>(null);
   /* Already teaching something? Then this is a rare errand, folded away. */
   const [joinNote, setJoinNote] = useState("");
@@ -7571,7 +7573,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * How a list of cards is ordered and what it leaves out.
    *
    * Built once here and handed to every screen that shows cards — the Cards
-   * tab, an open deck, its Manage cards and the cards to add to it —
+   * tab, an open deck and the cards to add to it —
    * because a teacher moving between them is looking at the same material
    * through the same controls, and two copies of this would be two card
    * lists that sort and narrow differently.
@@ -8803,7 +8805,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         name: "Numbers",
         written: parts.filter((r) => ready.has(r.id)).length,
         total: parts.length,
-        unit: "range",
+        unit: "part",
         decks: inLang.filter((d) => partsNow(d.parts || []).some((p) => ids.has(p))).length,
         open: () => {
           setSetOwner(null);
@@ -8916,7 +8918,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           rows.push({
             key: "numbers",
             title: "Numbers",
-            meta: written === parts.length ? `All ${plural(parts.length, "range")} written` : `${written} of ${plural(parts.length, "range")} written`,
+            meta: written === parts.length ? `All ${plural(parts.length, "part")} written` : written === 0 ? "Not started" : `${written} of ${plural(parts.length, "part")} written`,
             by: n.name,
             open: () => {
               setSetOwner(owner);
@@ -9526,7 +9528,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
 
   /* A deck's word sets — its number ranges and the language's pronouns —
-     written straight away from the Manage cards page. A deck
+     written straight away from the deck's screen. A deck
      being edited has its draft brought along, so saving the edit does not
      put back what was just changed. */
   const saveBuiltins = async (d: Module, parts: string[], pronounsOn: boolean) => {
@@ -9770,22 +9772,21 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }}
       />
     );
-    /* Remove, behind a card's three dots on Manage cards, where the Cards
+    /* Remove, behind a card's three dots on the deck's screen, where the Cards
        tab has Delete (0.714). While it is under way the spinner stands in
        for the dots. */
     const removeItem = (it: any): MoreItem => ({
       label: `Remove from this ${kindW}`, icon: "remove", onClick: () => removeFromModule(d, [it]),
     });
     const manageMenu = (it: any) => leaving.has(it.id) ? removeBtn(it) : cardMenu(it, [removeItem(it)], false);
-    /* A card in the deck, read on the deck screen; on Manage cards, with
-       Remove where the Cards tab has Delete. */
-    const moduleTile = (it: any, manage: boolean) =>
+    /* A card in the deck, on the deck's screen, with Remove where the Cards
+       tab has Delete. */
+    const moduleTile = (it: any) =>
       isNumberPart(it)
-        ? numberTile(it, manage ? removeBtn(it) : null)
+        ? numberTile(it, removeBtn(it))
         : isPronounGroup(it)
-        ? pronounTile(it, manage ? removeBtn(it) : null)
-        : manage
-        ? (
+        ? pronounTile(it, removeBtn(it))
+        : (
           <CardTile
             card={it}
             lang={langOfCard(it)}
@@ -9793,8 +9794,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             onClick={() => openCard(it)}
             corner={manageMenu(it)}
           />
-        )
-        : cardTile(it);
+        );
     const filterNote = (
       <>
         No cards in this {kindW} match the filter.{" "}
@@ -9830,90 +9830,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
     const realIds = (ids: Iterable<string>) => pickedIds(Array.from(ids).filter((x) => !x.startsWith("numbers:")));
 
-    /* ---- Manage cards: the deck's cards laid out as the Cards tab lays
-           out every card, with what changes which cards are in it. ---- */
-    if (managing) {
-      const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
-      return (
-        <Screen title="Manage cards" scrollKey={`manage:${d.id}`}
-          onBack={() => { setManaging(false); setSelCards(new Set()); setCardAction(null); setTagAction(null); }}>
-          <p className="at-hint at-managefor">{d.title}</p>
-          <Notice kind="error">{error}</Notice>
-          <ItemList
-            noun="card"
-            items={listed}
-            total={listedWhole}
-            /* With the deck empty, Import is in the box below instead. */
-            more={moduleEmpty ? [] : [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }]}
-            sort={cardSort}
-            filter={cardFilterProp}
-            size="small"
-            busy={busy}
-            filters={
-              listed.length ? (
-                <div className="at-mt3">
-                  {/* Both labels, and the stylesheet shows the one that
-                      fits on one line (0.728): the long one says where the
-                      cards go, which a phone has no room for. */}
-                  <Button icon="add" className="at-blockbtn at-addexisting"
-                    onClick={() => openAdding(d)}>
-                    <span className="at-longlabel">{`Add existing cards to this ${kindW}`}</span>
-                    <span className="at-shortlabel">Add existing cards</span>
-                  </Button>
-                </div>
-              ) : null
-            }
-            empty={filterNote}
-            emptyPanel={moduleEmpty ? (
-              <Nudge
-                icon="cards"
-                tone="attention"
-                action={
-                  /* Import, icon-only, beside the two worded buttons while
-                     the deck is empty; the toolbar holds it once it is not. */
-                  <div className="at-nudgeacts">
-                    <div className="at-row">
-                      <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
-                      <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
-                    </div>
-                    <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
-                  </div>
-                }
-              >
-                No cards in this {kindW} yet. Make a new one or add cards you already have, so your students have something to practise.
-              </Nudge>
-            ) : undefined}
-            match={matchEntry}
-            onNew={newCard}
-            selected={selCards}
-            onSelectedChange={setSelCards}
-            bulkActions={[
-              { label: `Remove from this ${kindW}`, icon: "folderRemove", onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
-              { label: "Add to another module", icon: "folderAdd", onClick: () => setCardAction("add") },
-              { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
-              { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
-              { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
-              { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
-              {
-                label: "Delete",
-                icon: "delete",
-                danger: true,
-                onClick: (ids) => setConfirm({ kind: "cards", ids: realIds(ids), action: () => {} }),
-              },
-            ]}
-            views={cardViews("teacher-deck", manageMenu, removeBtn)}
-            renderItem={(it) => moduleTile(it, true)}
-          />
-          {cardScreen}
-          {cardAction === "add" && cardActionScreen(d.id)}
-          {exportScreen}
-          {importScreen}
-          {tagAction && tagActionScreen()}
-          {statusAction && statusActionScreen()}
-          {cardsConfirm}
-        </Screen>
-      );
-    }
+    /* A new card made from the deck's screen goes straight into it. */
+    const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
     /* A path unit (0.616): its page is a deck's, headed with its number on
        the path of the course it was opened from, with that course's
        checklist and Publish above its cards. */
@@ -10008,81 +9926,82 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <Screen
         /* What is being done, not which deck: its name is the first
            thing on the screen. */
-        title={editing ? `Edit ${kindW}` : unitIn ? `Unit ${unitNo} · ${d.title}` : KindW}
+        title={unitIn ? `Unit ${unitNo} · ${d.title}` : KindW}
         scrollKey={d.id}
         /* Laid out like a card's screen — see .at-screen.cardform: one
            sheet ruled into sections, each headed at the editor's size with
            what it is for straight under the heading. */
         className="cardform"
-        /* Being edited, the way out is Cancel — a cross where the back
-           arrow was, asking first when there is something to lose. */
-        onBack={
-          editing
-            ? () => (changed ? setDiscardingModule(true) : setModuleDraft(null))
-            : () => { setOpenModule(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); setServerProblems(null); }
-        }
-        backIcon={editing ? "close" : "back"}
-        backLabel={editing ? "Cancel" : "Back"}
-        /* Edit, as on a card being read; Save while editing, which goes
-           back to reading the deck. Both float in the bottom corner — see
-           ScreenFab — and the bar over the deck holds nothing else. */
-        fab={
-          editing
-            ? {
-                icon: "save",
-                label: "Save",
-                off: !shown.title.trim() || !changed,
-                busy: !!busy,
-                onClick: () => {
-                  if (busy || !moduleDraft) return;
-                  if (!changed) snack("No changes to save.");
-                  else if (!shown.title.trim()) snack("Some required fields are missing. They're marked with *.", "warn");
-                  else saveModule(d, moduleDraft);
-                },
-              }
-            : { icon: "edit", label: "Edit", onClick: () => setModuleDraft(draftOf(d)) }
+        /* Back asks first only while a rename is half typed (0.732). */
+        onBack={() => {
+          if (editing && changed) { setDiscardingModule(true); return; }
+          setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setServerProblems(null);
+        }}
+        backIcon="back"
+        backLabel="Back"
+        /* No Edit and no Save (0.732, the owner's 1a): the name is renamed
+           by its pencil, and Export and Delete wait behind three dots. */
+        action={
+          <MoreMenu
+            label={`More for this ${kindW}`}
+            title={d.title}
+            items={[
+              { label: "Export", icon: "download", onClick: () => exportModules([d.id]) },
+              { label: `Delete this ${kindW}`, icon: "delete", danger: true, onClick: askDelete },
+            ]}
+          />
         }
       >
             <Notice kind="error">{error}</Notice>
 
-            {/* The facts about the deck, headed the way a card's screen
-                heads "This card", with Export by the heading as it is
-                there. Read, they are the edit's own controls held still —
-                the card's way — and its quality is read either way. */}
+            {/* The deck's name is its heading, with a pencil to rename it
+                where it stands (0.732, the owner's 1a). */}
             <div className="at-formblock">
               <div className="at-formhead">
-                <span className="at-formnum">{`This ${kindW}`}</span>
-                <span className="at-formacts">
-                  <Button reads size="sm" className="iconly" aria-label={`Export this ${kindW}`} title={`Export this ${kindW}`}
-                    onClick={() => exportModules([d.id])}>
-                    <Icon name="download" />
-                  </Button>
-                </span>
-                {/* The language, then what the deck holds on a line of its own,
-                    and, only when some of it sends students nothing, why
+                {editing ? null : <span className="at-formnum">{d.title}</span>}
+                {editing ? null : (
+                  <span className="at-formacts">
+                    <IconButton icon="edit" label={`Rename this ${kindW}`} onClick={() => setModuleDraft(draftOf(d))} />
+                  </span>
+                )}
+                {/* The language and what the deck holds on one line, and,
+                    only when some of it sends students nothing, why
                     (0.563). */}
                 <span className="at-formrole">
-                  <span className="at-formline">{(langOfModule(d) || {}).name}</span>
-                  <span className="at-formline">{moduleSize(d, held.length)}</span>
+                  <span className="at-formline">{`${(langOfModule(d) || {}).name} · ${moduleSize(d, held.length)}`}</span>
                   {(() => {
                     const off = notReaching(d, held);
                     return off ? <span className="at-formline at-notreach">{off.long}</span> : null;
                   })()}
                 </span>
               </div>
-              {/* Who made it and who last changed it (0.711). */}
-              {madeLine(d, account.handle, shortDate) ? <Help>{madeLine(d, account.handle, shortDate)}</Help> : null}
-              <fieldset className="at-cardlock" disabled={!editing}
->
-                <Field label={<>{KindW} name<span className="at-reqstar" aria-hidden="true" /></>}>
-                  <input
-                    className="at-input"
-                    placeholder="e.g. Week 3 · Verbs"
-                    value={shown.title}
-                    onChange={(e) => edit({ title: e.target.value })}
-                  />
-                </Field>
-              </fieldset>
+              {editing ? (
+                <>
+                  <Field label={`${KindW} name`}>
+                    <input
+                      className="at-input"
+                      placeholder="e.g. Week 3 · Verbs"
+                      value={shown.title}
+                      autoFocus
+                      onChange={(e) => edit({ title: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && shown.title.trim() && changed && !busy && moduleDraft) {
+                          e.preventDefault();
+                          saveModule(d, moduleDraft);
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          setModuleDraft(null);
+                        }
+                      }}
+                    />
+                  </Field>
+                  <div className="at-row at-mt3 at-mb3">
+                    <Button variant="primary" size="sm" disabled={!shown.title.trim() || !changed || !!busy}
+                      onClick={() => moduleDraft && saveModule(d, moduleDraft)}>Save</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setModuleDraft(null)}>Cancel</Button>
+                  </div>
+                </>
+              ) : null}
 
                 {/* Which courses carry it, as a card says which decks it
                     is in: the names, each with its way out, and the way to
@@ -10223,9 +10142,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               );
             })}
 
-            {/* The cards, word sets among them, to read: which cards
-                the deck holds is changed on Manage cards. */}
-            <Section title="Cards" lede={moduleEmpty ? undefined : "Tap a card to see it."}>
+            {/* The cards, word sets among them: read, added, selected and
+                removed here, since Manage cards folded into this screen
+                (0.732, the owner's 1a). */}
+            <Section title="Cards">
             {/* A word set the deck holds that is still being written
                 (0.569): what is missing, and the way straight to the set.
                 Students already get what is written, so it says so rather
@@ -10271,52 +10191,85 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 </div>
               ));
             })()}
-            <ItemList
-              noun="card"
-              items={listed}
-              total={listedWhole}
-              tools={moduleEmpty ? null : (
-                <Button variant="primary" icon="cards" onClick={() => setManaging(true)}>
-                  {`Manage this ${kindW}'s cards`}
-                </Button>
-              )}
-              sort={cardSort}
-              filter={cardFilterProp}
-              size="small"
-              busy={busy}
-              empty={filterNote}
-              emptyPanel={moduleEmpty ? (
-                <Nudge
-                  icon="cards"
-                  tone="attention"
-                  action={<Button variant="primary" icon="cards" onClick={() => setManaging(true)}>{`Manage this ${kindW}'s cards`}</Button>}
-                >
-                  No cards in this {kindW} yet. Add some so your students have something to practise.
-                </Nudge>
-              ) : undefined}
-              match={matchEntry}
-              views={cardViews("teacher-deck", (c) => cardActions(c))}
-              renderItem={(it) => moduleTile(it, false)}
-            />
-            </Section>
-
-            {/* At the foot while editing, away from Save, as the deck list
-                keeps it on the deck's own row. */}
-            {editing && (
-              <div className="at-formblock at-mt5">
-                <div className="at-formhead">
-                  <span className="at-formnum">{`Delete ${kindW}`}</span>
-                </div>
-                <p className="at-dangerline">{`Deleting a ${kindW} is permanent and cannot be undone.`}</p>
-                <Button variant="danger" icon="delete" onClick={askDelete}>
-                  {`Delete ${kindW}`}
+        <ItemList
+          noun="card"
+          items={listed}
+          total={listedWhole}
+          /* With the deck empty, Import is in the box below instead. */
+          more={moduleEmpty ? [] : [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }]}
+          sort={cardSort}
+          filter={cardFilterProp}
+          size="small"
+          busy={busy}
+          filters={
+            listed.length ? (
+              <div className="at-mt3">
+                {/* Both labels, and the stylesheet shows the one that
+                    fits on one line (0.728): the long one says where the
+                    cards go, which a phone has no room for. */}
+                <Button icon="add" className="at-blockbtn at-addexisting"
+                  onClick={() => openAdding(d)}>
+                  <span className="at-longlabel">{`Add existing cards to this ${kindW}`}</span>
+                  <span className="at-shortlabel">Add existing cards</span>
                 </Button>
               </div>
-            )}
+            ) : null
+          }
+          empty={filterNote}
+          emptyPanel={moduleEmpty ? (
+            <Nudge
+              icon="cards"
+              tone="attention"
+              action={
+                /* Import, icon-only, beside the two worded buttons while
+                   the deck is empty; the toolbar holds it once it is not. */
+                <div className="at-nudgeacts">
+                  <div className="at-row">
+                    <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
+                    <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
+                  </div>
+                  <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
+                </div>
+              }
+            >
+              No cards in this {kindW} yet. Make a new one or add cards you already have, so your students have something to practise.
+            </Nudge>
+          ) : undefined}
+          match={matchEntry}
+          onNew={newCard}
+          selected={selCards}
+          onSelectedChange={setSelCards}
+          bulkActions={[
+            { label: `Remove from this ${kindW}`, icon: "folderRemove", onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
+            { label: "Add to another module", icon: "folderAdd", onClick: () => setCardAction("add") },
+            { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
+            { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
+            { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
+            { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
+            {
+              label: "Delete",
+              icon: "delete",
+              danger: true,
+              onClick: (ids) => setConfirm({ kind: "cards", ids: realIds(ids), action: () => {} }),
+            },
+          ]}
+          views={cardViews("teacher-deck", manageMenu, removeBtn)}
+          renderItem={moduleTile}
+        />
+            </Section>
+
+            {/* Who made it and who last changed it (0.711), at the foot
+                since 0.732. */}
+            {madeLine(d, account.handle, shortDate) ? (
+              <div className="at-formblock at-mt5">
+                <Help>{madeLine(d, account.handle, shortDate)}</Help>
+              </div>
+            ) : null}
 
         {cardScreen}
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
+        {importScreen}
         {tagAction && tagActionScreen()}
         {statusAction && statusActionScreen()}
 
@@ -11531,7 +11484,7 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
     };
   }, [load, reach]);
   return (
-    <Screen title="Number system" onBack={onBack}>
+    <Screen title={`Numbers · ${name}`} onBack={onBack}>
       <Help>Fetching what is written for {name}…</Help>
       {error ? <Notice kind="warn">{error}</Notice> : null}
     </Screen>
