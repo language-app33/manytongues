@@ -2461,7 +2461,7 @@ export function MoreMenu({ label = "More", title, lede, items, ghost = true, bar
   lede?: string;
   items: (MoreItem | null | false | undefined)[];
   ghost?: boolean;
-  /** No outline round the button, the dots alone (0.718). */
+  /** No outline round the button, the dots alone (0.719). */
   bare?: boolean;
 }) {
   const [open, setOpen] = useState(false);

@@ -13224,7 +13224,7 @@ const openPronounTables = async () => {
     tiles.join(" | ").slice(0, 300) || "no tiles");
   /* A module's tile (0.689): no language or size under its title, and
      Export and Delete behind three dots that do not open the module when
-     pressed. Since 0.718 its quality is " · score: N" at the end of the
+     pressed. Since 0.719 its quality is " · score: N" at the end of the
      line under its name (0.715), after the courses it is in, and the
      three dots have no outline. */
   {

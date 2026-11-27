@@ -1186,7 +1186,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* No rule above it (0.715, the owner's 2b): it sits under the tile's text
    at the spacing of the line of facts. */
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
-/* A three-dots button with no outline (0.718, the owner's wish, on a
+/* A three-dots button with no outline (0.719, the owner's wish, on a
    module's tile): the icon alone, the 44px it can be pressed in kept. */
 .at-morebtn.bare { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
@@ -1361,8 +1361,16 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cardtable tr.opens:hover > td { background: var(--raised); }
 .at-cardtable tr.picked > td { background: var(--tag-bg); }
 .at-cardtable .at-cardtable-word .ar { font-size:calc(17px * var(--sscale, 1)); }
-.at-cardtable .at-cardtable-meaning { white-space:normal; min-width:140px; }
-.at-cardtable .at-cardtable-acts { width:1%; }
+.at-cardtable .at-cardtable-meaning { white-space:normal; min-width:128px; }
+.at-cardtable .at-cardtable-acts { width:1%; padding-inline:2px 4px; }
+/* A card's modules wrap rather than widen the table (0.718, the owner's
+   1a), so a long card in the first column still leaves the table inside
+   the page on a desktop. */
+.at-cardtable .at-cardtable-decks { white-space:normal; }
+/* And a row's three dots have no edge (0.718), as on a tile. */
+.at-cardtable .at-cardtable-acts .at-morebtn { border:none; background:transparent; width:32px; height:32px;
+  min-height:32px; padding:0; flex:none; color: var(--muted); }
+.at-cardtable .at-cardtable-acts .at-morebtn:hover, .at-cardtable .at-cardtable-acts .at-morebtn.on { color: var(--ink); }
 .at-cardtable .at-cardtable-acts > * + * { margin-inline-start:6px; }
 .at-cardtable .at-grouprow > th { font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.06em;
   text-transform:uppercase; color: var(--muted); padding-top:12px; }

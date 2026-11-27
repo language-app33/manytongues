@@ -11104,7 +11104,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       title={d.title}
                       /* One line under the name (0.715, the owner's 1c):
                          what in it needs looking at, who can see it, and
-                         its quality score last (0.718, the owner's wish:
+                         its quality score last (0.719, the owner's wish:
                          no ring left of the name). No score until there is
                          something to score (0.709).
                          Its language and size are off the tile (0.689),
