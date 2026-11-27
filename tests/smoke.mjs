@@ -291,6 +291,8 @@ let withPath = false;
 let pathOrder = ["u1", "u2"];
 /** @type {any[]} */
 const movedUnits = [];
+/** What the course's Exercises tab asked the server to save (0.735). @type {any[]} */
+const practiceSaves = [];
 /** Lesson 1's name as the stub server holds it, and the renames it was sent (0.732). */
 let lessonOneTitle = "Lesson 1";
 const renamedDecks = /** @type {any[]} */ ([]);
@@ -529,6 +531,7 @@ const fakeFetch = async (input, opts = {}) => {
     /* A course's exercises chosen (0.708): saved as asked, and handed back. */
     if (action === "set-course-practice") {
       const body = JSON.parse(opts.body || "{}");
+      practiceSaves.push(body);
       return json({ ok: true, course: { id: body.courseId, practice: body.practice } });
     }
     if (action === "my-courses" && withPath) {
@@ -3353,7 +3356,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     "CheckList", "LanguageRadio", "ModeSelector", "Section", "Tabs", "Screen",
     "SpaceFrame", "Empty", "Stat", "Tile", "TileNote", "CardTile", "CardReadout",
     "ItemList", "ConfirmModal", "PlayButton", "ClipList", "Icon", "LanguageTag",
-    "Snackbar", "KeysButton", "FilterBar",
+    "Snackbar", "KeysButton", "FilterBar", "ChipPick", "Switch",
   ].filter((n) => !shown.includes(n));
   check("every component in the library has a row", missing.length === 0, `missing: ${missing.join(", ")}`);
 
@@ -5215,6 +5218,21 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     `${savedCards.length - savesBefore} saved · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
   click(cardEdit());
   await sleep(400);
+  /* Its description folded to one row while it has none (0.735), and
+     written here so the card is saved with one. */
+  const descBlock = () => /** @type {any} */ (document.querySelector('.at-screen.cardform [data-el="editor-description"]'));
+  const descEnBox = () => /** @type {any} */ (document.querySelector('.at-screen.cardform input[aria-label="Description in English"]'));
+  const descBox = () => /** @type {any} */ (document.querySelector('.at-screen.cardform [data-el="editor-description"] input[aria-label="Description"]'));
+  check("a card with no description, being written, shows it as one row with Add",
+    !!descBlock() && !!descBlock().querySelector(".at-descrow") && !descEnBox(),
+    descBlock() ? (descBlock().textContent || "").trim() : "(no description)");
+  click(descBlock() && [...descBlock().querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Add"));
+  await sleep(200);
+  /* Both: the English is kept only beside one in the language itself. */
+  typeOn(descBox(), "فيه صفحات");
+  await sleep(100);
+  typeOn(descEnBox(), "where you buy books");
+  await sleep(150);
   typeOn(noteBox(), `${(noteBox() || { value: "" }).value}y`);
   await sleep(150);
   clickNamed(/^Cancel$/);
@@ -5237,6 +5255,11 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      reading the card as Save is. A plain Save never asks. */
   click(cardEdit());
   await sleep(400);
+  check("a card saved with a description opens to be written with its boxes showing",
+    (savedCards[savedCards.length - 1]?.forms || [])[0]?.descEn === "where you buy books" &&
+      !!descEnBox() && descEnBox().value === "where you buy books" && !!descBox() && descBox().value === "فيه صفحات" &&
+      !(descBlock() && descBlock().querySelector(".at-descrow")),
+    `${JSON.stringify((savedCards[savedCards.length - 1]?.forms || [])[0]?.descEn)} · ${descEnBox() ? descEnBox().value : "(no box)"}`);
   typeOn(noteBox(), `${(noteBox() || { value: "" }).value}z`);
   await sleep(150);
   clickNamed(/^Save and publish$/);
@@ -5843,15 +5866,75 @@ const openPronounTables = async () => {
     !document.querySelector('[role="radiogroup"][aria-label="What kind of card is this?"]') &&
       !!advancedTick() && !advancedTick().checked && tabNames().join("|") === "Basic|Exercises",
     `${tabNames().join("|")} · box ${advancedTick() ? (advancedTick().checked ? "ticked" : "unticked") : "missing"}`);
-  check("the box is the first thing in This card, above the card's name, and says nothing more",
+  /* Since 0.735 (the owner's 8a) one line under it says what it is for. */
+  check("the box is the first thing in This card, above the card's name, with one line saying what it is for",
     !!advancedBox() && advancedBox().closest(".at-formblock") === thisCardBlock() &&
       !!cardNameField() && !!(advancedBox().compareDocumentPosition(cardNameField()) & 4) &&
-      /^Build an advanced card$/.test((advancedBox().textContent || "").trim()) &&
+      ((advancedBox().querySelector("b") || {}).textContent || "").trim() === "Build an advanced card" &&
+      ((advancedBox().querySelector("i") || {}).textContent || "").trim() === "For several forms, a sentence with blanks, a verb table or a conversation." &&
       !cardNameField().querySelector(".at-label .req"),
     advancedBox() ? (advancedBox().textContent || "").trim() : "(no box)");
   check("whose Basic tab holds the word itself",
     [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Content$/.test((n.textContent || "").trim())),
     "(no word)");
+  /* ---- the Basic tab while writing (0.735, the owner's 9a and 10a) ----
+     No bare + beside the script or English heading: another answer is a
+     worded link under the box once it has something in it. And
+     Description is one row with Add until it is wanted. */
+  {
+    const editor = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen.over")].pop() || document.createElement("div"));
+    const setBox = (/** @type {any} */ el, /** @type {string} */ v) => {
+      if (!el) return;
+      if (el.getAttribute("contenteditable") === "true") {
+        el.textContent = v;
+      } else {
+        must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(el, v);
+      }
+      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+    };
+    const scriptBoxes = () => [...editor().querySelectorAll(".at-answerpair.headed .at-altfield")]
+      .map((f) => f.querySelector('input, [contenteditable="true"]')).filter(Boolean);
+    const englishBoxes = () => [...editor().querySelectorAll(".at-softrule .at-alts .at-altfield")]
+      .map((f) => f.querySelector('input, [contenteditable="true"]')).filter(Boolean);
+    const links = () => [...editor().querySelectorAll("button.at-addanswer")].map((b) => (b.textContent || "").trim());
+    check("a new card's Basic tab has no + button in the script or English heading",
+      editor().querySelectorAll(".at-answerheadrow").length >= 2 &&
+        !editor().querySelector(".at-answerheadrow button") && links().length === 0,
+      `${editor().querySelectorAll(".at-answerheadrow button").length} buttons in the headings · ${links().join(" | ")}`);
+    setBox(scriptBoxes()[0], "كتاب");
+    await sleep(200);
+    check("typing the word brings + Another way to write it under it, named for a screen reader as before",
+      links().join(" | ") === "+ Another way to write it" &&
+        editor().querySelector("button.at-addanswer")?.getAttribute("aria-label") === "Add another accepted answer",
+      links().join(" | ") || "(no link)");
+    click(editor().querySelector("button.at-addanswer"));
+    await sleep(200);
+    check("and pressing it adds a second box, with no link until that one is written",
+      scriptBoxes().length === 2 && links().length === 0,
+      `${scriptBoxes().length} boxes · ${links().join(" | ")}`);
+    click(editor().querySelector('.at-answerpair.headed.extra [aria-label="Remove this answer"]'));
+    await sleep(150);
+    setBox(scriptBoxes()[0], "");
+    await sleep(150);
+    setBox(englishBoxes()[0], "book");
+    await sleep(200);
+    check("and typing the English brings + Another accepted answer under it",
+      scriptBoxes().length === 1 && links().join(" | ") === "+ Another accepted answer",
+      `${scriptBoxes().length} script boxes · ${links().join(" | ") || "(no link)"}`);
+    setBox(englishBoxes()[0], "");
+    await sleep(150);
+    const desc = () => /** @type {any} */ (editor().querySelector('[data-el="editor-description"]'));
+    check("Description is one row saying it is optional, with Add",
+      !!desc() && !!desc().querySelector(".at-descrow") &&
+        ((desc().querySelector(".at-formrole") || {}).textContent || "").trim() === "Optional. Adds two kinds of exercise." &&
+        !desc().querySelector("input, [contenteditable]"),
+      desc() ? (desc().textContent || "").trim() : "(no description)");
+    click(desc() && [...desc().querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Add"));
+    await sleep(200);
+    check("and Add shows its two boxes",
+      !!desc() && !desc().querySelector(".at-descrow") && !!desc().querySelector('input[aria-label="Description in English"]'),
+      desc() ? (desc().textContent || "").replace(/\s+/g, " ").slice(0, 160) : "(no description)");
+  }
   const typeRows = () => [...document.querySelectorAll(
     '[role="radiogroup"][aria-label="What type of card"] .at-tickrow')];
   /* Ticking the box opens the Advanced tab, whose first question is the
@@ -9486,9 +9569,20 @@ const openPronounTables = async () => {
   const order = () => [...frame.querySelectorAll(".at-cardgrid .at-tilewrap")].map((t) => (t.textContent || "").slice(0, 40)).join(" | ");
   const sheetLabels = (/** @type {string} */ sheet) =>
     [...document.querySelectorAll(`${sheet} .at-filterlabel`)].map((s) => (s.textContent || "").trim());
+  /* Since 0.735 (the owner's 1a) "Sort by" is rows with a mark — real
+     radios, so this answers the row's own input — and "Order" is one
+     two-part switch under them. */
   const seg = (/** @type {string} */ group, /** @type {RegExp} */ re) =>
-    [...document.querySelectorAll(`.at-sortsheet [role="group"][aria-label="${group}"] .at-seg`)]
-      .find((b) => re.test((b.textContent || "").trim()));
+    /** @type {any} */ (group === "Sort by"
+      ? ([...document.querySelectorAll('.at-sortsheet [role="radiogroup"][aria-label="Sort by"] .at-tickrow')]
+          .find((r) => re.test(((r.querySelector("b") || {}).textContent || "").trim())) || { querySelector: () => null }).querySelector("input")
+      : [...document.querySelectorAll(`.at-sortsheet [role="group"][aria-label="${group}"] .at-seg`)]
+          .find((b) => re.test((b.textContent || "").trim())));
+  const picked = (/** @type {any} */ el) => !!el && (el.tagName === "INPUT" ? el.checked : el.getAttribute("aria-pressed") === "true");
+  const sortRows = () => [...document.querySelectorAll('.at-sortsheet [role="radiogroup"][aria-label="Sort by"] .at-tickrow b')]
+    .map((b) => (b.textContent || "").trim());
+  const orderWords = () => [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')]
+    .map((b) => (b.textContent || "").trim()).join(" | ");
   const sheetFoot = (/** @type {string} */ sheet) => /** @type {any} */ (document.querySelector(`${sheet} .at-sheetfoot button`));
   const shutSheet = async (/** @type {string} */ sheet) => {
     click(document.querySelector(`${sheet} [aria-label="Close"]`));
@@ -9536,16 +9630,30 @@ const openPronounTables = async () => {
   const before = order();
   click(one(".at-listline .at-sortbtn", frame));
   await sleep(200);
+  const sortSheetLabels = () => [...document.querySelectorAll(".at-sortsheet .at-label")].map((s) => (s.textContent || "").trim());
   check("the order opens the Sort panel: what to sort by, and which way",
-    sheetLabels(".at-sortsheet").join(" | ") === "Sort by | Order" &&
-      [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')].map((b) => (b.textContent || "").trim()).join(" | ") === "Newest first | Oldest first" &&
+    sortSheetLabels().join(" | ") === "Sort by | Order" &&
+      orderWords() === "Newest first | Oldest first" &&
       (sheetFoot(".at-sortsheet") || {}).textContent === "Apply",
-    sheetLabels(".at-sortsheet").join(" | ") || "(nothing open)");
+    sortSheetLabels().join(" | ") || "(nothing open)");
+  check("Sort by is four rows with a mark on the one in force, and nothing in capitals' boxes",
+    sortRows().join(" | ") === "Added | Changed | Recordings | Forms" &&
+      picked(seg("Sort by", /^Changed$/)) && !document.querySelector('.at-sortsheet [role="group"][aria-label="Sort by"]'),
+    sortRows().join(" | ") || "(no rows)");
+  check("and Order is one two-part switch, in the panel's own word",
+    document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg').length === 2 &&
+      !!document.querySelector(".at-sortsheet .at-sortorder [role=\"group\"]"),
+    orderWords());
+  click(seg("Sort by", /^Recordings$/));
+  await sleep(150);
+  check("picking Recordings says With first or Without first, and the list behind has not moved",
+    orderWords() === "With first | Without first" && order() === before && orderSays() === "Newest changes",
+    `${orderWords()} · ${orderSays()}`);
   click(seg("Sort by", /^Forms$/));
   await sleep(150);
   check("and the directions take the words of what is picked",
-    [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')].map((b) => (b.textContent || "").trim()).join(" | ") === "Most first | Fewest first",
-    [...document.querySelectorAll('.at-sortsheet [role="group"][aria-label="Order"] .at-seg')].map((b) => (b.textContent || "").trim()).join(" | "));
+    orderWords() === "Most first | Fewest first",
+    orderWords());
   click(seg("Sort by", /^Added$/));
   await sleep(100);
   click(seg("Order", /^Oldest first$/));
@@ -9558,8 +9666,7 @@ const openPronounTables = async () => {
   click(one(".at-listline .at-sortbtn", frame));
   await sleep(200);
   check("and it opens again at the order in force, not the one let go",
-    seg("Sort by", /^Changed$/)?.getAttribute("aria-pressed") === "true" &&
-      seg("Order", /^Newest first$/)?.getAttribute("aria-pressed") === "true",
+    picked(seg("Sort by", /^Changed$/)) && picked(seg("Order", /^Newest first$/)),
     [...document.querySelectorAll(".at-sortsheet .at-seg")].map((b) => `${(b.textContent || "").trim()}=${b.getAttribute("aria-pressed")}`).join(" "));
   click(seg("Sort by", /^Added$/));
   await sleep(100);
@@ -9595,31 +9702,87 @@ const openPronounTables = async () => {
     (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
     (sheetFoot(".at-filtersheet") || {}).textContent || "(no button)");
 
-  /* ---- and by kind, with each kind's subtypes under it ----
-     Offered once the kind is ticked and only then: "verbs" says nothing
-     about a sentence. */
-  const tickRow = (/** @type {RegExp} */ re) => /** @type {any} */ (
-    [...document.querySelectorAll(".at-filtersheet .at-tickrow")]
-      .find((r) => re.test((((r.querySelector("b") || {}).textContent) || "").trim())) || null);
-  check("the filter offers the three kinds of card",
-    !!tickRow(/^Word or phrase$/) && !!tickRow(/^Sentence$/) && !!tickRow(/^Scene$/),
-    [...document.querySelectorAll(".at-filtersheet .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
-  check("and no subtypes before a kind is ticked", !tickRow(/^No subtype$/) && !tickRow(/^Conversation$/), "");
-  const tilesBefore = tiles();
-  click(tickRow(/^Word or phrase$/) && tickRow(/^Word or phrase$/).querySelector("input"));
+  /* ---- chips, and no "Any" (0.735, the owner's 2a and 3a) ----
+     Every group is chips; nothing lit is what narrows nothing, so there is
+     no "Any" to press, and a lit chip pressed again lets go. */
+  const chipName = (/** @type {Element} */ b) => {
+    const note = b.querySelector(".at-chipnote");
+    return ((b.textContent || "").slice(0, (b.textContent || "").length - (note ? (note.textContent || "").length : 0))).trim();
+  };
+  const chipsIn = (/** @type {string} */ group) =>
+    [...document.querySelectorAll(`.at-filtersheet [role="group"][aria-label="${group}"] .at-chipopt`)];
+  const chipOf = (/** @type {string} */ group, /** @type {RegExp} */ re) =>
+    /** @type {any} */ (chipsIn(group).find((b) => re.test(chipName(b))) || null);
+  const lit = (/** @type {any} */ b) => !!b && b.getAttribute("aria-pressed") === "true" && b.classList.contains("on");
+  const panelButtons = () => [...document.querySelectorAll(".at-filtersheet .at-sheetbody button")].map((b) => (b.textContent || "").trim());
+  check("the Filter panel has no Any to press, in any group",
+    !panelButtons().some((t) => /^Any( module| card)?$/.test(t)) &&
+      document.querySelectorAll(".at-filtersheet .at-chipopt").length > 0 &&
+      !document.querySelector(".at-filtersheet .at-segmented, .at-filtersheet .at-filtergroup.wide"),
+    panelButtons().join(" | "));
+  check("and with nothing narrowing, no chip in it is lit",
+    !document.querySelector(".at-filtersheet .at-chipopt.on"),
+    [...document.querySelectorAll(".at-filtersheet .at-chipopt.on")].map(chipName).join(" | "));
+  const everyCard = tiles();
+  /* Every card here is published, so Published lights and keeps them all;
+     Waiting to publish is the one that narrows. */
+  click(chipOf("Status", /^Published$/));
   await sleep(250);
-  check("ticking words and phrases offers their subtypes, and no scene's",
-    !!tickRow(/^Noun$/) && !!tickRow(/^No subtype$/) && !tickRow(/^Conversation$/),
-    [...document.querySelectorAll(".at-filtersheet .at-tickrow b")].map((b) => (b.textContent || "").trim()).join(" | "));
+  check("pressing the Published chip lights it, keeps the published cards and counts as a filter",
+    lit(chipOf("Status", /^Published$/)) && tiles() === everyCard && /1/.test(filterBtn().textContent || "") &&
+      (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
+    `${tiles()} of ${everyCard} · ${filterBtn().textContent || ""}`);
+  click(chipOf("Status", /^Published$/));
+  await sleep(250);
+  check("and pressing it again unlights it and the count goes",
+    !lit(chipOf("Status", /^Published$/)) && tiles() === everyCard && !/\d/.test(filterBtn().textContent || ""),
+    `${tiles()} of ${everyCard} · ${filterBtn().textContent || ""}`);
+  click(chipOf("Status", /^Waiting to publish$/));
+  await sleep(250);
+  check("pressing Waiting to publish lights it alone and narrows the list",
+    lit(chipOf("Status", /^Waiting to publish$/)) && !lit(chipOf("Status", /^Published$/)) && tiles() < everyCard &&
+      (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
+    `${tiles()} of ${everyCard}`);
+  click(chipOf("Status", /^Waiting to publish$/));
+  await sleep(250);
+  check("and pressing it again gives every card back",
+    !lit(chipOf("Status", /^Waiting to publish$/)) && tiles() === everyCard && !/\d/.test(filterBtn().textContent || ""),
+    `${tiles()} of ${everyCard} · ${filterBtn().textContent || ""}`);
+
+  /* ---- and by kind, with each kind's subtypes under it ----
+     Offered once the kind is lit and only then: "verbs" says nothing
+     about a sentence. */
+  check("the filter offers the three kinds of card, as chips with their counts",
+    !!chipOf("Kind", /^Word or phrase$/) && !!chipOf("Kind", /^Sentence$/) && !!chipOf("Kind", /^Scene$/) &&
+      !!chipOf("Kind", /^Word or phrase$/).querySelector(".at-chipnote") &&
+      !/Tick a kind/.test((document.querySelector(".at-filtersheet") || {}).textContent || ""),
+    chipsIn("Kind").map((b) => (b.textContent || "").trim()).join(" | "));
+  check("and no subtypes before a kind is lit",
+    !chipOf("Which words or phrases", /^No subtype$/) && !chipOf("Which scenes", /^Conversation$/), "");
+  const tilesBefore = tiles();
+  click(chipOf("Kind", /^Word or phrase$/));
+  await sleep(250);
+  check("lighting words and phrases offers their subtypes, and no scene's",
+    !!chipOf("Which words or phrases", /^Noun$/) && !!chipOf("Which words or phrases", /^No subtype$/) &&
+      !chipOf("Which scenes", /^Conversation$/),
+    chipsIn("Which words or phrases").map(chipName).join(" | "));
   check("and narrows the list to them", tiles() <= tilesBefore, `${tiles()} of ${tilesBefore}`);
-  /* Filters take hold as they are ticked (0.728): the list behind the
+  /* Filters take hold as they are lit (0.728): the list behind the
      panel has already changed, and its button counts what is left. */
   check("and the panel's button counts the cards now listed",
     (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
     `${(sheetFoot(".at-filtersheet") || {}).textContent} · ${listed()} listed`);
-  click(tickRow(/^Word or phrase$/) && tickRow(/^Word or phrase$/).querySelector("input"));
+  click(chipOf("Kind", /^Sentence$/));
   await sleep(250);
-  check("and letting go of the kind gives the list back", tiles() === tilesBefore && !tickRow(/^No subtype$/),
+  check("and pressing a second kind lights both",
+    lit(chipOf("Kind", /^Word or phrase$/)) && lit(chipOf("Kind", /^Sentence$/)) && !lit(chipOf("Kind", /^Scene$/)),
+    chipsIn("Kind").map((b) => `${chipName(b)}=${b.getAttribute("aria-pressed")}`).join(" "));
+  click(chipOf("Kind", /^Sentence$/));
+  await sleep(150);
+  click(chipOf("Kind", /^Word or phrase$/));
+  await sleep(250);
+  check("and letting go of the kind gives the list back",
+    tiles() === tilesBefore && !chipOf("Which words or phrases", /^No subtype$/) && !lit(chipOf("Kind", /^Word or phrase$/)),
     `${tiles()} of ${tilesBefore}`);
 
   /* ---- and by a blank, from either side of it ----
@@ -9630,13 +9793,13 @@ const openPronounTables = async () => {
      blank". */
   const all = tiles();
   check("every card is listed before either filter is used", all >= 3, `${all} tiles`);
-  const sideLabel = '[role="group"][aria-label="Which side of a blank a card is on"] .at-seg';
+  const sideLabel = '[role="group"][aria-label="Which side of a blank a card is on"] .at-chipopt';
   const sides = () => [...document.querySelectorAll(sideLabel)]
     .map((b) => (b.textContent || "").trim());
   const blankSide = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(sideLabel)].find((b) => re.test((b.textContent || "").trim()));
-  check("the filter asks which side of a blank a card is on",
-    sides().join(" | ") === "Any card | Leaves one | Fills one | Fills none",
+  check("the filter asks which side of a blank a card is on, with no Any card to press",
+    sides().join(" | ") === "Leaves one | Fills one | Fills none",
     sides().join(" | ") || "(no blanks filter)");
 
   /* The words other cards borrow. */
@@ -9685,9 +9848,12 @@ const openPronounTables = async () => {
   await sleep(250);
   check("and fills-none leaves the values out",
     tiles() === all - values, `${tiles()} ordinary, ${values} values, ${all} in all`);
-  click(blankSide(/^Any card$/));
+  /* No "Any card" since 0.735: the lit side pressed again lets go. */
+  click(blankSide(/^Fills none$/));
   await sleep(250);
-  check("and putting it back shows every card again", tiles() === all, `${tiles()} of ${all}`);
+  check("and pressing the lit side again shows every card again, with no side lit",
+    tiles() === all && !document.querySelector(sideLabel.replace(".at-chipopt", ".at-chipopt.on")),
+    `${tiles()} of ${all}`);
 
   /* ---- the deck filter ----
      Which decks a card is in, or is not in. A mode with nothing ticked
@@ -9695,12 +9861,12 @@ const openPronounTables = async () => {
      ticked, and emptying the list in the meantime would read as a list that
      had lost its cards. */
   const moduleMode = (/** @type {RegExp} */ re) =>
-    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-chipopt')]
       .find((b) => re.test((b.textContent || "").trim()));
-  check("the filter offers in, not in, or any deck at all",
-    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
-      .map((b) => (b.textContent || "").trim()).join(" | ") === "Any module | In these | Not in these | In no module",
-    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+  check("the filter offers in, not in, or in no deck, with no Any module to press",
+    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-chipopt')]
+      .map((b) => (b.textContent || "").trim()).join(" | ") === "In these | Not in these | In no module",
+    [...document.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-chipopt')]
       .map((b) => (b.textContent || "").trim()).join(" | ") || "(no deck filter)");
   click(moduleMode(/^Not in these$/));
   await sleep(200);
@@ -9755,7 +9921,7 @@ const openPronounTables = async () => {
   await sleep(150);
   click(/** @type {any} */ ([...document.querySelectorAll(".at-filtersheet .at-tickrow")].find((r) => /Lesson 1/.test(r.textContent || ""))).querySelector("input"));
   await sleep(150);
-  click([...document.querySelectorAll('.at-filtersheet [role="group"][aria-label="Forms"] .at-seg')].find((b) => /^One$/.test((b.textContent || "").trim())));
+  click(chipOf("Forms", /^One$/));
   await sleep(200);
   const narrowedTo = listed();
   click(sheetFoot(".at-filtersheet"));
@@ -13673,10 +13839,56 @@ const openPronounTables = async () => {
     await sleep(300);
     check("a course's Exercises tab shows the presets, without the switches one by one",
       /With translation/.test(panel()) && !/Match the pairs/.test(panel()), panel().slice(0, 200));
-    click([...courseScreen.querySelectorAll('[role=tabpanel][aria-label="exercises"] button')]
-      .find((b) => (b.textContent || "").trim() === "Custom") || null);
+    /* Since 0.735 (the owner's 6a and 7a): four rows, each explaining
+       itself; under a preset a fixed "What this asks" over four folded
+       groups with their counts, read-only; under Custom sliding switches. */
+    const tabPanel = () => /** @type {any} */ (courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || document.createElement("div"));
+    const modeRows = () => [...tabPanel().querySelectorAll('[role="radiogroup"][aria-label="How much English"] .at-tickrow')];
+    const modeRow = (/** @type {string} */ name) => /** @type {any} */ (modeRows().find((r) => ((r.querySelector("b") || {}).textContent || "").trim() === name) || null);
+    check("the translation choice is four radio rows, each with its explanation showing",
+      modeRows().length === 4 &&
+        modeRows().map((r) => ((r.querySelector("b") || {}).textContent || "").trim()).join(" | ") === "With translation | Little translation | No translation | Custom" &&
+        modeRows().every((r) => !!((r.querySelector("i") || {}).textContent || "").trim()) &&
+        ((modeRow("No translation") || { querySelector: () => null }).querySelector("i") || {}).textContent === "No English: only pictures, sound and the language itself." &&
+        !!(modeRow("With translation") || { querySelector: () => null }).querySelector("input:checked"),
+      modeRows().map((r) => (r.textContent || "").trim()).join(" | ") || "(no rows)");
+    const folds = () => [...tabPanel().querySelectorAll("button.at-practice-fold")];
+    const foldNamed = (/** @type {string} */ n) => /** @type {any} */ (folds().find((b) => ((b.querySelector("b") || {}).textContent || "").trim() === n) || null);
+    check("under a preset, a label What this asks sits over four folded groups with counts, and no switch",
+      ((tabPanel().querySelector(".at-practice-asks > .at-label") || {}).textContent || "").trim() === "What this asks" &&
+        folds().map((b) => ((b.querySelector("b") || {}).textContent || "").trim()).join(" | ") === "What it means | Which word it is | Write it from a cue | Write it from its meaning" &&
+        folds().every((b) => /^\d+ of \d+ on$/.test(((b.querySelector(".at-practice-foldcount") || {}).textContent || "").trim()) && b.getAttribute("aria-expanded") === "false") &&
+        !tabPanel().querySelector('[role="switch"]'),
+      folds().map((b) => (b.textContent || "").trim()).join(" | ") || "(no groups)");
+    click(foldNamed("What it means"));
+    await sleep(200);
+    const openRows = () => [...tabPanel().querySelectorAll(".at-practice-group .at-practice-row")];
+    check("pressing What it means shows its exercises to read, each ticked or dashed, with no switch",
+      foldNamed("What it means")?.getAttribute("aria-expanded") === "true" && openRows().length > 0 &&
+        openRows().every((r) => !!r.querySelector(".at-practice-state")) && !tabPanel().querySelector('[role="switch"]'),
+      openRows().map((r) => (r.textContent || "").trim()).join(" | ") || "(nothing opened)");
+    click(foldNamed("What it means"));
+    await sleep(150);
+    check("and pressing it again folds it", openRows().length === 0, `${openRows().length} rows still open`);
+    const savesBefore = practiceSaves.length;
+    click((modeRow("Custom") || { querySelector: () => null }).querySelector("input"));
     await sleep(500);
     check("and Custom shows them", /Match the pairs/.test(panel()), panel().slice(0, 200));
+    const switches = () => [...tabPanel().querySelectorAll('button[role="switch"]')];
+    check("under Custom each exercise is one sliding switch, under small capital headings with counts",
+      practiceSaves.length === savesBefore + 1 && practiceSaves[practiceSaves.length - 1].practice?.mode === "custom" &&
+        switches().length > 4 && !tabPanel().querySelector(".at-segmented") && !tabPanel().querySelector("button.at-practice-fold") &&
+        [...tabPanel().querySelectorAll(".at-practice-levelname")].every((h) => /\d+ of \d+$/.test((h.textContent || "").trim())),
+      `${switches().length} switches · ${[...tabPanel().querySelectorAll(".at-practice-levelname")].map((h) => (h.textContent || "").trim()).join(" | ")}`);
+    const matchSwitch = /** @type {any} */ (switches().find((b) => b.getAttribute("aria-label") === "Match the pairs") || null);
+    const wasOn = matchSwitch && matchSwitch.getAttribute("aria-checked") === "true";
+    click(matchSwitch);
+    await sleep(400);
+    const lastSave = practiceSaves[practiceSaves.length - 1] || {};
+    check("and pressing a switch saves it as asked",
+      !!matchSwitch && wasOn && practiceSaves.length === savesBefore + 2 && lastSave.practice?.mode === "custom" &&
+        (lastSave.practice?.off || []).length === 1,
+      `${matchSwitch ? matchSwitch.getAttribute("aria-label") : "(no Match the pairs switch)"} · ${JSON.stringify(lastSave.practice || null)}`);
     click(tabNamed("Course") || null);
     await sleep(300);
   }

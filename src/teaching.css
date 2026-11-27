@@ -1085,18 +1085,35 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-checklist { margin:0 0 12px; padding-left:20px; line-height:1.45; }
 .at-checklist li { margin-bottom:4px; }
 
-/* A course's exercises (0.627): the four shortcuts, then a row per
-   exercise under its level. A row a shortcut has locked is greyed and
-   reads what the shortcut set. */
-.at-practice-modes > [role="group"] { display:grid; grid-template-columns:1fr 1fr; }
+/* A course's exercises (0.627): the four rows saying what each does, then
+   what the choice asks. Since 0.735 (the owner's 6a and 7a) a preset shows
+   it a folded group at a time, read-only; Custom shows every exercise with
+   its own sliding switch. */
 .at-practice-warn { margin:8px 0 0; color: var(--rose); font-size:14px; font-weight:600; }
 .at-practice-untaught { margin:6px 0 0; padding-left:20px; font-size:14px; }
 .at-practice-level { margin-top:14px; }
-.at-practice-levelname { font-size:13px; font-weight:700; color: var(--muted); margin-bottom:4px; }
-.at-practice-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); }
+/* A group's name as a small capital label with its count at the right. */
+.at-practice-levelname { display:flex; justify-content:space-between; gap:12px; align-items:baseline;
+  font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color: var(--muted);
+  border-top:1px solid var(--line); padding:12px 0 4px; }
+.at-practice-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); min-height:44px; }
 .at-practice-eng { margin-left:8px; }
-.at-practice-row.locked { opacity:.55; }
-.at-practice-lockword { font-size:13px; font-weight:700; color: var(--muted); }
+/* The name takes the row, so the tick or the switch sits at its right edge. */
+.at-practice-row > .grow { flex:1 1 auto; min-width:0; }
+.at-practice-asks { margin-top:16px; }
+.at-practice-group { border-bottom:1px solid var(--line); }
+.at-practice-group > .at-practice-row:last-child { border-bottom:0; }
+.at-practice-group > .at-practice-row { padding-left:12px; }
+.at-practice-fold { display:flex; align-items:center; gap:10px; width:100%; min-height:48px;
+  padding:8px 0; background:none; border:0; color: var(--text); cursor:pointer; text-align:left;
+  font-family: var(--ui); font-size:15px; }
+.at-practice-fold > b { flex:1 1 auto; font-weight:800; }
+.at-practice-foldcount { font-size:13px; font-weight:600; color: var(--muted); white-space:nowrap; }
+.at-practice-fold:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-practice-state { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; min-width:24px; }
+.at-practice-state.on { color: var(--jade); }
+.at-practice-state.off { color: var(--muted); font-weight:800; }
+.at-practice-state.where { font-size:12px; color: var(--muted); }
 
 /* A card being read opens with the card itself (0.732, the owner's 4a):
    its word large, how it is said, what it means, and three dots in the

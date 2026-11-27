@@ -182,20 +182,46 @@ chooses one of a few rather than acting (0.691): a card's status
 (`StatusMenu`) and `FilterMenu` open the same `PickSheet` of these rows.
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
-The pickers a list's Sort or Filter panel holds. `groups, note, onClear`
+The groups a list's Filter panel holds. `groups, note, onClear`
 
 A group is `{ key, label, value, quiet, onChange, options }` and draws a
-`Segmented`; `quiet` names the value that counts as not narrowing, and
-`narrowing(groups)` counts the ones that are away from it — that count is
-what the Filter button carries. A group with `custom` draws that instead, for
-a choice a row of buttons cannot say (which decks, of all of them), and `wide`
-gives it a line of its own. `chip` is what the group's chip under a list's bar
+`ChipPick` (0.735): each group full width, one under another, its choices
+rounded chips. `quiet` names the value that counts as not narrowing — that
+option is **not drawn**, since nothing lit already says it, and pressing the
+lit chip goes back to it. `narrowing(groups)` counts the groups away from
+`quiet` — that count is what the Filter button carries. A group with
+`custom` draws that instead, for a choice a few chips cannot say (which
+decks, of all of them). `chip` is what the group's chip under a list's bar
 says while it narrows ("Without recordings"; its `label` otherwise), and
 `onReset` puts that one group back — the chip's cross.
 
 It is only the pickers: the button, the panel they open in and the chips
-belong to `ItemList`'s `filter` (0.728). The Sort panel builds its own two
-groups from `ItemList`'s `sort`.
+under the bar belong to `ItemList`'s `filter` (0.728). The Sort panel no
+longer uses it: since 0.735 it is a `RadioGroup` ("Sort by") and one
+`Segmented` in ordinary letters ("Order"), built from `ItemList`'s `sort`.
+
+### `ChipPick` — 6 uses
+Chips to pick from: rounded, in ordinary letters, wrapping as they need.
+`options, label` and one of two modes.
+
+- **One at a time:** `value, onChange, quiet`. The option equal to `quiet`
+  is not drawn; pressing an unlit chip picks it, pressing the lit one goes
+  back to `quiet`. With no `quiet`, every option is drawn and the lit one
+  stays lit.
+- **Several:** `chosen, onToggle(value, wasOn)`, like `CheckList`.
+
+An option is `{ value, label?, note? }`; the note (a count) is drawn small
+after the label. Lit is green, the same green as the Filter button while
+anything is narrowing — green means "this is narrowing the list". `label`
+is what a screen reader says for the group.
+
+### `Switch` — 1 use
+On or off, as one sliding switch. `on, onChange(on), label, disabled`
+
+`role="switch"` with `aria-checked`; `label` names it. A 46×28 track inside
+a button padded to a 44px target. Used on a course's Exercises tab under
+Custom, where it replaced an Off / On `Segmented` (0.735); that pair was used
+nowhere else.
 
 ### `RadioGroup` — 2 uses
 One of a few, as a list of rows rather than a track of segments.
@@ -462,11 +488,13 @@ its play buttons resolve to "missing" rather than fetching.
 ## Odds and ends
 
 - **`Icon`** — 22 uses. `name, size=20`. Available names: `add, search, close,
-  delete, edit, tune, sort, size, check, back, save, folder, cards, person,
+  delete, edit, tune, filter, sort, size, check, back, save, folder, cards, person,
   group, key, download, verify, play, pause, view, select, school, copy,
   refresh, mic, remove, chevronDown, chevronUp, soundOff, flag, menu, help,
   theme, language, lock`.
-  Use these rather than glyph characters.
+  Use these rather than glyph characters. `filter` (a funnel, 0.735) is for
+  a button that narrows a list; `tune` (the sliders) is for settings — a
+  course's Exercises tab, a card's Advanced tab, the admin space.
 - **`plural(n, noun)`** — `plural(3, "card")` → `"3 cards"`. Use it instead of
   writing `${n} card${n === 1 ? "" : "s"}`.
 - **`localIdFor(cardId)` / `serverCardId(item)`** — a card has two names,
