@@ -1268,19 +1268,32 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 /* An empty course's line under each label (0.748). */
 .at-hint.at-modhint { margin:-4px 0 0; }
 .at-unitacts { display:flex; align-items:center; }
-/* The three dots in the row's top right corner, and the arrows then
-   Publish along the row's foot, at its right (0.741). */
+/* The three dots in the row's top right corner (0.741), and Open to
+   students along the row's foot, at its right, while the unit is not open.
+   The arrows left the tile in 0.750, for Move units. */
 .at-unitrow .at-deckrow2 { align-items:flex-start; }
 .at-unitrow .at-deckacts { margin-top:-8px; margin-right:-8px; }
 .at-unitfoot { display:flex; align-items:center; justify-content:flex-end; gap:2px; margin-top:6px; }
 .at-unitfoot:empty { display:none; }
-.at-unitfoot > .at-icon { flex:0 0 auto; min-width:40px; width:40px; height:40px; padding:0; border:none; background:none; }
 .at-unitfoot > .at-btn { margin-left:4px; white-space:nowrap; padding:9px 12px; }
 /* "Open to students" on one line on the narrowest phones (0.743). */
 @media (max-width: 360px) {
-  .at-unitfoot > .at-icon { min-width:34px; width:34px; }
   .at-unitfoot > .at-btn { padding:9px 10px; letter-spacing:0; font-size:13px; }
 }
+/* Move units (0.750): every unit on one slim line, arrows at its right. */
+.at-movelist { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.at-moverow { display:flex; align-items:center; gap:10px; padding:4px 4px 4px 14px; background: var(--surface);
+  border:2px solid var(--line); border-radius: var(--r); }
+.at-moverow.on { border-color: var(--jade); background: linear-gradient(var(--jade-bg), var(--jade-bg)), var(--surface); }
+.at-movenum { flex:0 0 auto; min-width:26px; height:26px; padding:0 4px; border-radius:8px; background: var(--raised);
+  display:grid; place-items:center; font-size: var(--fs-sm); font-weight:800; }
+.at-movetitle { flex:1 1 auto; min-width:0; font-weight:800; overflow-wrap:anywhere; }
+.at-moverow > .at-icon { flex:0 0 auto; min-width:44px; width:44px; height:44px; padding:0; border:none; background:none; }
+/* Its Cancel and Apply at the very foot of the screen, over the page's own
+   colour: under the body's bottom padding, rows showed beneath them. */
+.at-screen.at-movescreen .at-screenbody { padding-bottom:0; }
+.at-screen.at-movescreen .at-screenfoot { padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 75%, transparent); }
 .at-addwide { display:flex; width:100%; justify-content:center; margin-top:10px; }
 /* A unit's courses (0.740): one plain row per course, its place under the
    name, and the words "Open course" with an arrow at the right. */

@@ -183,7 +183,7 @@ doing one thing, what each does. `icon, label, note, danger, disabled,
 on, onClick`
 
 A module's green + opens one of these panels (0.736): "Add to the deck
-“…”" with **New card** and **Cards you already have**, each with its
+“…”" with **New card** and **Add existing cards** (0.750), each with its
 `note`. A list whose + could mean more than one thing asks this way rather
 than adding a second worded button under the list.
 
@@ -280,7 +280,11 @@ and there are no dots. `tools`, a screen's own worded button, is on a row of its
 the bar. (A module's screen had one, "Manage this deck's cards", until
 0.732, when it took in Manage cards and its list became the Cards tab's.) Each part is left out
 when it would hold nothing, and with `emptyPanel` showing the bar stands
-aside.
+aside. A module's Cards list passes no `more` while it is empty (0.750),
+so no bar is drawn at all, and puts its three dots on the Cards
+`Section`'s heading line as the section's `action` instead; its
+`emptyPanel` is a hint line and two `.at-deckadd.at-addwide` rows, the
+dotted buttons of the course screen.
 
 **The quiet line** under the bar, in small muted type: the count ("14 cards",
 or "5 of 14" while narrowed, against `total`), Clear while a filter is on,
@@ -397,6 +401,11 @@ of the height: To do on Teaching's Home with nothing in it.
 
 ### `Tile` — 7 uses
 The generic deck/course tile. `title, meta, onOpen, actions, footer`
+
+A course's unit tile (0.750) has no arrows: its `footer` is Open to
+students alone, and `undefined` once the unit is open, so no empty strip
+is drawn. Its order is changed on the Move units screen, opened from Move
+unit in the tile's three dots.
 
 Lived in `spaces.tsx` until recently, which made this file wrong about where
 reusable things are; it is in `shared.tsx` with the rest now.

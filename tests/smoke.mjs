@@ -291,6 +291,8 @@ let withPath = false;
 let pathOrder = ["u1", "u2", "u3"];
 /** @type {any[]} */
 const movedUnits = [];
+/** The whole orders sent by Move units' Apply (0.750). @type {any[]} */
+const orderedUnits = [];
 /** The units published in the course, and those asked to publish (0.740). */
 let pathLive = /** @type {Record<string, number>} */ ({ u1: 1 });
 /** @type {any[]} */
@@ -553,6 +555,12 @@ const fakeFetch = async (input, opts = {}) => {
       const rest = pathOrder.filter((x) => x !== body.deckId);
       rest.splice(body.to, 0, body.deckId);
       pathOrder = rest;
+      return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { ...pathLive }, opened: [] } });
+    }
+    if (action === "order-units" && withPath) {
+      const body = JSON.parse(opts.body || "{}");
+      orderedUnits.push(body);
+      pathOrder = body.order.slice();
       return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { ...pathLive }, opened: [] } });
     }
     /* Publishing a unit (0.740): no checklist, so the stub publishes. */
@@ -10264,8 +10272,8 @@ const openPronounTables = async () => {
     const rows = () => [...(sheet() ? sheet().querySelectorAll(".at-sheetact b") : [])].map((b) => (b.textContent || "").trim());
     check("the green + opens a panel headed with the deck's name in quotes",
       /^Add to the deck \u201c.+\u201d$/.test(title.trim()), title || "(no panel)");
-    check("and it lists exactly New card and Cards you already have, each with a line saying what it does",
-      rows().join(" | ") === "New card | Cards you already have" &&
+    check("and it lists exactly New card and Add existing cards, each with a line saying what it does",
+      rows().join(" | ") === "New card | Add existing cards" &&
         [...sheet().querySelectorAll(".at-sheetact")].every((r) => !!r.querySelector("i") && !!r.querySelector(".at-sheetactico")),
       rows().join(" | ") || "(no rows)");
     click([...sheet().querySelectorAll(".at-sheetact")][0]);
@@ -10280,9 +10288,9 @@ const openPronounTables = async () => {
     if (discard) { click(discard); await sleep(200); }
     click(document.querySelector(".at-listbar .at-newbtn") || buttonNamed(/^New card$/));
     await sleep(250);
-    click([...(sheet() ? sheet().querySelectorAll(".at-sheetact") : [])].find((r) => /Cards you already have/.test(r.textContent || "")));
+    click([...(sheet() ? sheet().querySelectorAll(".at-sheetact") : [])].find((r) => /Add existing cards/.test(r.textContent || "")));
     await sleep(300);
-    check("and Cards you already have opens the picker", !sheet(), "the panel is still open");
+    check("and Add existing cards opens the picker", !sheet(), "the panel is still open");
   }
   check("and adding heads the sets Word sets",
     [...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Word sets") &&
@@ -14099,14 +14107,15 @@ const openPronounTables = async () => {
     !publishOf(/Greetings unit/) && !!publishOf(/Family unit/) && !!publishOf(/Family unit/)?.classList.contains("off") &&
       !!publishOf(/Travel unit/) && !publishOf(/Travel unit/)?.classList.contains("off"),
     rows.join(" | "));
-  /* The three dots in the row's top right, and the arrows then Publish
-     along its foot (0.741). */
+  /* The three dots in the row's top right (0.741), and along its foot
+     Open to students alone: no arrows on any unit since 0.750. */
   {
     const row = unitRow(/Family unit/) || document.createElement("div");
     const foot = [...row.querySelectorAll(".at-unitfoot [aria-label], .at-unitfoot .at-btn")].map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim());
-    check("a unit row's three dots are in its top line, and Publish comes after the arrows",
+    check("a unit row's three dots are in its top line, and its foot holds Open to students alone, with no arrows on any unit",
       !!row.querySelector(".at-deckacts .at-morebtn") && !row.querySelector(".at-unitfoot .at-morebtn") &&
-        foot.join(" | ") === "Move Family unit up | Move Family unit down | Open to students",
+        foot.join(" | ") === "Open to students" && !unitRows().some((x) => x.querySelector('[aria-label^="Move "]')) &&
+        !(unitRow(/Greetings unit/) || document.createElement("div")).querySelector(".at-unitfoot"),
       foot.join(" | ") || "(no foot)");
   }
   click(publishOf(/Family unit/) || null);
@@ -14126,26 +14135,83 @@ const openPronounTables = async () => {
   await sleep(200);
   const dotRows = [...document.querySelectorAll(".at-moresheet .at-sheetact")].map((b) =>
     `${((b.querySelector("b") || {}).textContent || "").trim()} = ${((b.querySelector("i") || {}).textContent || "").trim()}`);
-  check("a published unit's three dots: Open it early, Remove from the course and Delete this unit, each with its line",
-    dotRows.join(" | ") === "Open it early = Students can start this unit now, without finishing the earlier ones. | " +
+  check("a published unit's three dots: Move unit, Open it early, Remove from the course and Delete this unit, each with its line",
+    dotRows.join(" | ") === "Move unit = Change the order students study units in. | " +
+      "Open it early = Students can start this unit now, without finishing the earlier ones. | " +
       "Remove from Arabic 101 = It stays in Material, and in any other course it is in. | " +
       "Delete this unit = From every course, for good. You will be asked to confirm." && !document.querySelector(".at-screen.cardform .at-unitcourse"),
     dotRows.join(" | ") || "(no sheet)");
   click(document.querySelector('.at-moresheet [aria-label="Close"]'));
   await sleep(150);
-  /* The arrows: the first cannot go up; down moves it. */
-  const arrow = (/** @type {RegExp} */ re, /** @type {string} */ label) =>
-    /** @type {HTMLButtonElement | null} */ ((unitRow(re) || document.createElement("div")).querySelector(`[aria-label="${label}"]`));
-  check("the arrows are there, the first unit's up arrow off",
-    !!arrow(/Greetings unit/, "Move Greetings unit up")?.disabled && !arrow(/Greetings unit/, "Move Greetings unit down")?.disabled,
-    unitRows().map((r) => [...r.querySelectorAll("[aria-label]")].map((b) => b.getAttribute("aria-label")).join(",")).join(" | "));
-  click(arrow(/Greetings unit/, "Move Greetings unit down"));
+  /* Move units (0.750, the owner's 1a, 2a, 3b, 7a): Move unit in a unit's
+     dots opens a screen of slim rows with arrows; nothing is sent until
+     Apply, which sends the whole order at once. */
+  const moveScreen = () => /** @type {HTMLElement | null} */ (document.querySelector('[data-el="move-units"]')?.closest(".at-screen") || null);
+  const moveRows = () => [...((moveScreen() || document.createElement("div")).querySelectorAll('[data-el="move-unit"]'))];
+  const moveTitles = () => moveRows().map((x) => `${((x.querySelector(".at-movenum") || {}).textContent || "").trim()} ${((x.querySelector(".at-movetitle") || {}).textContent || "").trim()}`);
+  const moveBtn = (/** @type {string} */ word) => /** @type {HTMLButtonElement | null} */ (
+    [...((moveScreen() || document.createElement("div")).querySelectorAll("button"))].find((b) => (b.textContent || "").trim() === word) || null);
+  const moveArrow = (/** @type {string} */ label) => /** @type {HTMLButtonElement | null} */ (
+    (moveScreen() || document.createElement("div")).querySelector(`[aria-label="${label}"]`));
+  const openMove = async (/** @type {RegExp} */ re) => {
+    click((unitRow(re) || document.createElement("div")).querySelector(".at-morebtn"));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-moresheet .at-sheetact")].find((b) => ((b.querySelector("b") || {}).textContent || "").trim() === "Move unit") || null);
+    await sleep(400);
+  };
+  const orderNow = () => unitRows().map((x) => ((x.querySelector(".at-decktitle") || {}).textContent || "").trim());
+  await openMove(/Family unit/);
+  {
+    const scr = moveScreen();
+    const title = ((scr && scr.querySelector(".at-screentitle, h1, h2")) || {}).textContent || "";
+    const on = moveRows().filter((x) => x.classList.contains("on")).map((x) => ((x.querySelector(".at-movetitle") || {}).textContent || "").trim());
+    check("Move unit opens Move units: a row per unit, the tapped one marked, the first's up arrow off, Apply off",
+      title.trim() === "Move units" && moveRows().length === 3 && on.join() === "Family unit" &&
+        !!moveArrow("Move Greetings unit up")?.disabled && !moveArrow("Move Greetings unit down")?.disabled && !!moveBtn("Apply")?.disabled &&
+        !!moveBtn("Cancel") && !moveBtn("Done"),
+      `${title} · ${moveTitles().join(" | ")} · on: ${on.join()}`);
+  }
+  click(moveArrow("Move Greetings unit down"));
+  await sleep(300);
+  check("a down arrow reorders and renumbers the rows, sends nothing, and turns Apply on",
+    moveTitles().join(" | ") === "1 Family unit | 2 Greetings unit | 3 Travel unit" && orderedUnits.length === 0 && movedUnits.length === 0 &&
+      !moveBtn("Apply")?.disabled,
+    `${moveTitles().join(" | ")} · ${orderedUnits.length} sent`);
+  click(moveBtn("Apply"));
   await sleep(700);
-  const order = unitRows().map((x) => ((x.querySelector(".at-decktitle") || {}).textContent || "").trim());
-  check("and the down arrow asks the server and the list then shows the new order",
-    movedUnits.length === 1 && movedUnits[0].courseId === "c1" && movedUnits[0].deckId === "u1" && movedUnits[0].to === 1 &&
-      order[0] === "1 · Family unit" && order[1] === "2 · Greetings unit",
-    `${JSON.stringify(movedUnits)} · ${order.join(" | ")}`);
+  check("Apply sends the whole new order once, closes the screen, and the course shows it",
+    orderedUnits.length === 1 && orderedUnits[0].courseId === "c1" && orderedUnits[0].order.join() === "u2,u1,u3" && !moveScreen() &&
+      orderNow()[0] === "1 · Family unit" && orderNow()[1] === "2 · Greetings unit" && movedUnits.length === 0,
+    `${JSON.stringify(orderedUnits)} · ${orderNow().join(" | ")}`);
+  /* Cancel leaves without asking and changes nothing. */
+  await openMove(/Travel unit/);
+  click(moveArrow("Move Travel unit up"));
+  await sleep(200);
+  click(moveBtn("Cancel"));
+  await sleep(400);
+  check("Cancel closes Move units with nothing sent and the order as it was",
+    !moveScreen() && orderedUnits.length === 1 && orderNow().join(" | ") === "1 · Family unit | 2 · Greetings unit | 3 · Travel unit" &&
+      !document.querySelector(".at-modal"),
+    orderNow().join(" | "));
+  /* The cross, with a move made, asks first (7a); Discard leaves it. */
+  await openMove(/Travel unit/);
+  click(moveArrow("Move Travel unit up"));
+  await sleep(200);
+  click((moveScreen() || document.createElement("div")).querySelector('[aria-label="Close"]'));
+  await sleep(300);
+  {
+    const modal = document.querySelector(".at-modal");
+    const said = ((modal && modal.textContent) || "").replace(/\s+/g, " ");
+    check("the close cross with a move made asks Apply the new order?",
+      !!moveScreen() && /Apply the new order\?/.test(said) && /You moved units but have not applied the change\./.test(said),
+      said || "(no question)");
+    click([...((modal && modal.querySelectorAll("button")) || [])].find((b) => (b.textContent || "").trim() === "Discard") || null);
+    await sleep(400);
+  }
+  check("and Discard closes it with nothing sent",
+    !moveScreen() && !document.querySelector(".at-modal") && orderedUnits.length === 1 &&
+      orderNow().join(" | ") === "1 · Family unit | 2 · Greetings unit | 3 · Travel unit",
+    orderNow().join(" | "));
   /* + Add a unit: since 0.749 (the owner's 6a) the same panel as Add a
      deck: a search, Create a new unit, then every unit, Add or Added. */
   click([...courseScreen0().querySelectorAll("button.at-addwide")].find((b) => /Add a unit/.test(b.textContent || "")) || null);
@@ -14279,7 +14345,7 @@ const openPronounTables = async () => {
       !!matchSwitch && wasOn && practiceSaves.length === savesBefore + 2 && lastSave.practice?.mode === "custom" &&
         (lastSave.practice?.off || []).length === 1,
       `${matchSwitch ? matchSwitch.getAttribute("aria-label") : "(no Match the pairs switch)"} · ${JSON.stringify(lastSave.practice || null)}`);
-    click(tabNamed("Course") || null);
+    click(tabNamed("Modules") || null);
     await sleep(300);
   }
   /* Found again: the Course tab was drawn afresh. A unit's page (0.740):
@@ -14384,14 +14450,21 @@ const openPronounTables = async () => {
       ((scr && scr.querySelector("h2")) || {}).textContent === "Unit" && /Not in a course yet/.test(txt) &&
         !!scr && [...scr.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Add it to a course"),
       txt.slice(0, 200));
-    const box = scr ? [...scr.querySelectorAll(".at-nudge")].find((n) => /No cards in this/.test(n.textContent || "")) : null;
+    /* Since 0.750 (the owner's 4a, 5a, 6b): one line and two dotted rows,
+       no amber box, and the dots on the Cards heading's line. */
+    const box = scr ? scr.querySelector('[data-el="module-empty"]') : null;
     const boxBtns = box ? [...box.querySelectorAll("button")].map((b) => (b.textContent || "").trim()) : [];
-    check("an empty module's box holds exactly New card and Cards you already have",
-      boxBtns.join(" | ") === "New card | Cards you already have", boxBtns.join(" | ") || "(no box)");
-    click(scr ? [...scr.querySelectorAll(".at-toolbar .at-morebtn, .at-listbar .at-morebtn")].pop() || null : null);
+    check("an empty module's box holds exactly New card and Add existing cards, as dotted rows, with no amber box",
+      boxBtns.join(" | ") === "New card | Add existing cards" && !!box && [...box.querySelectorAll("button")].every((b) => b.classList.contains("at-deckadd")) &&
+        !(scr && [...scr.querySelectorAll(".at-nudge")].some((n) => /No cards/.test(n.textContent || ""))),
+      boxBtns.join(" | ") || "(no box)");
+    const cardsSection = scr ? [...scr.querySelectorAll(".at-section")].find((x) => ((x.querySelector(".at-sectiontop .at-eyebrow") || {}).textContent || "").trim() === "Cards") : null;
+    check("and an empty module's list draws no toolbar row",
+      !!cardsSection && !cardsSection.querySelector(".at-listbar"), cardsSection ? "a toolbar is drawn" : "(no Cards section)");
+    click(cardsSection ? cardsSection.querySelector(".at-sectiontop .at-morebtn") : null);
     await sleep(200);
     const dotRows2 = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
-    check("and its list's three dots offer Restore from a backup file", dotRows2.includes("Restore from a backup file"),
+    check("and the three dots on the Cards heading's line offer Restore from a backup file", dotRows2.includes("Restore from a backup file"),
       dotRows2.join(" | ") || "(no sheet)");
     click(document.querySelector('.at-moresheet [aria-label="Close"]'));
     await sleep(150);
@@ -14622,6 +14695,35 @@ const openPronounTables = async () => {
   await sleep(500);
   click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);
   await sleep(500);
+  /* The course's tabs since 0.750 (the owner's 8a, 9a): the first is
+     Modules, with no Join code on it; People opens on the student code,
+     above Teachers, and an empty Students list has no button. */
+  {
+    const scr = [...document.querySelectorAll(".at-screen.cardform")].pop() || document.body;
+    const tabs = [...scr.querySelectorAll("[role=tab]")];
+    const tabWords = tabs.map((t) => (t.textContent || "").trim());
+    const first = ((scr.querySelector('[role=tabpanel][aria-label="course"]') || {}).textContent || "");
+    check("a course's tabs read Modules, People and Exercises, and Modules has no Join code or Modules heading",
+      tabWords.join(" | ") === "Modules | People | Exercises" && !/Join code|Student code/.test(first) &&
+        ![...scr.querySelectorAll('[data-el="course-modules"] .at-formnum')].length,
+      `${tabWords.join(" | ")} · ${first.slice(0, 120)}`);
+    click(tabs.find((t) => (t.textContent || "").trim() === "People") || null);
+    await sleep(300);
+    const panel = scr.querySelector('[role=tabpanel][aria-label="people"]');
+    const code = panel ? panel.querySelector(".at-codeblock") : null;
+    const teachers = panel ? [...panel.querySelectorAll("*")].find((el) => el.children.length === 0 && (el.textContent || "").trim() === "Teachers") : null;
+    const said = ((panel && panel.textContent) || "").replace(/\s+/g, " ");
+    check("People opens on the student code, above Teachers",
+      !!code && /Student code/.test(code.textContent || "") && !!teachers && !!(code.compareDocumentPosition(teachers) & 4) &&
+        /Your administrator adds and removes people, and hands out teacher codes\./.test(said),
+      said.slice(0, 200) || "(no People tab)");
+    const nudge = panel ? [...panel.querySelectorAll(".at-nudge")].find((n) => /Nobody has joined yet/.test(n.textContent || "")) : null;
+    check("and an empty Students list says Nobody has joined yet, with no button",
+      !!nudge && (nudge.textContent || "").trim() === "Nobody has joined yet." && !nudge.querySelector("button"),
+      nudge ? nudge.innerHTML.slice(0, 200) : "(no box)");
+    click(tabs.find((t) => (t.textContent || "").trim() === "Modules") || null);
+    await sleep(300);
+  }
   /* Since 0.749 Create a new unit is the first row of the panel + Add a
      unit opens; with no unit to list, + Add a unit names one at once. */
   click(buttonNamed(/^Add a unit$/));
