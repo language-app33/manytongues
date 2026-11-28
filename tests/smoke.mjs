@@ -9793,12 +9793,12 @@ const openPronounTables = async () => {
       !/Tick a kind/.test((document.querySelector(".at-filtersheet") || {}).textContent || ""),
     chipsIn("Kind").map((b) => (b.textContent || "").trim()).join(" | "));
   check("and no subtypes before a kind is lit",
-    !chipOf("Which words or phrases", /^No subtype$/) && !chipOf("Which scenes", /^Conversation$/), "");
+    !chipOf("Which words or phrases", /^Kind not set$/) && !chipOf("Which scenes", /^Conversation$/), "");
   const tilesBefore = tiles();
   click(chipOf("Kind", /^Word or phrase$/));
   await sleep(250);
   check("lighting words and phrases offers their subtypes, and no scene's",
-    !!chipOf("Which words or phrases", /^Noun$/) && !!chipOf("Which words or phrases", /^No subtype$/) &&
+    !!chipOf("Which words or phrases", /^Noun$/) && !!chipOf("Which words or phrases", /^Kind not set$/) &&
       !chipOf("Which scenes", /^Conversation$/),
     chipsIn("Which words or phrases").map(chipName).join(" | "));
   check("and narrows the list to them", tiles() <= tilesBefore, `${tiles()} of ${tilesBefore}`);
@@ -9817,7 +9817,7 @@ const openPronounTables = async () => {
   click(chipOf("Kind", /^Word or phrase$/));
   await sleep(250);
   check("and letting go of the kind gives the list back",
-    tiles() === tilesBefore && !chipOf("Which words or phrases", /^No subtype$/) && !lit(chipOf("Kind", /^Word or phrase$/)),
+    tiles() === tilesBefore && !chipOf("Which words or phrases", /^Kind not set$/) && !lit(chipOf("Kind", /^Word or phrase$/)),
     `${tiles()} of ${tilesBefore}`);
 
   /* ---- and by a blank, from either side of it ----
@@ -14549,7 +14549,7 @@ const openPronounTables = async () => {
     }
   };
   const save = async () => {
-    click([...document.querySelectorAll('.at-fab[aria-label="Save as draft"]')].pop() || null);
+    click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
     await sleep(700);
   };
   await openSheet();
