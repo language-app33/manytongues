@@ -36,7 +36,7 @@ import { leadOf, subFormsOf, wordOf } from "./cards.ts";
 /* And what a row is, for the one rule below that reads one: verbs.ts
    knows what a table is made of and no language at all, which is the
    same direction every other import here goes. */
-import { agreedValue, asSubject, citedCell, colOf, isCell, isRowLead, ownerOf, personsFor, personsOf, rowIdsOf, rowOf, standsInRows, tensesOf } from "./verbs.ts";
+import { agreedValue, asSubject, citedCell, colOf, isCell, isRowLead, ownerOf, personAt, personsOf, rowIdsOf, rowOf, standsInRows, tensesOf } from "./verbs.ts";
 import { aboutPerson, ADJECTIVE_IS_SLOT, ADJECTIVE_SLOT, beReadings, fitEnglish, isLent, readAs } from "./variables.ts";
 import type { Value } from "./variables.ts";
 /*
@@ -1793,11 +1793,9 @@ function cellWhereUnsaid(unit: Record<string, any>, card: unknown, lang: Lang): 
     if (tense) bits.push(tense.label || tense.id);
   }
   if (picked.includes("col")) {
-    /* By the name the card's own table gives it: plain "I" on a verb
-       with one. See personsFor. */
-    const person =
-      personsFor(card, spec).find((p) => p.id === colOf(unit)) ||
-      personsOf(spec).find((p) => p.id === colOf(unit));
+    /* By the name the card's own table gives it in this row: plain "I"
+       on a verb with one, or in a Hebrew past. See personAt. */
+    const person = personAt(card, spec, rowOf(unit), colOf(unit));
     if (person) bits.push(unsaidOfPerson(spelledPerson(person.label || person.id), en));
   }
   return bits.join(" · ");
@@ -2839,27 +2837,33 @@ const AR_SUBJECT_PERSONS: VerbPerson[] = [
  * teacher wrote the masculine and a woman learnt to say the wrong word
  * about herself, which is what 0.261 put right for Arabic.
  *
- * The past and the future mostly do not split — אכלתי and אכלנו are
- * anybody's — and those boxes are typed twice, as Arabic's already are:
- * a cell carries the words it was given. The masculine keeps each id the
- * single column had, so nothing a teacher has written moves; the feminine
- * sits beside it.
+ * The past and the future do not split for *I*, *we* and *they* —
+ * אכלתי, אכלנו and אכלו are anybody's — so since 0.746 those three
+ * feminine columns `joinsIn` the past and the future: there, a verb has
+ * one box each, called plain "I", "we" and "they", unless the teacher
+ * ticks that one has two forms and writes a different word. In the
+ * present every column stands, as it must. The plural *you (f)* is left
+ * its own in every row, because the written language has a feminine
+ * there (כתבתן). The masculine keeps each id the single column had, so
+ * nothing a teacher has written moves; the feminine sits beside it. See
+ * joinedInRow in src/verbs.ts.
  *
  * `picks` as before, on the third person only: a plural of women reaches
  * *they (f)*, which asks for both number and gender and so wins over
  * *they (m)*, which asks for number alone and still takes every other
  * plural.
  */
+const HE_JOINED_ROWS = ["past", "future"];
 const HE_SUBJECT_PERSONS: VerbPerson[] = [
-  { id: "i", label: "I (m)", is: MASC_ONE },
-  { id: "i-f", label: "I (f)", is: FEM_ONE },
+  { id: "i", label: "I (m)", alone: "I", is: MASC_ONE },
+  { id: "i-f", label: "I (f)", is: FEM_ONE, joins: "i", joinsIn: HE_JOINED_ROWS },
   ...SUBJECT_PERSONS.slice(1, 5),
-  { id: "we", label: "we (m)", is: PEOPLE },
-  { id: "we-f", label: "we (f)", is: WOMEN },
+  { id: "we", label: "we (m)", alone: "we", is: PEOPLE },
+  { id: "we-f", label: "we (f)", is: WOMEN, joins: "we", joinsIn: HE_JOINED_ROWS },
   { id: "you-pl", label: "you (m pl)", is: PEOPLE },
   { id: "you-pl-f", label: "you (f pl)", is: WOMEN },
-  { id: "they", label: "they (m)", picks: { number: "plural" }, is: PEOPLE },
-  { id: "they-f", label: "they (f)", picks: { number: "plural", gender: "feminine" }, is: WOMEN },
+  { id: "they", label: "they (m)", alone: "they", picks: { number: "plural" }, is: PEOPLE },
+  { id: "they-f", label: "they (f)", picks: { number: "plural", gender: "feminine" }, is: WOMEN, joins: "they", joinsIn: HE_JOINED_ROWS },
 ];
 
 const ATTACHED_PERSONS: VerbPerson[] = [
@@ -3694,6 +3698,7 @@ export const NIQQUD = new RegExp(`[${NIQQUD_CLASS}]`, "g");
 export const HAS_NIQQUD = new RegExp(`[${NIQQUD_CLASS}]`);
 const HE_MARK_RUN = new RegExp(`([\\u05D0-\\u05EA])([${NIQQUD_CLASS}]+)`, "g");
 
+const HE_JOINER = /[\u05BE-]/g;
 export const HE_PUNCT = /[.,!?;:"'()[\]־׀׃׳״«»]/g;
 
 /* Five letters take another shape at the end of a word. A beginner who
@@ -3710,6 +3715,12 @@ export function normHe(s: string, { stripNiqqud, foldFinals }: { stripNiqqud?: b
     ? x.replace(NIQQUD, "")
     : x.replace(HE_MARK_RUN, (_, base, marks) => base + marks.split("").sort().join(""));
   if (foldFinals) x = x.replace(HE_FINALS, (c) => HE_FINAL_OF[c]);
+  /* The maqaf joins two words into one — בית־ספר — and so does the hyphen
+     most keyboards type in its place. Both are read as the space a learner
+     types there: taken out with the rest of the punctuation, as they were
+     until 0.739, בית ספר was one letter-and-a-space away from ביתספר and
+     marked a near miss, while the two words run together were right. */
+  x = x.replace(HE_JOINER, " ");
   return x.replace(HE_PUNCT, "").replace(TYPED_PUNCT, "").replace(TYPED_DASH, " ").replace(/\s+/g, " ").trim();
 }
 
@@ -3771,10 +3782,15 @@ const HE_PREFIXES = ["וה", "וב", "ול", "ומ", "וכ", "וש", "שה", "כ
  * shapes. Read off spellings the teacher already typed; nothing is looked
  * up.
  *
- * Near enough, not right. Four rules, each applied only while three
+ * Near enough, not right. Five rules, each applied only while three
  * letters remain, so that a root which truly holds one of these letters
  * keeps it:
  *   - drop a plural ending or a feminine ה from the end;
+ *   - drop a leading ל, when what is left has three letters besides its
+ *     vowel letters: a verb written as "to …" (לכתוב) joins its family
+ *     (0.744). The cost is that a few nouns that begin with a ל of their
+ *     own may be filed with a family they do not belong to. When this
+ *     rule is taken the next one is not;
  *   - drop a leading מ, the commonest noun prefix — and only that. The
  *     article and the one-letter prepositions are peeled when matching a
  *     word inside a phrase, not here: half the roots in the language start
@@ -3797,6 +3813,17 @@ export function heRootKey(text: string) {
     if (x.endsWith(suf) && x.length - suf.length >= 3) {
       x = x.slice(0, -suf.length);
       break;
+    }
+  }
+  /* A verb written as "to …" is the root behind a ל. Taken only when the
+     rest holds three letters besides its vowel letters, so the ל of a
+     noun such as לימוד stays where it is; and when it is taken, the מ
+     rule is not, or למכור would lose two letters and have no key. */
+  if (x.startsWith("ל") && x.length >= 4) {
+    let candidate = x.slice(1);
+    if (candidate.replace(/[וי]/g, "").length >= 3) {
+      while (candidate.length > 3 && /[וי]/.test(candidate)) candidate = candidate.replace(/[וי]/, "");
+      return candidate;
     }
   }
   if (x.startsWith("מ") && x.length >= 4) x = x.slice(1);

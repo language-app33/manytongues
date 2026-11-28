@@ -14,6 +14,7 @@ import { formsOf } from "./cards.ts";
 import { isDialog } from "./dialogs.ts";
 import { isSentence } from "./variables.ts";
 import { GRAMMAR, LANGUAGES } from "./languages.ts";
+import { splitAlternatives } from "./answers.ts";
 
 type Shape = "word" | "sentence" | "scene";
 
@@ -108,10 +109,29 @@ export function droppedByBasic(
   if (more) out.push(more === 1 ? "1 other form" : `${more} other forms`);
   if (hasGrammar(word.forms[0])) out.push("the grammar");
   if ((word.tableCells || []).some((c) => some(c.ar) || some(c.en))) out.push("the table");
-  if (some(word.category)) out.push("the subtype");
+  if (some(word.category)) out.push("the kind of word");
   if (some(word.writtenExamples)) out.push("the examples");
   if (some(word.fills) || some(word.refName)) out.push("the blanks it fills");
   if (some(word.uses)) out.push("the words it teaches");
   if (some(clue)) out.push("the clue for its other meanings");
   return out;
+}
+
+/*
+ * Whether a basic card's word says no more than its hero does (0.732): one
+ * spelling, one way of saying it, one English, and nothing recorded,
+ * pictured or written besides. Then a card being read hides its Content
+ * block, since the card drawn at the top already shows all of it;
+ * otherwise the block stays, so a recording, a picture or a second answer
+ * is never out of sight.
+ */
+export function onlyWords(form: Record<string, any> | null | undefined): boolean {
+  if (!form) return true;
+  const count = (v: unknown) => splitAlternatives(typeof v === "string" ? v : "").filter(Boolean).length;
+  /* A saved word carries its one spelling as an answer too; a second one,
+     or one with its own recording or picture, is more than the hero says. */
+  const answers = Array.isArray(form.answers) ? form.answers.filter((a: any) => a && (some(a.text) || some(a.lat))) : [];
+  return count(form.ar) <= 1 && count(form.lat) <= 1 && count(form.en) <= 1 && answers.length <= 1 &&
+    !answers.some((a: any) => some(a.clips) || some(a.slowClips) || some(a.images)) &&
+    !some(form.clips) && !some(form.slowClips) && !some(form.images) && !some(form.voices);
 }

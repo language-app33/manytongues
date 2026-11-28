@@ -8,6 +8,582 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.747 — 28 November 2026
+
+**Every message at the foot of the screen is now one size and one look.**
+
+- They had drifted into five sizes: "Saved" and most messages, the same
+  ones a little taller when they had an Undo, a small grey "Working…"
+  pill, and a larger "No connection" bar with Retry.
+- All of them now take the larger size "No connection" always had: full
+  width (up to the width of the page on a computer), the same height
+  whether or not there is a button in it, and a coloured edge on the left
+  that says what kind of message it is: green for done, red for a
+  problem, yellow for information, grey for "Working…".
+- "Working…" is now that same bar, with grey words, rather than a small
+  dashed pill.
+- The Edit and Save button on a card or deck moves up a little further
+  while a message is showing, so the taller message does not cover it.
+- A "Deleted … Undo" bar from an older version of the word list, which
+  nothing could bring up any more, has been removed.
+
+**Trade-off:** a plain "Saved" is now bigger and covers a little more of
+the screen for its four seconds.
+
+**To check by hand:** on a phone, that a save message, "Working…" during a
+slow save, and "No connection" (with the phone in flight mode) are the
+same size, and that the Edit or Save button on a card stays clear of them.
+
+## 0.746 — 28 November 2026
+
+**Hebrew verbs: one box for "I", "we" and "they" in the past and future.**
+
+- In the past and future, "I", "we" and "they" are one word for everybody
+  in Hebrew, but a verb had two boxes for each, labelled "I (m)" and
+  "I (f)", and students were taught and asked the same word twice. Now
+  those rows have one box each, called plain "I", "we" and "they".
+- **The present is unchanged**: it really differs by gender, so it keeps
+  all twelve boxes. The plural "you (f)" keeps its own box everywhere.
+- For a verb that does need two, the teacher ticks **"‘I’ has two forms in
+  the past and future"** (and the same for "we" and "they") and writes the
+  second word.
+- **Verbs already written** with the same word in both boxes are joined
+  when the teacher next opens them, and on students' devices straight
+  away. A student keeps whichever of the two they had got further with.
+- Arabic and Vietnamese are unchanged.
+
+**To check by hand:** on a real phone, a Hebrew verb's past tense, as the
+teacher (one "I" box, the tick off) and as the student ("See how this verb
+changes" shows one "I", "we" and "they" in the past, twelve in the present).
+
+## 0.745 — 28 November 2026
+
+**Nothing changes in the app: the automatic check now opens a Hebrew
+session.**
+
+- Until now the check that walks the app's screens did so in Arabic and
+  Vietnamese only. It now also starts a Hebrew session and checks that the
+  words are drawn right to left, that a new word shows its niqqud, that a
+  known word is shown without them and a tap puts them back, that "Write
+  in Hebrew" takes a word typed without niqqud as right and then shows it
+  with them, and that a joined word such as "school" can be typed with a
+  space.
+
+## 0.744 — 28 November 2026
+
+**Hebrew: "Built on the same root" gathers a verb written as "to …"**.
+
+- A verb card written in its "to …" form, such as "to write", is now listed
+  with the other words of its family (write, writer, letter, writing),
+  where before it was left out on its own.
+- **The cost:** a few nouns that happen to begin with the same letter as
+  "to" may now be listed with a family they do not belong to. The grouping
+  was always a near guess and still is.
+
+**To check by hand:** a Hebrew deck with a "to …" verb and a noun from the
+same family, that "Built on the same root" lists them together.
+## 0.743 — 28 November 2026
+
+**A unit is "Open to students", not "Published"**, as chosen on the page of
+mock-ups (1a), so it is not confused with publishing a card.
+
+- On a course's unit row the button reads **Open to students**, and the
+  line under the unit's name says "Open to students" or "Not open yet".
+- A unit's screen says the same in each course's row ("Unit 1 of 3 · Not
+  open yet"), and opening one says "Family is open to students in
+  Beginners A1".
+- A card's Publish is unchanged. "Open it early" stays as it was.
+
+**Trade-off:** the word "open" now appears three times around a unit (Open
+to students, Open it early, Open course).
+
+**To check by hand:** on a real phone, that the longer button is easy to
+read beside the arrows (on the narrowest phones its letters are a little
+smaller to keep it on one line).
+
+## 0.742 — 28 November 2026
+
+**Hebrew: ten thousand is said the correct way**, once the teacher gives
+the word for it.
+
+- Ten thousand was said with the masculine ten and the singular thousand.
+  Written Hebrew says it with the bound ten and the plural, the same way
+  three to nine thousand already were.
+- Ten now has one more box on the number screen, **"before thousands"**,
+  like three to nine. Once a teacher writes it, ten thousand (and 10,001,
+  10,500 and so on) is said the correct way.
+- **Until that box is written, nothing changes**: ten thousand keeps its
+  old wording, and the screen shows the box as missing. Eleven thousand and
+  above, and ten million, are unchanged.
+- A student who learnt the old wording will see the new one once their
+  teacher fills the box.
+
+**To check by hand:** on a Hebrew number screen, that ten shows the new
+box, and that a number question on ten thousand uses it once it is written.
+
+## 0.741 — 28 November 2026
+
+**A course's unit and deck rows, tidier**, as asked.
+
+- The line under a unit's name no longer starts with "Unit", nor a deck's
+  with "Deck": the headings above them already say so. A personal set still
+  says "Personal set", as the one thing among the decks that is not one.
+- A row's three dots sit in its top right corner.
+- On a unit's row, the up and down arrows come first and Publish after
+  them, at the right of the row's foot.
+- The Copy button beside the student code is in ordinary letters like the
+  other buttons (0.740 missed it).
+
+**To check by hand:** on a real phone, that the arrows and Publish are easy
+to hit at the row's foot.
+
+## 0.740 — 28 November 2026
+
+**The audit round: a course, a unit, a card's status, and plainer words**,
+as chosen on the page of mock-ups.
+
+**A course's screen**
+
+- The course's name is the heading, with "Palestinian Arabic · 3 students"
+  under it.
+- **One "Modules" section** holds everything the course teaches, as rows of
+  one kind. First "Units, studied in order": the units, numbered, each
+  with small up and down arrows and three dots. A draft unit's row has a
+  green **Publish** button; on an empty unit it is grey and says "Add a
+  card first". Under the units, "+ Add a unit" opens a panel: "New unit"
+  first, then units you already have. Then "Decks, studied in any order":
+  the decks, each with three dots, and "+ Add a deck".
+- A unit's three dots hold "Open it early" (or "Stop opening it early"),
+  "Remove from" the course, and "Delete this unit", each with a line
+  saying what it does.
+- The student code stays where it is.
+
+**Publishing a unit has no checklist.** Publish always works, except on a
+unit with no cards. The four rules that used to block it are gone. With
+the checklist went the two pieces of advice beside it on a unit's screen:
+how many of its cards are still drafts, and which blanks always take the
+same form.
+
+**A unit's screen**
+
+- The bar at the top says "Unit". Under the name, "Courses" and one row
+  per course it is in ("Beginners A1 · Unit 1 of 3 · Draft"); a row opens
+  that course. In no course, an amber box says so, with "Add it to a
+  course". Order and publishing are done on the course's screen.
+- An empty unit or deck offers two buttons, "New card" and "Cards you
+  already have". Restoring from a backup file is in the three dots.
+
+**People:** a person's code is in ordinary small grey text on a plain row.
+
+**Material:** the line of explanation above each list shows only while the
+list has fewer than five items.
+
+**A card**
+
+- Being read, its name shows only when it differs from the English, as
+  "Listed as: …".
+- The status panel's rows each have a line saying what they do, and a
+  published card goes straight to Draft or Ready for review (each asks
+  first). Not published: Draft, Ready for review, Publish. Published:
+  Published, Draft, Ready for review. Published then edited: Changes in
+  draft, Changes ready for review, Publish changes, Discard changes, Draft.
+- While writing, "Save and publish" is the green main button; the other
+  reads "Save as draft".
+- The three kinds of card each have a picture and one line: "One thing to
+  learn, like “house” or “good morning”."; "A full sentence with a gap,
+  like “I am from ___”. Your other cards take turns filling it."; "Several
+  lines in order: a conversation between people, or a short text to
+  read."
+- "What subtype" is "Kind of word" (or "Conversation or text" on a
+  scene), says what choosing gives you, and its button reads "Choose".
+- "Filling blanks" is "Use in sentences" on a word and "Blanks in this
+  sentence" on a sentence. "Tags" are "groups" everywhere a teacher reads
+  the word. "The card's ID" is "A name for this exact card", folded away
+  as optional.
+- On a sentence, each explanation about blanks is one line, and a box that
+  does not apply is not shown.
+- "Words this teaches" is "Words in this sentence": "Ticked words are
+  learnt on their own first, then practised inside this sentence."
+
+**Elsewhere**
+
+- "Import" is called "Restore from a backup file".
+- Settings starts with your account, with Sign out at its end; the
+  practising settings are grouped under "When you practise"; then
+  Appearance.
+- "Sign out" everywhere, never "Log out".
+- Only a screen's green main button is in capitals. Every other button is
+  in ordinary letters, on the learner's side too.
+
+**Left as it is, by your choice:** where the student code sits; a module's
+line in the Modules list; the Advanced tab's length; the recording screen;
+student flags, student progress and adding many cards at once.
+
+**Trade-offs.** Publishing and reordering a unit mean going to its course;
+an edited card's status panel is five rows; teachers used to "tags" meet
+"groups"; every screen shifts slightly as buttons leave capitals.
+
+**To check by hand.** On a real phone: that the small arrows and three dots
+on a unit's row are easy to hit, and that buttons in ordinary letters still
+fit on the narrowest phones.
+## 0.739 — 28 November 2026
+
+**A Hebrew word written with a joining line is right when typed with a
+space.** Found in an audit of Hebrew teaching and learning.
+
+A card written with the Hebrew joining line or a hyphen, such as בית־ספר,
+marked a student who typed the two words with a space between them as a
+near miss, and accepted the two words run together with no space. Now the
+joining line, a hyphen and a space all count as the same thing, whichever
+the teacher wrote and whichever the student types. The two words run
+together are a near miss.
+
+- Nothing else about Hebrew marking changes: vowel points, final letters
+  and punctuation are marked as before.
+- Arabic and Vietnamese are unchanged.
+- To check by hand: on a Hebrew card whose word has a joining line, answer
+  "Write in Hebrew" with a space instead and see it marked correct.
+
+## 0.738 — 27 November 2026
+
+**Four follow-ups to 0.735**, as chosen on the page of options (1a, 2b,
+3a, 4b, 5a, 6b).
+
+- **The Filter panel says what a chip does:** one line under its title,
+  "Tap to show only matching cards."
+- **Course › Exercises: the four translation choices are tiles with a
+  picture**, the look of the New module panel: English in a box for With
+  translation, the same with only the box's corners for Little
+  translation, a picture for No translation, and the sliders for Custom.
+  The chosen one is green with a tick. Choosing still saves at once.
+- **"Where needed" is now "If needed", and explained.** Under Little
+  translation, a line above the groups headed "In the list below" says:
+  "If needed = asked only for a card with no other way in, such as a word
+  with no picture or recording." The words "If needed" are drawn there
+  exactly as they appear in the rows.
+- **A card's "Another way to write it" and "Another accepted answer"** are
+  green and bold with a + in front, no longer underlined, like Clear on a
+  list's line.
+
+**Trade-offs:** the four tiles are a little taller than the rows were.
+
+**To check by hand:** on a real phone, that the tiles are easy to tell
+apart and to tap.
+
+## 0.737 — 27 November 2026
+
+**The cross that closes a sheet is just the cross**, as chosen on the page
+of mock-ups.
+
+Every sheet (Sort, Filter, Join a course, Custom tags, the subtype and
+deck lists and the rest) closed with a cross inside a grey square with an
+outline. The outline and the grey square are gone; the cross stands on its
+own at the end of the title's line. The area that answers a tap is as
+large as before. With a mouse, the cross turns green under the pointer.
+
+## 0.736 — 27 November 2026
+
+**A calmer module screen and a more rewarding Numbers set**, as chosen on
+the page of mock-ups.
+
+**A module's screen**
+
+- **Deck quality is one row** under Courses: the score, its bar and "3
+  ways to raise it". Tapping it opens the advice on a screen of its own,
+  so the cards follow straight after, on the first screen.
+- **On that advice screen each piece of advice is one row**: its picture,
+  what to do and its points. Tapping a row opens its explanation and its
+  words. The small "+2" beside each word is gone (it still shows when you
+  point at the word on a computer).
+- **One green + in the card list.** The separate "Add existing cards"
+  button is gone. The + opens a panel headed "Add to the deck “At home”"
+  (or "the unit", "the personal set") with two rows: **New card** and
+  **Cards you already have**, each with a picture and a line saying what
+  it does. Import stays in the three dots.
+- "Students in these courses see this deck." stays.
+
+**Word sets › Numbers**
+
+- **The top of the screen says what students can do now**, large and with
+  no box: "Students can count to 19", then "2 of 6 parts ready. Next: 20
+  to 99." and a row of steps that fill in. Before anything is written it
+  reads "Write 10 words to begin" with the instruction under it. "Any
+  teacher here can edit it." is now small print at the foot.
+- **A finished part** keeps its white tile and grey outline and gains a
+  solid green tick in front of its name. Under the name are the part's
+  first numbers as the app says them, always the same ones ("٠ صفر · ١
+  واحد · ٢ اتنين…").
+- **A part under way** shows a thin bar of how much is written.
+- **When saving finishes a part**, a message says "0 to 9 is ready.
+  Students can now be asked these numbers. Next: 10 to 19.", and that
+  part's tile glows green for a moment and is marked **Just finished**
+  until you leave the screen. No movement for people whose phone is set
+  to reduce motion.
+- **Parts are named by their range alone**: "0 to 9", "10 to 19", "20 to
+  99", "100 to 999", "Thousands and millions", "A billion and over". The
+  "Parts" heading is gone. Where a part's name stands on its own — the
+  part's own screen, an entry in a module's card list, the list of word
+  sets to add to a module — it reads "Numbers · 0 to 9".
+
+**Inside one part**
+
+- **An explanation shared by several numbers is said once**, above them,
+  in place of once per number.
+- **A number with exactly two forms is one row**: its figure, then its two
+  boxes side by side under column headings.
+- A number with one form (0) or three (1 and 2) keeps a box of its own
+  with its forms stacked full width, each labelled.
+- Once a word is typed, its transliteration box and Record button appear
+  under it, as before. In a row they sit under each box, in the same
+  column, so a filled row is taller than the empty rows in the pictures.
+- The screen still opens with Modules.
+
+The learner's side is unchanged, except that a numbers card is named
+"Numbers · 0 to 9" where it was "Numbers 0 to 9".
+
+**Trade-offs:** quality advice is one press further, and its words a
+second press; a new card inside a module is two presses; the boxes in a
+row are about half the width they were.
+
+**To check by hand:** on a real phone, typing Arabic into the half-width
+boxes with the phone's own keyboard and with the on-screen keys, and how
+the green glow looks.
+
+## 0.735 — 27 November 2026
+
+**Simpler Sort and Filter panels, a course's Exercises tab, and a card's
+Basic tab while it is written**, as chosen on the page of mock-ups.
+
+**The Sort panel** (every list that has one)
+
+- **"Sort by" is a list of rows** with a mark on the chosen one. **"Order"
+  is one two-part switch** under it, full width, in ordinary letters. Apply
+  stays: the list does not move until it is pressed.
+
+**The Filter panel** (every list that has one)
+
+- **Every group is full width**, one under another. Its choices are
+  rounded chips in ordinary letters that wrap as they need. Kind is chips
+  too.
+- **There is no "Any" chip.** Nothing lit in a group means it narrows
+  nothing. Tap a chip to filter; tap it again to stop. Only filters that
+  are on are green.
+
+**The Filter button**
+
+- **Its picture is a funnel**, wherever there is a Filter button. While
+  filters are on it is **green** with the count (it was gold), the same
+  green as a lit chip.
+
+**Course › Exercises**
+
+- **The translation choice is four rows**, each with its explanation always
+  showing and a mark on the chosen one. No translation now reads "No
+  English: only pictures, sound and the language itself."
+- **Under With, Little or No translation**, a label "What this asks" sits
+  over the four groups ("What it means", "Which word it is", "Write it from
+  a cue", "Write it from its meaning"), each a row with its count ("9 of 15
+  on"). Tap a group to read its exercises, each with a tick, a dash, or
+  "Where needed".
+- **Under Custom** everything is open, as before, and each exercise has
+  **one sliding switch** instead of the OFF / ON pair. The group headings
+  are small capital labels with their counts.
+
+**A card's Basic tab, while writing it**
+
+- **"Build an advanced card"** has one line under it: "For several forms, a
+  sentence with blanks, a verb table or a conversation."
+- **The bare + beside "Arabic" and "English" is gone.** Once a box has
+  something in it, a worded link appears under it: "+ Another way to write
+  it" for the word, "+ Another accepted answer" for the English.
+- **Description is one row**, "Optional. Adds two kinds of exercise.", with
+  **Add**. Add opens the two boxes as before. A card that has a description
+  opens with them showing.
+- Card name is unchanged: required, and first. A card being read is
+  unchanged.
+
+**Trade-offs**
+
+- The Sort panel is a little taller.
+- A teacher has to learn that tapping a lit chip turns it off.
+- A second accepted answer cannot be added until the first is typed.
+- Description is one press further.
+- The OFF / ON pair was used only on the course's Exercises tab, so the
+  sliding switch changes that tab alone.
+
+**To check by hand**
+
+- On a real phone: that the Filter panel scrolls smoothly with its Show
+  button in view, and that the sliding switches are easy to hit.
+
+## 0.734 — 27 November 2026
+
+**Two tidy-ups on the teacher screens.**
+
+- **Numbers:** the line between the introduction and Parts sat right on
+  the last line of the introduction. It now has the same room above it as
+  the line under the screen's title. Check a number gets the same room
+  above The number.
+- **A module's screen:** the three dots at the top right are the dots
+  alone, with no outline round them, as on a module's tile. They stay that
+  way while their panel is open.
+
+## 0.733 — 27 November 2026
+
+**A simpler Home, New module panel and Cards list for teachers.**
+
+**Teaching › Home**
+
+- The "Join a course as a teacher" section is gone. A dashed **Join another
+  course** button sits at the end of My courses and opens a panel from the
+  foot of the screen with the code box. A teacher with no course yet sees a
+  box saying so, with a **Join a course** button that opens the same panel.
+- When there is nothing to do, To do is a slim band: the same dashed box
+  and cup on one row, about a third of the height it was. With something to
+  do it looks as before.
+- **Search courses** shows only with more than five courses.
+
+**The New module panel**
+
+- Each kind has a picture and a new description:
+  - **Deck:** "Cards on one topic, independent of your other decks."
+  - **Unit:** "One lesson on a course's path. Each unit builds on the ones
+    before it, so students do them in order."
+  - **Personal set:** "For words that are different for each student, like
+    My family. Students answer about your pictures once, then practise
+    their own words."
+
+**Teaching › Material › Cards, and the cards inside a module**
+
+- Two tiles a row on a phone, all the same height: the word on one line and
+  the meaning on one line, cut with … when too long. Thinner outlines, more
+  room. The three dots stay on each tile.
+- A card with no English shows its transliteration in italics in the
+  meaning's place; with none, "Picture" or "Recording" with a small symbol;
+  with neither, nothing.
+- The badge for a card students cannot fully see yet (Draft, Ready for
+  review, Changes in draft, Changes ready for review, Recording missing)
+  stays on the tile, at its foot. Published cards show none.
+- On a phone the second view is a **list**, not a table: one card a row
+  with its meaning, and under it its modules, its kind when it is not a
+  plain word, and the same badge. A tablet or computer keeps the full
+  table.
+
+The learner's side is unchanged.
+
+**Trade-offs:** the join code box is one press away; six to eight cards
+show per phone screen where twelve did; on a phone, sorting is done from
+the Sort control, since the list has no column headings.
+
+**To check by hand:** on a real phone, that the join panel stays above the
+keyboard, and that pressing and holding a tile or a list row still starts
+selecting.
+
+## 0.732 — 27 November 2026
+
+**Simpler teacher screens.** A module, the word sets and a card being read
+each ask less of the eye, as chosen on the page of mock-ups.
+
+**A module's screen**
+
+- **Its name is the heading**, with a small pencil beside it. Tap the
+  pencil and the name becomes a box with Save and Cancel, right there.
+- **Three dots at the top right** hold Export and Delete. Delete still asks
+  first.
+- **The card list is on the module's own screen**: the green + for a new
+  card, Add existing cards, Select (in the list's three dots) and Import.
+  The separate "Manage cards" screen and the Edit button are gone.
+- **The language and the number of cards are on one line** under the name,
+  and "Made by … · last changed by …" is at the foot of the screen.
+
+**Word sets**
+
+- **Numbers**: the screen is called "Numbers · (language)", like its tile,
+  and opens with two lines instead of a paragraph. Each part says one plain
+  thing — "Ready", "10 words still to write" or "Needs Numbers 0 to 9
+  first". The next part worth writing is marked **Start here**, and parts
+  that cannot work yet are drawn fainter (they still open). The section at
+  the foot is called "Fix a number".
+- **Pronouns**: each pronoun shows its word, its transliteration and
+  Record. Its English is one line with **Change**, which opens the three
+  English boxes. The long introduction is one sentence; **How sentences use
+  them** opens a panel from the foot of the screen.
+- **The tiles on the Word sets tab** say "Not started" instead of "0 of 11
+  ranges written", and "not in a module yet".
+
+**A card, before Edit**
+
+- **The card is shown as a card**: the word large, how it is said and what
+  it means. Under it, its modules, and a short "to improve" list where
+  there is something to improve (for now: a word written without its
+  vowel marks), with a button that turns the screen to editing.
+- **The red stars, the "Build an advanced card" tick-box and the "This
+  card" heading show only after Edit.** Export is behind three dots on the
+  card. A word that is only its spelling, its sound and its meaning no
+  longer repeats itself in a Content section under the card; one with a
+  recording, a picture or a second answer keeps that section. An empty
+  Description is not shown.
+- **On the Exercises tab** the exercise tiles are exactly as they were.
+  "What is practised" is one row per form saying in words where it comes
+  up ("On its own and in sentences", "In sentences only", "Not
+  practised"); the tick-boxes come back after Edit.
+- **Editing a card looks exactly as it did.**
+
+**Trade-offs**
+
+- Renaming, exporting and deleting a module are each one press further
+  away.
+- A card being read no longer looks like the card being edited.
+- The line "Students choose and write this word" from the mock-up is not
+  shown: it belongs to the Description, which shows only when one is
+  written. The card's first tab keeps its name, "Basic".
+
+**To check by hand**
+
+- On a real phone: that the pencil and the three dots are easy to hit, and
+  the Pronouns screen with the keyboard open.
+
+## 0.731 — 27 November 2026
+
+**Modules has the line Cards has.** Teaching › Material › Modules now shows
+the same quiet line under its bar: how many modules there are, and the
+order they are in, which you tap to change.
+
+- **Three orders:** Added (oldest or newest first), Changed (newest or
+  oldest changes first) and Name (A to Z or Z to A). Like on Cards, a new
+  order waits for Apply.
+- **It starts as before:** oldest added first, the order the tab has always
+  had.
+
+## 0.730 — 27 November 2026
+
+**The app opens on older iPhones and iPads.** On Safari older than 16.4
+(an iPhone or iPad on iOS 16.3 or earlier, or a Mac not updated since
+early 2023) the app showed a blank page and nothing else. It now starts
+there. On the oldest of them, iOS 15 and before, some of the app's look
+may still be missing; that has not been seen on a real device.
+
+**Sounds come back after an interruption on an iPhone.** After a phone
+call, Siri, or the app being left in the background, the sounds for a
+right or wrong answer could stay silent until the app was closed and
+opened again. They now come back with the next answer. To be checked on a
+real iPhone: it cannot be made to happen on a computer.
+
+Both came out of a check of the whole app in Safari's own engine
+(`docs/AUDIT-safari-ios.md`). Practising, the tabs and the teacher's card
+screens ran in it without a fault, in a private window too.
+
+## 0.729 — 27 November 2026
+
+**Every module says what kind it is, by its name.** In Teaching › Material
+› Modules, each tile now has a small outlined badge right after the
+module's name: **Deck**, **Unit** or **Personal set**. The words "Unit"
+and "Personal set" are gone from the line under the name, which now says
+only what needs looking at, who can see the module, and its score. On a
+phone, a long name pushes the badge onto the next line. Other lists of
+modules, such as a course's, are unchanged for now.
+
+
 ## 0.728 — 27 November 2026
 
 **A simpler bar above every list.** Teaching › Material › Cards had two

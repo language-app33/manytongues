@@ -302,6 +302,75 @@ export function keepsApart(
   });
 }
 
+/*
+ * A column joined row by row (0.746). Hebrew's *I (f)* is a word of its own
+ * in the present — אוכל and אוכלת — and a copy of *I (m)* in the past and
+ * the future, where כתבתי is anybody's. So the column always stands, and
+ * in the rows its `joinsIn` names each cell is decided on its own: a copy
+ * unless a different word is written there. A column with no `joinsIn` is
+ * joined or kept apart as a whole, as Arabic's *I (f)* has been since
+ * 0.456. These four are the one answer to both; nothing else reads
+ * `joinsIn`.
+ */
+
+/** The column `person` joins in this row, or "" where it stands alone. */
+export function joinedInRow(
+  spec: VerbSpec | null | undefined,
+  person: VerbPerson | null | undefined,
+  row: string,
+): string {
+  const to = joinsOf(spec, person);
+  if (!to || !person) return "";
+  if (!Array.isArray(person.joinsIn)) return to;
+  return person.joinsIn.includes(str(row)) ? to : "";
+}
+
+/**
+ * Whether a card keeps `person` apart in this row. A whole-column join is
+ * answered for the whole column, by keepsApart; a row join by this row's
+ * own two cells: apart only where a word is written that is not the word
+ * of the column it joins.
+ */
+export function keepsApartIn(
+  card: unknown,
+  spec: VerbSpec | null | undefined,
+  person: VerbPerson | null | undefined,
+  row: string,
+): boolean {
+  const to = joinedInRow(spec, person, row);
+  if (!to || !person) return true;
+  if (!Array.isArray(person.joinsIn)) return keepsApart(card, spec, person);
+  const own = cellAt(card, row, person.id);
+  if (!own || !str(own.ar)) return false;
+  const mate = cellAt(card, row, to);
+  return !mate || bareLetters(mate.ar) !== bareLetters(own.ar);
+}
+
+/** Whether the cell at this row and column is a copy, neither shown nor asked. */
+export function foldedAt(card: unknown, spec: VerbSpec | null | undefined, row: string, col: string): boolean {
+  const person = personsOf(spec).find((p) => p.id === str(col));
+  return !!joinedInRow(spec, person, row) && !keepsApartIn(card, spec, person, row);
+}
+
+/**
+ * The person of one cell, under the name it goes by in that row: *I* in a
+ * past where the verb has one *I*, *I (m)* in the present beside *I (f)*.
+ */
+export function personAt(
+  card: unknown,
+  spec: VerbSpec | null | undefined,
+  row: string,
+  col: string,
+): VerbPerson | null {
+  const all = personsOf(spec);
+  const person = all.find((p) => p.id === str(col));
+  if (!person) return null;
+  const alone = all.some(
+    (p) => p.id !== person.id && joinedInRow(spec, p, row) === person.id && !keepsApartIn(card, spec, p, row),
+  );
+  return alone && str(person.alone) ? { ...person, label: str(person.alone) } : person;
+}
+
 /**
  * The columns one card is laid out in: the table's, less every column that
  * joins another on a card that does not keep it apart, and with the column
@@ -310,7 +379,11 @@ export function keepsApart(
  */
 export function personsFor(card: unknown, spec: VerbSpec | null | undefined): VerbPerson[] {
   const all = personsOf(spec);
-  const folded = new Set(all.filter((p) => joinsOf(spec, p) && !keepsApart(card, spec, p)).map((p) => p.id));
+  /* A column joined row by row always stands; its rows are folded by
+     tableOf, one cell at a time. */
+  const folded = new Set(
+    all.filter((p) => !Array.isArray(p.joinsIn) && joinsOf(spec, p) && !keepsApart(card, spec, p)).map((p) => p.id),
+  );
   if (!folded.size) return all;
   const plain = new Set(all.filter((p) => folded.has(p.id)).map((p) => joinsOf(spec, p)));
   return all
@@ -340,11 +413,14 @@ export function foldJoined<T extends Record<string, any>>(
   const rows = rowIdsOf(spec);
   const holder = { subs: list };
   const gone = new Map<T, T | null>();
+  /* Cell by cell, each in its own row: a column joined in the past only
+     loses its past copies and keeps every present cell (joinedInRow). */
   for (const person of personsOf(spec)) {
-    const to = joinsOf(spec, person);
-    if (!to || keepsApart(holder, spec, person)) continue;
+    if (!joinsOf(spec, person)) continue;
     for (const cell of list) {
       if (!rows.has(rowOf(cell)) || colOf(cell) !== person.id || ownerOf(cell)) continue;
+      const to = joinedInRow(spec, person, rowOf(cell));
+      if (!to || keepsApartIn(holder, spec, person, rowOf(cell))) continue;
       gone.set(cell, (cellAt(holder, rowOf(cell), to) as T | null) || null);
     }
   }
@@ -836,8 +912,8 @@ export function agreedCell(
      sentence about a woman speaker takes the verb's one *I*. Handed back
      under the column asked for, so what agrees with the verb after it —
      an adjective linked to it — still reads a woman speaker. */
-  const to = joinsOf(spec, person);
-  if (!to || keepsApart(card, spec, person)) return cellAt(card, row, person.id);
+  const to = joinedInRow(spec, person, row);
+  if (!to || keepsApartIn(card, spec, person, row)) return cellAt(card, row, person.id);
   const mate = cellAt(card, row, to);
   return mate ? ({ ...mate, col: person.id } as Form) : null;
 }
@@ -993,11 +1069,15 @@ export function tableOf(
   const persons = str(of) ? personsOf(spec) : personsFor(card, spec);
   for (const tense of tensesOf(spec)) {
     for (const person of persons) {
+      /* And a column joined row by row is left out of the rows where it is
+         a copy, with its mate called by its plain name there: one *I* in
+         Hebrew's past, *I (m)* and *I (f)* in its present. */
+      if (!str(of) && foldedAt(card, spec, tense.id, person.id)) continue;
       out.push({
         row: tense.id,
         col: person.id,
         tense,
-        person,
+        person: (!str(of) && personAt(card, spec, tense.id, person.id)) || person,
         form: cellAt(card, tense.id, person.id, of),
       });
     }

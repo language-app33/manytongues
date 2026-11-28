@@ -31,6 +31,7 @@ import {
   CardReadout,
   CardTile,
   CheckList,
+  ChipPick,
   ClipList,
   ConfirmModal,
   Empty,
@@ -54,7 +55,9 @@ import {
   Section,
   Segmented,
   Stat,
+  Switch,
   Tabs,
+  TileChoice,
   Tile,
   TileNote,
   plural,
@@ -66,7 +69,7 @@ import {
    Icon itself: a name missing from here renders as a blank square, which is
    visible rather than silent. */
 const ICON_NAMES = [
-  "add", "search", "close", "delete", "edit", "tune", "sort", "size", "check",
+  "add", "search", "close", "delete", "edit", "tune", "filter", "english", "englishLittle", "sort", "size", "check",
   "back", "save", "folder", "cards", "person", "group", "key", "download",
   "verify", "play", "pause", "view", "select", "school", "copy", "refresh",
   "mic", "remove", "chevronDown", "chevronUp", "menu", "help", "theme",
@@ -178,6 +181,8 @@ const PLACES: Record<string, [string, string]> = {
   CoursesPage: [TEACH, "Teaching\u2019s Home, under To do, and a learner\u2019s Courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewModule: [TEACH, "Making a new module"],
+  OpenRow: [TEACH, "New module \u00b7 each kind, with its picture and what it is"],
+  CardTile: [PARTS, "A card's tile \u00b7 what stands for a missing meaning, a picture or a recording"],
   ExportScreen: [TEACH, "Exporting cards or modules"],
   ImportScreen: [TEACH, "Importing cards or modules"],
   LockMark: [TEACH, "A locked module's padlock"],
@@ -202,6 +207,7 @@ const PLACES: Record<string, [string, string]> = {
   SentencePicker: [TEACH, "Editing a card · picking a sentence card as a line"],
   CapitalsBlock: [TEACH, "Editing a card · the tick for whether its English keeps its capital letters in a sentence"],
   BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its modules"],
+  CardHero: [TEACH, "A card being read · the card itself at the top: its word, how it is said, what it means"],
   DescriptionBlock: [TEACH, "Editing a card · Basic or Advanced · the word's description in the language itself, and its English"],
   MeaningsBlock: [TEACH, "Editing a card · Advanced · the other cards with the same word or meaning, the clue, and adding another"],
   CarryAsk: [TEACH, "Editing a card · whether a spelling fix goes onto the other cards with the same word"],
@@ -218,14 +224,14 @@ const PLACES: Record<string, [string, string]> = {
   IdBox: [TEACH, "Editing a card · the ID it answers to"],
   TagList: [TEACH, "Editing a card · its tags"],
   TagSheet: [TEACH, "Editing a card · the sheet custom tags are chosen in"],
-  PickSheet: [TEACH, "Editing a card · the sheet a subtype or a card's modules are chosen in"],
+  PickSheet: [TEACH, "Editing a card · the sheet a kind of word or a card's modules are chosen in"],
   RenameAsk: [TEACH, "Editing a card · renaming an ID or a tag"],
   StripAsk: [TEACH, "Editing a card · taking a tag off every card"],
   RecordingOverlays: [TEACH, "Editing a card · recording a form"],
   ModuleSwitch: [TEACH, "Editing a card · which modules it is in"],
   ModulePickScreen: [TEACH, "Putting cards in modules · a card being written, or selected cards"],
   Nudge: [TEACH, "An empty part of a module, course or card, inviting you to fill it"],
-  ChoiceSwitch: [TEACH, "Editing a card · its subtype, and a built session's mode"],
+  ChoiceSwitch: [TEACH, "Editing a card · its kind of word, and a built session's mode"],
   BlankNameBox: [TEACH, "Editing a card · naming a blank nobody has named yet"],
   VerbTable: [TEACH, "Filling in a verb's forms"],
   Alternatives: [TEACH, "Editing a card · several accepted answers"],
@@ -238,12 +244,13 @@ const PLACES: Record<string, [string, string]> = {
   ImageScreen: [TEACH, "Editing a card · adding a picture"],
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
-  ModuleQuality: [TEACH, "A module · its quality, and what would raise it"],
-  PathSection: [TEACH, "A course · its path of units"],
+  ModuleQuality: [TEACH, "A module's quality · the score, and what would raise it"],
+  QualityRow: [TEACH, "A module · the row with its quality score"],
+  CourseModules: [TEACH, "A course · its units and decks, in one Modules list"],
+  AddSheet: [TEACH, "A panel of things to add: decks to a course, or a unit to courses"],
   PracticeSection: [TEACH, "A course · which exercises its students are asked"],
   CourseWordSets: [TEACH, "A course · whose numbers and pronouns its students get"],
   SetSection: [TEACH, "A personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
-  UnitChecklist: [TEACH, "A unit · what it needs before it is published"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],
   ReviewLine: [TEACH, "A card · where its sentences stand with review"],
@@ -253,6 +260,7 @@ const PLACES: Record<string, [string, string]> = {
   NarrowBlank: [TEACH, "Reviewing a card's sentences · narrowing a blank"],
   ReportsScreen: [TEACH, "Reports from students"],
   NumbersTab: [TEACH, "A language's number system · its parts, the clock, and the way to corrections"],
+  DoneTick: [TEACH, "A language's number system · the tick on a finished part"],
   FetchingSystems: [TEACH, "A language's number system · while it is fetched"],
   FixScreen: [TEACH, "A language's number system · correcting how a number is said"],
   SampleRows: [TEACH, "A language's number system · numbers as a student will be asked them"],
@@ -328,6 +336,7 @@ const PLACES: Record<string, [string, string]> = {
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
   SortSheet: [PARTS, "A list's Sort panel, which waits for Apply"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
+  TileChoice: [PARTS, "One of a few, as tiles with a picture · a course's How much English"],
   MoreMenu: [PARTS, "Three dots, opening a menu of actions"],
   ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],
   Tabs: [PARTS, "A row of tabs"],
@@ -659,6 +668,10 @@ export function ComponentGallery() {
   const [only, setOnly] = useState("any");
   const [maker, setMaker] = useState("");
   const [seg, setSeg] = useState("on");
+  const [chip, setChip] = useState("any");
+  const [chips, setChips] = useState<string[]>(["word"]);
+  const [switched, setSwitched] = useState(true);
+  const [tiled, setTiled] = useState("with");
   const [segBig, setSegBig] = useState("b");
   const [checked, setChecked] = useState(["one"]);
   const [tab, setTab] = useState("first");
@@ -788,21 +801,22 @@ export function ComponentGallery() {
       <Row
         name="FilterBar"
         what="The pickers a list's Sort or Filter panel holds: how to order it, or what to leave out."
-        note="ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips. Give a group a `quiet` value to say which setting counts as not narrowing; narrowing() counts the groups away from it, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the buttons, for a choice a few buttons cannot say; `wide` gives it a line of its own."
+        note="What the Filter panel holds since 0.735: each group full width, its choices ChipPick chips, with no Any — the group's `quiet` option is not drawn, and pressing the lit chip goes back to it. ItemList draws these itself, in the panel from the foot of the screen — pass its filter prop the groups and it owns the button, the panel and the chips under the bar. narrowing() counts the groups away from `quiet`, for the button's number. `chip` is what the group's chip under the list says while it narrows, and `onReset` takes that one off. A group with `custom` draws that instead of the chips, for a choice a few chips cannot say. Sort no longer uses this: its panel is RadioGroup rows and a Segmented Order."
       >
         <V label="two groups" wide>
           <FilterBar
             note="3 of 12"
             groups={[
               {
-                key: "order",
-                label: "Sort",
+                key: "status",
+                label: "Status",
                 value: order,
                 onChange: setOrder,
                 quiet: "added",
                 options: [
-                  { value: "added", label: "Added" },
-                  { value: "changed", label: "Changed" },
+                  { value: "added", label: "Any" },
+                  { value: "changed", label: "Published" },
+                  { value: "waiting", label: "Waiting to publish" },
                 ],
               },
               {
@@ -925,6 +939,71 @@ export function ComponentGallery() {
           <Field label="A note" hint="Only you see this." optional>
             <input className="at-input" placeholder="Anything" readOnly />
           </Field>
+        </V>
+      </Row>
+
+      <Row
+        name="ChipPick"
+        what="Rounded chips in ordinary letters, wrapping as they need: one of a few, or several."
+        note="The Filter panel's choices (0.735). One at a time: value, onChange and `quiet`, the value meaning none, which is not drawn — pressing the lit chip goes back to it. Several: chosen and onToggle(value, wasOn). An option's note (a count) is drawn small after its label. label is what a screen reader says for the group."
+      >
+        <V label="one at a time, quiet left out" wide>
+          <ChipPick
+            label="Recordings"
+            quiet="any"
+            value={chip}
+            onChange={setChip}
+            options={[
+              { value: "any", label: "Any" },
+              { value: "with", label: "With" },
+              { value: "without", label: "Without" },
+              { value: "lost", label: "Missing" },
+            ]}
+          />
+        </V>
+        <V label="several, with counts" wide>
+          <ChipPick
+            label="Kind"
+            chosen={chips}
+            onToggle={(v, on) => setChips((c) => (on ? c.filter((x) => x !== v) : c.concat([v])))}
+            options={[
+              { value: "word", label: "Word or phrase", note: 42 },
+              { value: "sentence", label: "Sentence", note: 17 },
+              { value: "scene", label: "Scene", note: 3 },
+            ]}
+          />
+        </V>
+      </Row>
+
+      <Row
+        name="Switch"
+        what="On or off, as one sliding switch."
+        note="A course's Exercises tab under Custom (0.735), where it replaced an OFF / ON pair. role=switch with aria-checked; label names it. The button is padded to a 44px target around a 46×28 track."
+      >
+        <V label="press it">
+          <Switch on={switched} onChange={setSwitched} label="Match the pairs" />
+        </V>
+        <V label="disabled">
+          <Switch on={false} onChange={() => {}} label="Unavailable" disabled />
+        </V>
+      </Row>
+
+      <Row
+        name="TileChoice"
+        what="One of a few, as tiles with a picture, a name and a line, and a tick on the chosen one."
+        note="The New module panel's look, as a real radio group (0.738). For a choice that changes something at once, where each option is worth reading before it is tapped: a course's How much English. options are { value, label, note, icon }; label is what a screen reader says for the group. RadioGroup is the plainer rows, for a form."
+      >
+        <V label="value + onChange" wide>
+          <TileChoice
+            label="How much English"
+            value={tiled}
+            onChange={setTiled}
+            options={[
+              { value: "with", label: "With translation", note: "Students see English in questions and answers.", icon: "english" },
+              { value: "little", label: "Little translation", note: "Students see English only where a card needs it.", icon: "englishLittle" },
+              { value: "none", label: "No translation", note: "No English: only pictures, sound and the language itself.", icon: "image" },
+            ]}
+          />
         </V>
       </Row>
 
@@ -1103,7 +1182,7 @@ export function ComponentGallery() {
               row: (d) => ({ cells: { title: d.title } }),
             }}
             onNew={() => {}}
-            more={[{ label: "Import", icon: "upload", onClick: () => {} }]}
+            more={[{ label: "Restore from a backup file", icon: "upload", onClick: () => {} }]}
             sort={{
               value: order,
               down: orderDown,

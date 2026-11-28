@@ -21,8 +21,8 @@ import { must } from "./helpers.mjs";
 import { arComposer } from "../src/numbers/ar-PS.ts";
 import { arTimeComposer } from "../src/numbers/ar-PS.time.ts";
 import {
-  askingsKnown, askKnown, componentId, fileIntoModules, generate, handOn, handOnCounting, handOnSplit, isFromSystem,
-  isRangeSkill, rangeId, wordsOfRange,
+  askingsKnown, askKnown, componentId, fileIntoModules, generate, handOn, handOnCounting, handOnSplit, homesOf, isFromSystem,
+  isRangeSkill, partProgress, rangeId, wordsOfRange,
 } from "../src/numbers/generate.ts";
 import { countingOf, partsNow } from "../src/numbers/types.ts";
 import { formsOf, leadOf, subFormsOf } from "../src/cards.ts";
@@ -219,7 +219,7 @@ test("a skill holds a schedule and no words at all", () => {
   assert.equal(form.en, "");
   assert.equal(form.range, true, "the marker every gate reads");
   assert.deepEqual(form.s, {});
-  assert.equal(skill.name, "Numbers 0 to 9", "and it is listed by what it is");
+  assert.equal(skill.name, "Numbers · 0 to 9", "and it is listed by what it is");
 });
 
 test("a skill is offered a listening question only where something has been recorded", () => {
@@ -521,4 +521,26 @@ test("Arabic writes its figures digit for digit, with its own thousands mark", a
   assert.equal(write(2000000), "٢٬٠٠٠٬٠٠٠");
   assert.equal(write(-1), "");
   assert.equal(LANGUAGES["vi"].numerals, undefined);
+});
+
+/* How much of a part's own words is written (0.736): the thin bar on a
+   part under way counts the boxes of the words it is the first to need,
+   and only those. */
+test("a part's progress counts its own boxes, and how many hold a word", () => {
+  const homes = homesOf(arComposer);
+  const slots = arComposer.requiredSlots();
+  const empty = { lexemes: {} };
+  const none = partProgress("numbers:0-9", slots, homes, empty);
+  assert.equal(none.written, 0, "nothing written yet");
+  assert.equal(none.total, 21, "0 has one box, 1 and 2 three each, 3 to 9 two each");
+  const some = partProgress("numbers:0-9", slots, homes, {
+    lexemes: {
+      "unit.3": { slot: "unit.3", forms: { standalone: "تلاتة", "construct.m": " " } },
+      "unit.0": { slot: "unit.0", forms: { standalone: "صفر" } },
+      "teen.11": { slot: "teen.11", forms: { standalone: "احدعش" } },
+    },
+  });
+  assert.deepEqual(some, { written: 2, total: 21 }, "a box of spaces is empty, and a word of another part is not this part's");
+  const teens = partProgress("numbers:10-19", slots, homes, empty);
+  assert.ok(teens.total > 0 && teens.written === 0, "another part counts its own boxes");
 });

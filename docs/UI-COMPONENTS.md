@@ -106,6 +106,10 @@ instead; treat it as available rather than established.
 
 Pass `icon` rather than an `<Icon>` child — that way the spacing is consistent.
 
+Only `variant="primary"` is set in capitals (0.740, the owner's choice): it
+is a screen's one main green button. Every other button is in ordinary
+letters, so do not write a label in capitals to make it stand out.
+
 The words are boxed in `.at-btnlabel`, which is `display: contents` and so
 invisible to the layout — except in an `.at-row` or a screen's footer, where
 a label longer than the whole row is wide wraps inside its button instead of
@@ -161,7 +165,7 @@ second argument saves the caller working out which way the tick just went.
 ### `MoreMenu` — 3 uses
 Three dots that open the app's one context menu (0.689; a sheet since
 0.690): the less used things done with a tile or a list — a module's Export
-and Delete, a list's Import — out of the way of the one it is for.
+and Delete, a list's Restore from a backup file — out of the way of the one it is for.
 `label, title, lede, items, ghost=true`
 
 The panel is a `PickSheet` of `SheetAction` rows, the same one a saved
@@ -174,28 +178,60 @@ clicks stop at it, so a tile it sits on does not open as well.
 
 ### `SheetAction`
 One row of that panel: its icon in a round well, its name, and a line under
-it where it cannot be done and why. `icon, label, note, danger, disabled,
+it — where it cannot be done and why, or, in a panel that offers ways of
+doing one thing, what each does. `icon, label, note, danger, disabled,
 on, onClick`
+
+A module's green + opens one of these panels (0.736): "Add to the deck
+“…”" with **New card** and **Cards you already have**, each with its
+`note`. A list whose + could mean more than one thing asks this way rather
+than adding a second worded button under the list.
 
 `on` marks the choice that holds now, edged and ticked, where the panel
 chooses one of a few rather than acting (0.691): a card's status
 (`StatusMenu`) and `FilterMenu` open the same `PickSheet` of these rows.
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
-The pickers a list's Sort or Filter panel holds. `groups, note, onClear`
+The groups a list's Filter panel holds. `groups, note, onClear`
 
 A group is `{ key, label, value, quiet, onChange, options }` and draws a
-`Segmented`; `quiet` names the value that counts as not narrowing, and
-`narrowing(groups)` counts the ones that are away from it — that count is
-what the Filter button carries. A group with `custom` draws that instead, for
-a choice a row of buttons cannot say (which decks, of all of them), and `wide`
-gives it a line of its own. `chip` is what the group's chip under a list's bar
+`ChipPick` (0.735): each group full width, one under another, its choices
+rounded chips. `quiet` names the value that counts as not narrowing — that
+option is **not drawn**, since nothing lit already says it, and pressing the
+lit chip goes back to it. `narrowing(groups)` counts the groups away from
+`quiet` — that count is what the Filter button carries. A group with
+`custom` draws that instead, for a choice a few chips cannot say (which
+decks, of all of them). `chip` is what the group's chip under a list's bar
 says while it narrows ("Without recordings"; its `label` otherwise), and
 `onReset` puts that one group back — the chip's cross.
 
 It is only the pickers: the button, the panel they open in and the chips
-belong to `ItemList`'s `filter` (0.728). The Sort panel builds its own two
-groups from `ItemList`'s `sort`.
+under the bar belong to `ItemList`'s `filter` (0.728). The Sort panel no
+longer uses it: since 0.735 it is a `RadioGroup` ("Sort by") and one
+`Segmented` in ordinary letters ("Order"), built from `ItemList`'s `sort`.
+
+### `ChipPick` — 6 uses
+Chips to pick from: rounded, in ordinary letters, wrapping as they need.
+`options, label` and one of two modes.
+
+- **One at a time:** `value, onChange, quiet`. The option equal to `quiet`
+  is not drawn; pressing an unlit chip picks it, pressing the lit one goes
+  back to `quiet`. With no `quiet`, every option is drawn and the lit one
+  stays lit.
+- **Several:** `chosen, onToggle(value, wasOn)`, like `CheckList`.
+
+An option is `{ value, label?, note? }`; the note (a count) is drawn small
+after the label. Lit is green, the same green as the Filter button while
+anything is narrowing — green means "this is narrowing the list". `label`
+is what a screen reader says for the group.
+
+### `Switch` — 1 use
+On or off, as one sliding switch. `on, onChange(on), label, disabled`
+
+`role="switch"` with `aria-checked`; `label` names it. A 46×28 track inside
+a button padded to a 44px target. Used on a course's Exercises tab under
+Custom, where it replaced an Off / On `Segmented` (0.735); that pair was used
+nowhere else.
 
 ### `RadioGroup` — 2 uses
 One of a few, as a list of rows rather than a track of segments.
@@ -207,6 +243,16 @@ label saying what the answer gets you. Reach for this over `Segmented` the
 moment an option needs explaining — a segment holds two or three words and
 nothing else. Built from the same `at-tickrow` furniture as `CheckList`, with
 `type="radio"` doing the exclusivity, so it needs no styling of its own.
+
+### `TileChoice` — 1 use
+One of a few, as tiles: a picture, a name and a line saying what it does,
+with a tick on the chosen one. `options, value, onChange, label, disabled`
+
+Each option is `{ value, label, note?, icon }`. The New module panel's look,
+as a real radio group (`role="radio"`, `aria-checked`). For a choice that
+changes something at once, where each option is worth reading before it is
+tapped: a course's How much English (0.738). For plainer choices in a form,
+`RadioGroup`.
 
 ### `LanguageRadio` — 4 uses
 The languages, through `RadioGroup`. `languages, value, onChange, label, name`
@@ -228,10 +274,11 @@ busy`
 **The bar is one row** (0.728): New (+ alone under 640px, "+ New card"
 from there), the search box taking what is left, Filter (with the count of
 filters on, and its word from 640px), `narrow`, and three dots. The dots hold
-Select first, where there is anything to select, then `more` (Import, where a
+Select first, where there is anything to select, then `more` (Restore from a backup file, where a
 list has it); where Select would be alone in them it is an icon of its own
-and there are no dots. `tools`, the screen's worded button ("Manage this
-deck's cards"), is on a row of its own above the bar. Each part is left out
+and there are no dots. `tools`, a screen's own worded button, is on a row of its own above
+the bar. (A module's screen had one, "Manage this deck's cards", until
+0.732, when it took in Manage cards and its list became the Cards tab's.) Each part is left out
 when it would hold nothing, and with `emptyPanel` showing the bar stands
 aside.
 
@@ -276,6 +323,21 @@ is missing.
 `itemKey` defaults to reading `.id`, so items need one unless you pass your
 own.
 
+**No `match`, no search box** (0.733): a box that cannot narrow anything is
+left out, and a bar with nothing else in it is not drawn at all.
+
+**On a phone the table is a list** (0.733). Under 640px wide (`useNarrow()`,
+which reads `(max-width: 639px)` and says no where there is no
+`matchMedia`) the table view is drawn by `CardRows`: one card a row, its
+`meaning` cell over a line of its `decks` cell (or the row's `noDecks`,
+"In no module" for a teacher's card), its `kind` where it is not "Word or
+phrase", and its `status`; its `word` on the right, cut with … at half the
+row. The rows press, tick, answer Enter and Space, and start selecting on a
+held finger exactly as the table's rows do — both use the same helpers. The
+view switch says "List" and shows the list icon there. Sort is from the
+Sort control, since the list has no column headings. `CardRow` gained
+`noDecks` for this.
+
 `groups` is `[{ key, label }]` and `groupOf` is `(item) => key`. Together they
 split the list into labelled runs, each headed with how many are in it
 altogether rather than how many the page has reached. **The list is sorted
@@ -290,7 +352,19 @@ learning and not started.
 ### `CardTile` — 2 uses
 One card tile for both the learner's and the teacher's lists.
 
-`card, lang, showLat, meta, actions, onClick, className`
+`card, lang, showLat, meta, actions, corner, onClick, className, standIn`
+
+**The teacher's grids pass `className="teach"`** (0.733): two tiles a row
+on a phone, every tile the same height, the word and the meaning one line
+each and cut with …, a 1px outline, and the status badge at the tile's foot
+at its own width, wrapping rather than cut. The grid around them picks up
+the wider columns from the class (`:has()`). The learner's tiles pass
+nothing and are as they were.
+
+`standIn` (0.733) is what goes in the meaning's place on a card with no
+meaning and no name: `standIn(card)` from `cards.ts` gives the first
+transliteration (drawn in italics), else "Picture" or "Recording" with a
+small symbol, else nothing.
 
 `meta` is the one line of small print, and the caller decides what it says.
 It replaced a `moduleTitles` prop, which this file and the gallery both went
@@ -301,6 +375,25 @@ in the interface face rather than the taught script's, and it stands in for
 the meaning line rather than sitting above it. The script keeps its own line
 underneath. Nothing is passed for this — the tile reads it off the card —
 and only a verb whose own word is a cell of its table has one.
+
+### `CoursesPage` — spaces.tsx, 2 uses
+The list of someone's courses: Teaching's Home and the learner's Courses.
+`joinButton` (0.733, Teaching only) puts joining at the foot of My courses
+as a dashed button, `label`, opening a `PickSheet` titled `title` with the
+code box; `noneAtAll` says the person has no course at all, and then a
+`Nudge` saying `none` with a `first` button stands in for the list.
+Without `joinButton` the join box is the section it always was.
+`searchFrom` searches the courses only from that many on (Teaching: six).
+
+### `OpenRow` — spaces.tsx
+A row that opens something, drawn as a module's tile. `icon` (0.733) puts
+a picture in a soft green square beside the words, at the top of them, and
+lets the line under the title take as many lines as it needs: the kinds on
+the New module panel.
+
+### `Empty`
+`slim` (0.733) draws it on one row, the picture beside the words, a third
+of the height: To do on Teaching's Home with nothing in it.
 
 ### `Tile` — 7 uses
 The generic deck/course tile. `title, meta, onOpen, actions, footer`
@@ -415,11 +508,13 @@ its play buttons resolve to "missing" rather than fetching.
 ## Odds and ends
 
 - **`Icon`** — 22 uses. `name, size=20`. Available names: `add, search, close,
-  delete, edit, tune, sort, size, check, back, save, folder, cards, person,
+  delete, edit, tune, filter, english, englishLittle, sort, size, check, back, save, folder, cards, person,
   group, key, download, verify, play, pause, view, select, school, copy,
   refresh, mic, remove, chevronDown, chevronUp, soundOff, flag, menu, help,
   theme, language, lock`.
-  Use these rather than glyph characters.
+  Use these rather than glyph characters. `filter` (a funnel, 0.735) is for
+  a button that narrows a list; `tune` (the sliders) is for settings — a
+  course's Exercises tab, a card's Advanced tab, the admin space.
 - **`plural(n, noun)`** — `plural(3, "card")` → `"3 cards"`. Use it instead of
   writing `${n} card${n === 1 ? "" : "s"}`.
 - **`localIdFor(cardId)` / `serverCardId(item)`** — a card has two names,

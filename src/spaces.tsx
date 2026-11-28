@@ -9,7 +9,7 @@ import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
 import { keyFromLink, signInLink } from "./sign-in-link.ts";
 import type { CardShape } from "./card-editor.tsx";
-import { formsOf, leadOf } from "./cards.ts";
+import { formsOf, leadOf, standIn } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 
 /*
@@ -63,7 +63,6 @@ import {
   levelOf,
   LEVEL_NAME,
   scriptVars,
-  dimsOf,
   TYPES,
   verbOf } from "./languages.ts";
 import {
@@ -91,15 +90,14 @@ import { offersFor } from "./offers.ts";
 import { NumberSystemEditor } from "./number-system-editor.tsx";
 import { PronounsEditor, hasPronouns } from "./pronouns-editor.tsx";
 import type { NumberSystem, TimeSystem } from "./numbers/types.ts";
-import { partsNow } from "./numbers/types.ts";
+import { partName, partsNow } from "./numbers/types.ts";
 import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
 import type { PartSentences } from "./review.ts";
 import { moduleQuality, FIXES_SHOWN, qualityTone, qualityShown } from "./module-quality.ts";
 import { moduleKind, moduleKindCap } from "./modules.ts";
 import type { ModuleKind } from "./modules.ts";
 import type { Quality } from "./module-quality.ts";
-import { blankFills, countingCards, deleteUnitLine, draftsLine, isLiveIn, isPathUnit, pathUnits, problemLine, sameFormBlanks, unitProblems } from "./path.ts";
-import type { UnitProblem } from "./path.ts";
+import { countingCards, deleteUnitLine, isLiveIn, isPathUnit, pathUnits } from "./path.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 import type { ReviewState } from "./review.ts";
@@ -130,10 +128,13 @@ import {
   cardWords,
   clipped,
   CheckList,
+  ChipPick,
   ClipList,
   clipHashes,
   ConfirmModal,
   RadioGroup,
+  Switch,
+  TileChoice,
   Field,
   formHasAudio,
   FilterMenu,
@@ -1726,7 +1727,10 @@ function TodoSection({ items, actionsOf }: {
           ))}
         </div>
       ) : (
-        <Empty art={<TeaArt />}>You&rsquo;re all caught up. Your students have everything they need.</Empty>
+        /* Slim (0.733, the owner's choice): the same dashed box and cup on
+           one row, so a quiet To do takes a third of the room it did and
+           the courses under it come up the screen. */
+        <Empty slim art={<TeaArt />}>You&rsquo;re all caught up. Your students have everything they need.</Empty>
       )}
     </section>
   );
@@ -1748,8 +1752,21 @@ export function CoursesPage({
   footer,
   groups,
   top,
+  joinButton,
+  noneAtAll,
+  searchFrom,
 }: {
   courses: Course[];
+  /** Join as a button at the foot of My courses, opening a panel with the
+      code box, in place of a section of its own (0.733, Teaching's Home).
+      Left out, the join box is drawn as it always was: the learner's side. */
+  joinButton?: { label: string; first: string; none: Node; title: string };
+  /** No course at all, as against none in the languages switched on:
+      Teaching's Home then says so in a box with its Join button. */
+  noneAtAll?: boolean;
+  /** Search the courses only from this many on (0.733): a list of five
+      fits on a screen and is read, not searched. Left out, always. */
+  searchFrom?: number;
   /** What comes before the courses: Teaching's To do (0.693). */
   top?: Node;
   /** The courses under a heading each, in place of one "My courses" list:
@@ -1772,10 +1789,22 @@ export function CoursesPage({
   footer?: Node;
 }) {
   const [code, setCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const asButton = !!joinButton && !!onJoin;
+  const join = () => {
+    if (!onJoin || !code.trim()) return;
+    onJoin(code.trim());
+    setCode("");
+    setJoining(false);
+  };
+  const searchable = searchFrom === undefined || courses.length >= searchFrom;
+  /* Teaching with no course at all: a box saying so, with the way in. */
+  const firstNudge = asButton && noneAtAll;
+  const lineOver = courses.length ? lead : firstNudge ? null : emptyLead;
   return (
     <>
       {top}
-      {(courses.length ? lead : emptyLead) ? <Help>{courses.length ? lead : emptyLead}</Help> : null}
+      {lineOver ? <Help>{lineOver}</Help> : null}
 
       <Notice kind="error">{error}</Notice>
 
@@ -1794,16 +1823,64 @@ export function CoursesPage({
             size="large"
             busy={busy}
             empty="No courses match."
-            match={(c, q) => c.title.toLowerCase().includes(q)}
+            match={searchable ? (c, q) => c.title.toLowerCase().includes(q) : undefined}
             groups={groups ? groups.map((g) => ({ key: g.key, label: String(g.title) })) : undefined}
             groupOf={groups ? (c) => (groups.find((g) => g.courses.includes(c)) || { key: "" }).key : undefined}
             renderItem={renderCourse}
           />
+          {asButton && joinButton ? (
+            <>
+              <Button icon="add" className="at-blockbtn at-joinmore" onClick={() => setJoining(true)}>{joinButton.label}</Button>
+              {joinNote ? <Help>{joinNote}</Help> : null}
+            </>
+          ) : null}
         </section>
       )}
 
+      {/* Teaching with nothing to teach yet (0.733): the box says why the
+          screen is bare and holds the way in. */}
+      {courses.length === 0 && firstNudge && joinButton ? (
+        <section className="at-section at-coursesection" data-el="courses-of-space">
+          <h3 className="at-sectionhead">My courses</h3>
+          <Nudge icon="school" tone="attention" action={<Button variant="primary" icon="add" onClick={() => setJoining(true)}>{joinButton.first}</Button>}>
+            {joinButton.none}
+          </Nudge>
+          {joinNote ? <Help>{joinNote}</Help> : null}
+        </section>
+      ) : courses.length === 0 && asButton && joinButton ? (
+        /* Courses, but none in the languages switched on: the line above
+           says so, and joining another is still one press away. */
+        <section className="at-section at-coursesection">
+          <Button icon="add" className="at-blockbtn at-joinmore" onClick={() => setJoining(true)}>{joinButton.label}</Button>
+          {joinNote ? <Help>{joinNote}</Help> : null}
+        </section>
+      ) : null}
+
+      {joining && joinButton ? (
+        <PickSheet title={joinButton.title} lede={typeof joinHint === "string" ? joinHint : undefined} onClose={() => setJoining(false)}>
+          <div className="at-toolbar">
+            <input
+              className="at-input at-search"
+              placeholder={joinPlaceholder}
+              aria-label={joinPlaceholder}
+              value={code}
+              autoCapitalize="characters"
+              autoFocus
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") join();
+              }}
+            />
+            <Button variant="primary" disabled={!code.trim() || busy} onClick={join}>
+              <Icon name="school" />
+              Join
+            </Button>
+          </div>
+        </PickSheet>
+      ) : null}
+
       {/* The heading names the section; the box holds only the doing. */}
-      {onJoin && (
+      {onJoin && !asButton && (
       <section className="at-section at-coursesection">
         <h3 className="at-sectionhead">{joinTitle}</h3>
         <div className="at-joinbox">
@@ -1929,11 +2006,21 @@ const MODE_LABEL: Record<PracticeMode, string> = {
   none: "No translation",
   custom: "Custom",
 };
-/* What each preset does, in one line under the choice (0.708). */
+/* What each preset does (0.708); since 0.735 always under its own row, so
+   a teacher reads all four before a tap that changes what students get. */
+/* Each choice's picture (0.738, the owner's 2b). */
+const MODE_ICON: Record<PracticeMode, string> = {
+  with: "english",
+  little: "englishLittle",
+  none: "image",
+  custom: "tune",
+};
 const MODE_SAYS: Record<PracticeMode, string> = {
   with: "Students see English in questions and answers.",
   little: "Students see English only where a card needs it.",
-  none: "No English: pictures, sound and the language itself.",
+  /* "only" since 0.735 (the owner's wording): this is the whole of what
+     students get, not a list of extras. */
+  none: "No English: only pictures, sound and the language itself.",
   custom: "Choose each exercise yourself.",
 };
 
@@ -2102,6 +2189,11 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
   const now: CoursePractice = readPractice(course.practice) || { mode: "with", off: [] };
   const [asking, setAsking] = useState<{ next: CoursePractice; n: number } | null>(null);
   const [showUntaught, setShowUntaught] = useState(false);
+  /* Which groups are open under a preset (0.735): all shut to begin with,
+     and shut again when the preset changes, so what opens is what was
+     asked about under this one. */
+  const [opened, setOpened] = useState<Set<number>>(() => new Set());
+  useEffect(() => setOpened(new Set()), [now.mode]);
   const untaught = useMemo(() => untaughtWithoutEnglish(cards), [cards]);
   /* The exercises this course's language words, by level. A type the pack
      has no wording for is not one its cards can be asked. */
@@ -2136,18 +2228,20 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           What students in this course are asked. Phones on an older version of the app ask everything until they update.
         </span>
       </div>
-      <div className="at-practice-modes">
-      <Segmented
-        size={null}
+      {/* Four choices, each saying what it does (0.735, the owner's 6a):
+          every tap changes what students get, so each explains itself
+          before it is made. Since 0.738 (the owner's 2b) as tiles with a
+          picture, the New module panel's look. */}
+      <TileChoice
         label="How much English"
-        disabled={busy}
-        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m] }))}
         value={now.mode}
-        onChange={(mode) => mode !== now.mode && ask({ mode, off: now.off })}
+        disabled={busy}
+        onChange={(mode) => {
+          if (busy) return;
+          if (mode !== now.mode) ask({ mode, off: now.off });
+        }}
+        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m], note: MODE_SAYS[m], icon: MODE_ICON[m] }))}
       />
-      </div>
-      {/* What the chosen preset does, in a line (0.708). */}
-      <Help>{MODE_SAYS[now.mode]}</Help>
       {/* Switches set under an earlier Custom choice still apply. */}
       {now.mode !== "custom" && now.off.length > 0 && (
         <Help>
@@ -2167,36 +2261,100 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           {untaught.map((c) => <li key={c.id}>{word(c)}</li>)}
         </ul>
       )}
-      {/* The switches one by one, only under Custom (0.708). */}
-      {now.mode === "custom" && byLevel.map(([level, types]) => (
-        <div key={level} className="at-practice-level">
-          <div className="at-practice-levelname">{LEVEL_NAME[level] || `Level ${level}`}</div>
-          {types.map((t) => {
-            const s = switchOf(now, t);
-            const locked = now.mode !== "custom" && usesEnglish(t);
-            const spec = lang ? exOf(t, lang) : null;
+      {/* Under a preset, what it asks, a group at a time (0.735, the
+          owner's 7a): a fixed label over the four groups, each folded with
+          its count, opening to read — the preset decides, so no switches. */}
+      {now.mode !== "custom" && (
+        <div className="at-field at-practice-asks">
+          <label className="at-label">What this asks</label>
+          {/* What "If needed" in the rows means, said once above them and
+              drawn as it is drawn there, so the eye links the two (0.738,
+              the owner's 3a and 6b). Only Little translation uses it. */}
+          {now.mode === "little" && (
+            <p className="at-practice-key">
+              <span className="at-practice-keyhead">In the list below</span>
+              <span className="at-practice-state where">If needed</span>
+              {" = asked only for a card with no other way in, such as a word with no picture or recording."}
+            </p>
+          )}
+          {byLevel.map(([level, types]) => {
+            const on = types.filter((t) => switchOf(now, t) !== "off").length;
+            const open = opened.has(level);
+            const name = LEVEL_NAME[level] || `Level ${level}`;
             return (
-              <div key={t} className={`at-practice-row${locked ? " locked" : ""}`}>
-                <span className="grow">
-                  {(spec && spec.label) || t}
-                  {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
-                </span>
-                {locked ? (
-                  <span className="at-practice-lockword">{s === "on" ? "On" : s === "off" ? "Off" : "Where needed"}</span>
-                ) : (
-                  <Segmented
-                    label={(spec && spec.label) || t}
-                    disabled={busy}
-                    options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
-                    value={s === "off" ? "off" : "on"}
-                    onChange={(v) => flip(t, v === "on")}
-                  />
-                )}
+              <div key={level} className="at-practice-group">
+                <button
+                  type="button"
+                  className="at-practice-fold"
+                  aria-expanded={open}
+                  onClick={() =>
+                    setOpened((was) => {
+                      const next = new Set(was);
+                      if (next.has(level)) next.delete(level);
+                      else next.add(level);
+                      return next;
+                    })
+                  }
+                >
+                  <b>{name}</b>
+                  <span className="at-practice-foldcount">{`${on} of ${types.length} on`}</span>
+                  <Icon name={open ? "chevronUp" : "chevronDown"} size={18} />
+                </button>
+                {open &&
+                  types.map((t) => {
+                    const s = switchOf(now, t);
+                    const spec = lang ? exOf(t, lang) : null;
+                    return (
+                      <div key={t} className="at-practice-row">
+                        <span className="grow">
+                          {(spec && spec.label) || t}
+                          {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
+                        </span>
+                        {s === "on" ? (
+                          <span className="at-practice-state on" aria-label="On" title="On">
+                            <Icon name="check" size={18} />
+                          </span>
+                        ) : s === "off" ? (
+                          <span className="at-practice-state off" aria-label="Off" title="Off">
+                            –
+                          </span>
+                        ) : (
+                          <span className="at-practice-state where">If needed</span>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             );
           })}
         </div>
-      ))}
+      )}
+      {/* Under Custom every group open, each exercise one sliding switch
+          (0.735, the owner's 7a; it was an OFF / ON pair). */}
+      {now.mode === "custom" && byLevel.map(([level, types]) => {
+        const on = types.filter((t) => switchOf(now, t) !== "off").length;
+        return (
+          <div key={level} className="at-practice-level">
+            <div className="at-practice-levelname">
+              <span>{LEVEL_NAME[level] || `Level ${level}`}</span>
+              <span>{`${on} of ${types.length}`}</span>
+            </div>
+            {types.map((t) => {
+              const s = switchOf(now, t);
+              const spec = lang ? exOf(t, lang) : null;
+              return (
+                <div key={t} className="at-practice-row">
+                  <span className="grow">
+                    {(spec && spec.label) || t}
+                    {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
+                  </span>
+                  <Switch on={s !== "off"} label={(spec && spec.label) || t} disabled={busy} onChange={(v) => flip(t, v)} />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
       {asking && (
         <ConfirmModal
           title={`${plural(asking.n, "card")} would have no questions`}
@@ -4697,7 +4855,7 @@ function ImportScreen({ cards, modules, langName, busy, failed, onImport, onClos
 
   return (
     <Screen
-      title="Import"
+      title="Restore from a backup file"
       onBack={onClose}
       rise
       action={
@@ -4709,7 +4867,7 @@ function ImportScreen({ cards, modules, langName, busy, failed, onImport, onClos
             disabled={busy || nothing}
             onClick={() => onImport({ file: read.file, cards: read.cards, decks: read.decks, ticked })}
           >
-            {busy ? "Importing…" : "Import"}
+            {busy ? "Restoring…" : "Restore"}
           </Button>
         ) : null
       }
@@ -4966,24 +5124,30 @@ type WordSet = {
   name: string;
   written: number;
   total: number;
-  /** What `written` and `total` count: "range" for numbers, "pronoun". */
+  /** What `written` and `total` count: "part" for numbers, "pronoun". */
   unit: string;
   decks: number;
   open: () => void;
 };
 /** "9 of 12 ranges written · in 2 decks", as a word set's tile says it. */
 function wordSetLine(s: WordSet): string {
+  /* "Not started" rather than "0 of 11 written" (0.732, the owner's 7a). */
   const done = s.written === s.total
     ? `All ${plural(s.total, s.unit)} written`
+    : s.written === 0
+    ? "Not started"
     : `${s.written} of ${plural(s.total, s.unit)} written`;
-  return `${done} · ${s.decks ? `in ${plural(s.decks, "module")}` : "in no module yet"}`;
+  return `${done} · ${s.decks ? `in ${plural(s.decks, "module")}` : "not in a module yet"}`;
 }
 /* A row that opens something, drawn as a deck's tile is: a real button, so
    it answers a keyboard and a screen reader the way a tap does. */
-function OpenRow({ title, meta, onOpen, label }: { title: Node; meta?: Node; onOpen: () => void; label?: string }) {
+function OpenRow({ title, meta, onOpen, label, icon }: { title: Node; meta?: Node; onOpen: () => void; label?: string;
+  /** A picture ahead of the words: each kind on the New module panel (0.733). */
+  icon?: string }) {
   return (
-    <button type="button" className="at-deckcard at-openrow" data-open="" onClick={onOpen} aria-label={label}>
+    <button type="button" className={`at-deckcard at-openrow${icon ? " withicon" : ""}`} data-open="" onClick={onOpen} aria-label={label}>
       <span className="at-deckrow2">
+        {icon ? <span className="at-kindicon" aria-hidden="true"><Icon name={icon} size={22} /></span> : null}
         <span className="at-deckmain">
           <span className="at-decktitle">{title}</span>
           {meta ? <span className="at-deckmeta">{meta}</span> : null}
@@ -5031,10 +5195,14 @@ function lockedDeleteNote(titles: string[]): string {
    module (0.722, as before 0.710). A unit can also be made from a
    course's path. */
 type NewKind = "deck" | "unit" | "set";
-const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
-  { kind: "deck", title: "Deck", meta: "A set of cards, for any course." },
-  { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
-  { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
+/* Worded by the owner (0.733): what really tells a deck from a unit is
+   that a deck stands alone and a unit builds on the ones before it.
+   Sharing between courses is not it (a unit can be on several paths), so
+   neither says so. */
+const NEW_KINDS: { kind: NewKind; title: string; meta: string; icon: string }[] = [
+  { kind: "deck", title: "Deck", icon: "cards", meta: "Cards on one topic, independent of your other decks." },
+  { kind: "unit", title: "Unit", icon: "path", meta: "One lesson on a course's path. Each unit builds on the ones before it, so students do them in order." },
+  { kind: "set", title: "Personal set", icon: "person", meta: "For words that are different for each student, like My family. Students answer about your pictures once, then practise their own words." },
 ];
 
 function NewModule({
@@ -5661,93 +5829,246 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
    that would raise it most, folded away until asked for.
    ------------------------------------------------------------------ */
 
-function QualityMark({ quality }: { quality?: Quality | null }) {
-  if (!quality || quality.score === null || !qualityShown(quality)) return null;
+
+/* ------------------------------------------------------------------
+   A course's Modules (0.740, the owner's choice)
+
+   One list of everything a course teaches, as rows of one kind: its units
+   first, "studied in order", each with Publish while it is a draft, small
+   arrows to move it and three dots for the rest; then its decks and
+   personal sets, "studied in any order", each with three dots. The labels
+   say the one difference between the two groups a teacher has to know.
+   Publish is on the row because an unpublished unit is one no student
+   sees, and nothing else has to be cleared first: the checklist was
+   withdrawn in the same release.
+   ------------------------------------------------------------------ */
+
+/* Material's line of explanation over each list shows while the list is
+   shorter than this (0.740, the owner's choice). */
+const EXPLAIN_UNDER = 5;
+
+/* How many cards a module holds, as its tile says it. */
+const heldIn = (m: Module): number => (typeof m.cardCount === "number" ? m.cardCount : (m.cardIds || []).length);
+
+/*
+ * A panel of things to add, each a row that says what tapping it does:
+ * "Add", or "Added" for one already in (tapping takes it out again).
+ * Stays open while several are picked; a row being saved says so and
+ * waits. The course's "+ Add a deck" and a unit's course picker (0.740).
+ */
+function AddSheet({ title, lede, rows, none, find, create, onToggle, onClose }: {
+  title: string;
+  lede?: string;
+  rows: { id: string; title: string; meta?: string; on: boolean; saving?: "add" | "drop" }[];
+  /** Said where there is nothing to list. */
+  none?: string;
+  /** A search box over the list, with this placeholder. */
+  find?: string;
+  /** A first row that makes a new one: closes the panel and hands over. */
+  create?: { label: string; onCreate: () => void };
+  onToggle: (id: string, on: boolean) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const wanted = q.trim().toLowerCase();
+  const listed = wanted ? rows.filter((r) => r.title.toLowerCase().includes(wanted)) : rows;
   return (
-    <span className={`at-quality ${qualityTone(quality.score)}`} title="Quality, out of 100">
-      {` · Quality ${quality.score}`}
-    </span>
+    <PickSheet title={title} lede={lede} className="at-decksheet" onClose={onClose}>
+      {find && rows.length > 0 && (
+        <SearchBox boxClassName="at-mb3" placeholder={find} aria-label={find} value={q} dir="auto" onChange={setQ} />
+      )}
+      <div className="at-deckpicks">
+        {create && (
+          <button className="at-deckpick new" onClick={() => { onClose(); create.onCreate(); }}>
+            <Icon name="add" size={18} />
+            <span className="at-tickbody"><b>{create.label}</b></span>
+          </button>
+        )}
+        {!rows.length && none ? <Help>{none}</Help> : null}
+        {wanted && rows.length > 0 && !listed.length && <Help>Nothing matches that.</Help>}
+        {listed.map((r) => (
+          <button
+            className={`at-deckpick${r.on ? " on" : ""}${r.saving ? " saving" : ""}`}
+            key={r.id}
+            aria-pressed={r.on}
+            aria-busy={r.saving ? true : undefined}
+            disabled={!!r.saving}
+            onClick={() => !r.saving && onToggle(r.id, r.on)}
+          >
+            <span className="at-tickbody">
+              <b>{r.title}</b>
+              {r.meta ? <i>{r.meta}</i> : null}
+            </span>
+            <span className="at-deckmark">
+              {r.saving ? (
+                <span className="at-decksaving" role="status">
+                  <span className="at-spin" aria-hidden="true" />
+                  {r.saving === "add" ? "Adding…" : "Removing…"}
+                </span>
+              ) : r.on ? "Added" : "Add"}
+            </span>
+          </button>
+        ))}
+      </div>
+    </PickSheet>
   );
 }
 
-/* ------------------------------------------------------------------
-   A course's path (0.616)
-
-   Above a course's decks: its units, in order, drafts included — each with
-   whether it is published in this course, a warning where it is published
-   and its checklist is no longer clear (R17), and its quality. Every rule
-   is in src/path.ts; this only shows it and calls the server.
-   ------------------------------------------------------------------ */
-
-function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, busy, onOpen, onCreate, onAdd, onMove, onOpenForClass, onRemove, onDelete }: {
+function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf, busy, saving, onOpen, onCreateUnit, onAddUnit, onPublish, onEmptyPublish, onMove, onOpenForClass, onRemove, onDelete, onToggleDeck, onCreateDeck }: {
   course: Course;
   /** The course's units in path order, drafts included. */
   units: Module[];
-  problemsOf: (unitId: string) => UnitProblem[];
-  qualityOf: (unit: Module) => Quality | null;
+  /** Its decks and personal sets. */
+  decks: Module[];
   /** The teacher's units not in this course, to add. */
-  spare: Module[];
+  spareUnits: Module[];
+  /** Every deck and personal set that could be in it, for "+ Add a deck". */
+  deckChoices: Module[];
   /** How many other courses hold a unit. */
   othersOf: (unitId: string) => number;
   busy?: boolean;
-  onOpen: (unitId: string) => void;
-  onCreate: (title: string) => void;
-  onAdd: (unitId: string) => void;
+  saving: Record<string, "add" | "drop">;
+  onOpen: (id: string) => void;
+  onCreateUnit: (title: string) => void;
+  onAddUnit: (unitId: string) => void;
+  onPublish: (unitId: string) => void;
+  /** Publish pressed on a unit with nothing in it. */
+  onEmptyPublish: () => void;
   onMove: (unitId: string, to: number) => void;
   onOpenForClass: (unitId: string, open: boolean) => void;
-  onRemove: (unitId: string) => void;
+  onRemove: (id: string) => void;
   onDelete: (unitId: string) => void;
+  onToggleDeck: (id: string, on: boolean) => void;
+  onCreateDeck: () => void;
 }) {
   const [naming, setNaming] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [addingUnit, setAddingUnit] = useState(false);
+  const [addingDeck, setAddingDeck] = useState(false);
   const [deleting, setDeleting] = useState<Module | null>(null);
   const opened = new Set(course.opened || []);
+  const inCourse = new Set(decks.map((d) => d.id));
+  /* The controls at a row's right: a press on them is theirs alone, not
+     the row's, which opens the module. */
+  const hold = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
-    <div className="at-formblock" data-el="course-path">
-      <div className="at-formhead">
-        <span className="at-formnum">Path</span>
-        <span className="at-formrole">
-          {units.length
-            ? "Students open these units in order. Tap one to open it."
-            : "Units your students open one after another, in the order you set."}
-        </span>
-      </div>
-      {units.map((u, i) => {
-        const live = isLiveIn(course, u.id);
-        const attention = live && problemsOf(u.id).length > 0;
-        return (
-          <div className="at-pathrow" key={u.id} data-el="path-unit">
-            <OpenRow
-              title={`${i + 1}. ${u.title}`}
-              label={`Open unit ${i + 1}, ${u.title}`}
-              meta={
-                <>
-                  {live ? "Published" : "Draft"}
-                  {attention ? <span className="at-notreach">{" · Needs attention"}</span> : null}
-                  {live && opened.has(u.id) ? " · Open for the class" : null}
-                  <QualityMark quality={qualityOf(u)} />
-                </>
-              }
-              onOpen={() => onOpen(u.id)}
-            />
-            <div className="at-row at-pathacts">
-              <Button size="sm" variant="ghost" icon="chevronUp" disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)}>Move up</Button>
-              <Button size="sm" variant="ghost" icon="chevronDown" disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)}>Move down</Button>
-              {live ? (
-                <Button size="sm" variant="ghost" disabled={busy} onClick={() => onOpenForClass(u.id, !opened.has(u.id))}>
-                  {opened.has(u.id) ? "Close for the class" : "Open for the class"}
-                </Button>
-              ) : null}
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(u.id)}>Remove from this course</Button>
-              <Button size="sm" variant="ghost" icon="delete" disabled={busy} onClick={() => setDeleting(u)}>Delete unit</Button>
+    <>
+      <p className="at-eyebrow at-modgroup">Units, studied in order</p>
+      <div className="at-decklist2" data-el="course-units">
+        {units.map((u, i) => {
+          const live = isLiveIn(course, u.id);
+          const early = live && opened.has(u.id);
+          const empty = heldIn(u) === 0 && !(u.parts || []).length;
+          return (
+            /* Since 0.741 (the owner's wish): no "Unit ·" on the line, which
+               the heading above already says; the three dots in the row's
+               top right corner; the arrows, then Publish, along its foot. */
+            <div key={u.id} data-el="path-unit" className="at-unitrow">
+              <Tile
+                title={`${i + 1} · ${u.title}`}
+                /* "Open to students" rather than "Publish" (0.743, the owner's 1a):
+                   a card's Publish is another thing. */
+                meta={`${live ? "Open to students" : "Not open yet"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
+                onOpen={() => onOpen(u.id)}
+                footer={
+                  <span className="at-unitfoot" onClick={hold}>
+                    <IconButton icon="chevronUp" label={`Move ${u.title} up`} disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)} />
+                    <IconButton icon="chevronDown" label={`Move ${u.title} down`} disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)} />
+                    {!live && (
+                      <Button size="sm" variant="primary" off={empty || undefined} disabled={busy}
+                        onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Open to students</Button>
+                    )}
+                  </span>
+                }
+                actions={
+                  <span className="at-unitacts" onClick={hold}>
+                    <MoreMenu
+                      bare
+                      label={`More for ${u.title}`}
+                      title={u.title}
+                      items={[
+                        live ? {
+                          label: early ? "Stop opening it early" : "Open it early",
+                          note: early ? "Students reach this unit in order again." : "Students can start this unit now, without finishing the earlier ones.",
+                          icon: early ? "lock" : "unlock",
+                          onClick: () => onOpenForClass(u.id, !early),
+                        } : null,
+                        { label: `Remove from ${course.title}`, note: "It stays in Material, and in any other course it is in.", icon: "folderRemove", onClick: () => onRemove(u.id) },
+                        { label: "Delete this unit", note: "From every course, for good. You will be asked to confirm.", icon: "delete", danger: true, onClick: () => setDeleting(u) },
+                      ]}
+                    />
+                  </span>
+                }
+              />
             </div>
-          </div>
-        );
-      })}
-      <div className="at-row at-mt3">
-        <Button icon="add" disabled={busy} onClick={() => setNaming("")}>New unit</Button>
-        <Button icon="add" disabled={busy || !spare.length} onClick={() => setAdding(true)}>Add an existing unit</Button>
+          );
+        })}
       </div>
+      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingUnit(true)}>
+        <Icon name="add" size={17} />
+        Add a unit
+      </button>
+
+      <p className="at-eyebrow at-modgroup">Decks, studied in any order</p>
+      <div className="at-decklist2" data-el="course-decks">
+        {decks.map((d) => (
+          <div key={d.id} data-el="course-deck" className="at-unitrow">
+            <Tile
+              title={d.title}
+              /* "Deck" is the heading's word; only a personal set, the one
+                 thing here that is not a deck, says what it is (0.741). */
+              meta={`${d.set ? "Personal set · " : ""}${plural(heldIn(d), "card")}`}
+              onOpen={() => onOpen(d.id)}
+              actions={
+                <span className="at-unitacts" onClick={hold}>
+                  <MoreMenu
+                    bare
+                    label={`More for ${d.title}`}
+                    title={d.title}
+                    items={[
+                      { label: `Remove from ${course.title}`, note: "It stays in Material, and in any other course it is in.", icon: "folderRemove", onClick: () => onRemove(d.id) },
+                    ]}
+                  />
+                </span>
+              }
+            />
+          </div>
+        ))}
+      </div>
+      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingDeck(true)}>
+        <Icon name="add" size={17} />
+        Add a deck
+      </button>
+
+      {addingUnit && (
+        <PickSheet title="Add a unit" onClose={() => setAddingUnit(false)}>
+          <div className="at-sheetacts">
+            <SheetAction icon="add" label="New unit" onClick={() => { setAddingUnit(false); setNaming(""); }} />
+          </div>
+          {spareUnits.length > 0 && (
+            <>
+              <p className="at-eyebrow at-modgroup">Units you already have</p>
+              <div className="at-sheetacts">
+                {spareUnits.map((u) => (
+                  <SheetAction key={u.id} icon="layers" label={u.title} note={plural(heldIn(u), "card")}
+                    onClick={() => { setAddingUnit(false); onAddUnit(u.id); }} />
+                ))}
+              </div>
+            </>
+          )}
+        </PickSheet>
+      )}
+      {addingDeck && (
+        <AddSheet
+          title="Add a deck"
+          lede={`Choose the decks ${course.title} teaches. Students see them at their next check.`}
+          find="Search modules"
+          create={{ label: "Create a new module", onCreate: onCreateDeck }}
+          rows={deckChoices.map((d) => ({ id: d.id, title: d.title, meta: moduleSize(d), on: inCourse.has(d.id), saving: saving[d.id] }))}
+          none="You have no decks yet."
+          onToggle={onToggleDeck}
+          onClose={() => setAddingDeck(false)}
+        />
+      )}
       {naming !== null && (
         <ConfirmModal
           title="New unit"
@@ -5764,25 +6085,8 @@ function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, bu
             const title = (naming || "").trim();
             if (!title) return;
             setNaming(null);
-            onCreate(title);
+            onCreateUnit(title);
           }}
-        />
-      )}
-      {adding && (
-        <ConfirmModal
-          title="Add an existing unit"
-          danger={false}
-          confirmLabel="Done"
-          body={
-            <div>
-              {spare.map((u) => (
-                <OpenRow key={u.id} title={u.title} label={`Add ${u.title}`} meta="Add to the end of the path"
-                  onOpen={() => { setAdding(false); onAdd(u.id); }} />
-              ))}
-            </div>
-          }
-          onCancel={() => setAdding(false)}
-          onConfirm={() => setAdding(false)}
         />
       )}
       {deleting && (
@@ -5805,40 +6109,7 @@ function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, bu
           }}
         />
       )}
-    </div>
-  );
-}
-
-/*
- * A unit's checklist in one course (0.616): what stands between it and
- * publishing there, in the teacher's words, and the button. The server
- * judges published cards only, so it can be stricter than this; what it
- * answered is shown in place of this screen's own reading when it does.
- */
-function UnitChecklist({ live, problems, drafts, textOf, busy, onPublish }: {
-  live: boolean;
-  problems: UnitProblem[];
-  drafts: number;
-  textOf: (cardId: string) => string;
-  busy?: boolean;
-  onPublish: () => void;
-}) {
-  return (
-    <Field label="Checklist">
-      {problems.length ? (
-        <ul className="at-checklist" data-el="unit-checklist">
-          {problems.map((p, i) => <li key={i}>{problemLine(p, textOf)}</li>)}
-        </ul>
-      ) : !live ? (
-        <Notice kind="ok">Ready to publish</Notice>
-      ) : null}
-      {drafts > 0 ? <Help>{draftsLine(drafts)}</Help> : null}
-      {!live && (
-        <Button variant="primary" icon="check" disabled={busy || problems.length > 0} onClick={onPublish}>
-          Publish unit
-        </Button>
-      )}
-    </Field>
+    </>
   );
 }
 
@@ -5854,11 +6125,68 @@ const FIX_ICON: Record<string, string> = {
   repeats: "copy", long: "sort", scene: "group",
 };
 
+/* What the top suggestions would take the score to, and the score's
+   colour: worked out once for the quality row on the module's screen and
+   for the advice screen it opens (0.736), so the two draw the same bar. */
+function qualityPlan(quality: Quality) {
+  const score = quality.score || 0;
+  const fixes = quality.fixes.slice(0, FIXES_SHOWN);
+  const gainOf = (g: number) => Math.max(1, Math.round(g));
+  const reach = Math.min(100, score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
+  return { score, fixes, gainOf, reach, tone: qualityTone(score) };
+}
+
+/* The score's bar, with where the suggestions would take it drawn on after
+   it, faint. A span, so it can sit inside the row's button. */
+function QualityBar({ quality }: { quality: Quality }) {
+  const { score, fixes, reach, tone } = qualityPlan(quality);
+  return (
+    <span className="at-qualitybar" aria-hidden="true">
+      <span className={`now ${tone}`} style={{ width: `${score}%` }} />
+      {fixes.length ? <span className="then" style={{ left: `${score}%`, width: `${reach - score}%` }} /> : null}
+    </span>
+  );
+}
+
+/*
+ * A module's quality as one row on its screen (0.736, the owner's choice):
+ * the score, how many ways there are to raise it, and its bar. The advice
+ * itself is a press away on a screen of its own, so the cards follow
+ * straight after on the first screen rather than under three cards of
+ * advice. Drawn as the app's tiles are, white and outlined: it opens
+ * something, it is not chosen.
+ */
+function QualityRow({ quality, kindW, onOpen }: { quality: Quality; kindW: string; onOpen: () => void }) {
+  if (quality.score === null) return null;
+  const { score, fixes, tone } = qualityPlan(quality);
+  const n = fixes.length;
+  const u = quality.untaught.length;
+  const KindW = kindW.charAt(0).toUpperCase() + kindW.slice(1);
+  return (
+    <button type="button" className="at-qualityrow" onClick={onOpen}
+      aria-label={`${KindW} quality: ${score} out of 100. Open the advice.`}>
+      <span className="at-qualityrowtop">
+        <span className={`at-qualityrowtext ${tone}`}>
+          <b>{score}</b>
+          {" of 100"}
+          {n ? ` · ${plural(n, "way")} to raise it` : ""}
+          {u ? ` · ${plural(u, "sentence")} to look at` : ""}
+        </span>
+        <span className="at-qualityrowgo" aria-hidden="true"><Icon name="chevronDown" size={20} /></span>
+      </span>
+      <QualityBar quality={quality} />
+    </button>
+  );
+}
+
 /*
  * A deck's quality (0.561): the score with a bar and where the top
- * suggestions would take it; the suggestions as cards, each with what to do,
+ * suggestions would take it; the suggestions, each with what to do,
  * why, what it is worth and, where it is about particular cards, those
- * cards to tap (0.563).
+ * cards to tap (0.563). On a screen of its own since 0.736, each
+ * suggestion a row that opens: closed, the rows are compared by their
+ * points at a glance; open, one says why and which words. How many more
+ * sentences a word needs is in its chip's title, no longer a "+2" on it.
  */
 function ModuleQuality({ quality, cards, lang, onOpenCard }: {
   quality: Quality;
@@ -5866,23 +6194,25 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
   lang: Partial<Lang>;
   onOpenCard: (id: string) => void;
 }) {
+  /* Which suggestions are open: all closed to begin with. */
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   if (quality.score === null) return null;
-  const fixes = quality.fixes.slice(0, FIXES_SHOWN);
-  const gainOf = (g: number) => Math.max(1, Math.round(g));
-  const reach = Math.min(100, quality.score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
-  const tone = qualityTone(quality.score);
+  const { fixes, gainOf, reach, tone } = qualityPlan(quality);
   const byId = new Map(cards.map((c) => [String(c.id), c]));
   const rowOf = new Map(quality.words.map((w) => [w.id, w]));
   const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
+  const toggle = (key: string) => setOpen((was) => {
+    const next = new Set(was);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
   return (
     <>
       <p className={`at-qualityscore ${tone}`}>
         <b>{quality.score}</b> <span>out of 100</span>
       </p>
-      <div className="at-qualitybar" aria-hidden="true">
-        <span className={`now ${tone}`} style={{ width: `${quality.score}%` }} />
-        {fixes.length ? <span className="then" style={{ left: `${quality.score}%`, width: `${reach - quality.score}%` }} /> : null}
-      </div>
+      <QualityBar quality={quality} />
       {/* Always shown (0.562): there are at most three, and they are the
           most useful thing here. */}
       {fixes.length > 0 && (
@@ -5893,11 +6223,17 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
               <ul className="at-qfixes">
                 {fixes.map((f) => {
                   const ids = (f.cards || []).filter((id) => byId.has(id));
+                  const isOpen = open.has(f.key);
                   return (
-                    <li className="at-qfix" key={f.key}>
-                      <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                    <li className={`at-qfix${isOpen ? " open" : ""}`} key={f.key}>
+                      <button type="button" className="at-qfixhead" aria-expanded={isOpen} onClick={() => toggle(f.key)}>
+                        <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                        <span className="at-qfixtitle">{f.title}</span>
+                        <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                        <span className="at-qfixgo" aria-hidden="true"><Icon name={isOpen ? "chevronUp" : "chevronDown"} size={20} /></span>
+                      </button>
+                      {isOpen ? (
                       <div className="at-qfixbody">
-                        <p className="at-qfixtitle">{f.title}</p>
                         <p className="at-qfixtext">{f.text}</p>
                         {ids.length ? (
                           <div className="at-qfixwords">
@@ -5910,19 +6246,14 @@ function ModuleQuality({ quality, cards, lang, onOpenCard }: {
                                   <b lang={lang.id} dir={lang.direction} style={script}>
                                     {cardWords(byId.get(id) as Card, lang as Lang).word}
                                   </b>
-                                  {owed ? <i aria-label={`needs ${plural(owed, "more sentence")}`}>{`+${owed}`}</i> : null}
                                 </button>
                               );
                             })}
                           </div>
                         ) : null}
-                        {ids.length ? (
-                          <p className="at-qfixhint">
-                            {f.key === "words" ? "Tap a word to open it. The number is how many more sentences it needs." : "Tap one to open it."}
-                          </p>
-                        ) : null}
+                        {ids.length ? <p className="at-qfixhint">Tap one to open it.</p> : null}
                       </div>
-                      <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -6036,6 +6367,40 @@ export const CARD_SORTS: Record<
   },
 };
 
+/*
+ * The orders the Modules tab offers (0.731), in the Sort panel's words as
+ * CARD_SORTS gives the Cards tab's. `cmp` puts the "up" order first; the
+ * list turns it round for "down". "Down" is each one's usual order —
+ * oldest first, newest changes, A to Z — because the panel keeps the
+ * direction when another order is picked, and Name after Oldest added
+ * must not land on Z to A. `made` is each module's place in the order the
+ * server sent them, which is the order they were made.
+ */
+export const MODULE_SORTS: Record<
+  string,
+  {
+    label: string;
+    cmp: (a: Module, b: Module, made: Map<string, number>) => number;
+    down: string;
+    up: string;
+    saysDown: string;
+    saysUp: string;
+  }
+> = {
+  added: {
+    label: "Added", cmp: (a, b, made) => (made.get(b.id) || 0) - (made.get(a.id) || 0),
+    down: "Oldest first", up: "Newest first", saysDown: "Oldest added", saysUp: "Newest added",
+  },
+  changed: {
+    label: "Changed", cmp: (a, b) => (a.updated || 0) - (b.updated || 0),
+    down: "Newest first", up: "Oldest first", saysDown: "Newest changes", saysUp: "Oldest changes",
+  },
+  name: {
+    label: "Name", cmp: (a, b) => b.title.localeCompare(a.title),
+    down: "A to Z", up: "Z to A", saysDown: "Names A to Z", saysUp: "Names Z to A",
+  },
+};
+
 export function sortCards(cards: Card[], key: string, newestFirst: boolean = true) {
   const sort = CARD_SORTS[key || ""];
   if (!sort) return cards;
@@ -6082,32 +6447,39 @@ const SAVE_BOOKKEEPING = new Set([
   "status", "changes", "changed", "review",
 ]);
 
-type StatusTo = "draft" | "review" | "published" | "discard" | "unpublish";
+type StatusTo = "draft" | "review" | "published" | "discard" | "unpublish" | "unpublish:review";
 
-/** The status menu's choices, by what the card is now. */
-function statusChoices(card: Card): { value: string; label: string }[] {
+/**
+ * The status menu's choices, by what the card is now, each with a line
+ * saying what it does (0.740, the owner's choice). A published card goes
+ * straight to Draft or Ready for review: there is no Unpublish step of
+ * its own. "Draft" there is what Unpublish was; "Ready for review" is
+ * that and then marked to be checked, one action with one confirmation.
+ */
+function statusChoices(card: Card): { value: string; label: string; note: string }[] {
   if (card.status && card.status !== "published") {
     return [
-      { value: "draft", label: "Draft" },
-      { value: "review", label: "Ready for review" },
-      { value: "published", label: "Publish" },
+      { value: "draft", label: "Draft", note: "Only teachers see it." },
+      { value: "review", label: "Ready for review", note: "Only teachers see it. Marked to be checked." },
+      { value: "published", label: "Publish", note: "Students see it." },
     ];
   }
   if (!card.changes) {
     return [
-      { value: "published", label: "Published" },
-      { value: "unpublish", label: "Unpublish…" },
+      { value: "published", label: "Published", note: "Students see it." },
+      { value: "unpublish", label: "Draft", note: "Takes it back from students." },
+      { value: "unpublish:review", label: "Ready for review", note: "Takes it back from students. Marked to be checked." },
     ];
   }
   return [
     /* Short, because it is what the menu reads as while it is shut, on a
        phone, beside the card's name. A card with changes is published:
        "changes" says both. */
-    { value: "changes:draft", label: "Changes in draft" },
-    { value: "changes:review", label: "Changes ready for review" },
-    { value: "published", label: "Publish changes" },
-    { value: "discard", label: "Discard changes…" },
-    { value: "unpublish", label: "Unpublish…" },
+    { value: "changes:draft", label: "Changes in draft", note: "Students still see the old version." },
+    { value: "changes:review", label: "Changes ready for review", note: "Students still see the old version. Marked to be checked." },
+    { value: "published", label: "Publish changes", note: "Students see the new version." },
+    { value: "discard", label: "Discard changes", note: "The card goes back to what students see." },
+    { value: "unpublish", label: "Draft", note: "Takes the whole card back from students, with its changes." },
   ];
 }
 /* Which icon the status menu wears while it is shut: out, a draft not
@@ -6126,7 +6498,8 @@ const CHOICE_ICON: Record<string, string> = {
   "changes:draft": "draft",
   "changes:review": "view",
   discard: "refresh",
-  unpublish: "block",
+  unpublish: "draft",
+  "unpublish:review": "view",
 };
 /* The status as the menu reads while it is shut — "Published", "Draft",
    "Changes in draft". */
@@ -6153,7 +6526,7 @@ function StatusMenu({ card, disabled, onStatus }: {
   disabled?: boolean;
   onStatus: (to: StatusTo) => void;
 }) {
-  const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
+  const [asking, setAsking] = useState<"discard" | "unpublish" | "unpublish:review" | null>(null);
   const [open, setOpen] = useState(false);
   const now = statusNow(card);
   const choices = statusChoices(card);
@@ -6161,7 +6534,7 @@ function StatusMenu({ card, disabled, onStatus }: {
   const pick = (value: string) => {
     setOpen(false);
     if (value === now) return;
-    if (value === "discard" || value === "unpublish") {
+    if (value === "discard" || value === "unpublish" || value === "unpublish:review") {
       setAsking(value);
       return;
     }
@@ -6198,8 +6571,8 @@ function StatusMenu({ card, disabled, onStatus }: {
                 <SheetAction
                   key={c.value}
                   icon={CHOICE_ICON[c.value] || "verify"}
-                  label={c.label.replace(/…$/, "")}
-                  danger={c.value === "discard" || c.value === "unpublish"}
+                  label={c.label}
+                  note={c.note}
                   on={c.value === now}
                   onClick={() => pick(c.value)}
                 />
@@ -6220,20 +6593,23 @@ function StatusMenu({ card, disabled, onStatus }: {
           }}
         />
       )}
-      {asking === "unpublish" && (
+      {(asking === "unpublish" || asking === "unpublish:review") && (
         <ConfirmModal
-          title="Unpublish this card?"
+          title="Take this card back from students?"
           body={
             <p>
               Students stop seeing it. Their progress on it is kept, and comes back if you publish it
-              again. {card.changes ? "Your changes are kept, as a draft." : "The card is kept, as a draft."}
+              again. {asking === "unpublish:review"
+                ? "The card is kept, marked ready for review."
+                : card.changes ? "Your changes are kept, as a draft." : "The card is kept, as a draft."}
             </p>
           }
-          confirmLabel="Unpublish"
+          confirmLabel="Take it back"
           onCancel={() => setAsking(null)}
           onConfirm={() => {
+            const to = asking;
             setAsking(null);
-            onStatus("unpublish");
+            onStatus(to);
           }}
         />
       )}
@@ -6563,12 +6939,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      Course, People or Exercises. Each course opens on Course. */
   const [courseTab, setCourseTab] = useState("course");
   useEffect(() => setCourseTab("course"), [courseView]);
-  /* The course a unit's page was opened from (0.616): its checklist, its
-     number and its Publish are that course's. And what the server last
-     answered when publishing was refused, which may be stricter than this
-     screen's reading — it judges published cards only. */
+  /* The course a unit's page was opened from (0.616): the course its
+     quality is read in. Publishing and the checklist left the unit's
+     page in 0.740; its place in each course is said there and arranged
+     on the course's screen. */
   const [unitCourse, setUnitCourse] = useState<string | null>(null);
-  const [serverProblems, setServerProblems] = useState<{ unitId: string; courseId: string; problems: UnitProblem[] } | null>(null);
+  /* The course picker on a unit's page: its amber box's button, or Add
+     to another course in its three dots (0.740). */
+  const [pickingCourse, setPickingCourse] = useState(false);
   /* The decks a course is still saving, and which way: shown on the
      deck's row as "Adding…" or "Removing…" until the server answers, and
      not tappable meanwhile, so a second tap cannot undo the first. */
@@ -6737,9 +7115,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The open deck, being edited: null while it is only read. */
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
   const [discardingModule, setDiscardingModule] = useState(false);
-  /* The deck's own "Manage cards" page, and the picker it opens to add
+  /* The open module's quality advice, on a screen of its own (0.736). */
+  const [qualityOpen, setQualityOpen] = useState(false);
+  /* The panel the green + opens inside a module (0.736): a new card or
+     cards the teacher already has. */
+  const [addingHow, setAddingHow] = useState(false);
+  /* Both belong to the module that was open: another module, or none,
+     starts without them, however it was left. */
+  useEffect(() => { setQualityOpen(false); setAddingHow(false); }, [openModule]);
+  /* The picker a deck's screen opens to add
      cards the teacher already has: what is ticked, held until Done. */
-  const [managing, setManaging] = useState(false);
   const [adding, setAdding] = useState<{ ids: string[]; parts: string[]; pronouns: boolean } | null>(null);
   /* Already teaching something? Then this is a rare errand, folded away. */
   const [joinNote, setJoinNote] = useState("");
@@ -6958,10 +7343,31 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     () => (off.length ? courses.filter((c) => inPlayWith(off, c.language)) : courses),
     [courses, off]
   );
-  const onModules = useMemo(
-    () => (off.length ? modules.filter((d) => inPlayWith(off, (langOfModule(d) || ({} as Lang)).id)) : modules),
-    [modules, off, langOfModule]
-  );
+  /* The Modules tab's order, in the line under its bar as on Cards
+     (0.731). A module carries no date it was made, but the server sends
+     them in the order they were made, so that order is "Added"; until
+     somebody picks another it is oldest first, the order the tab has
+     always had. */
+  const [moduleSortKey, setModuleSortKey] = useState("added");
+  const [moduleSortDown, setModuleSortDown] = useState(true);
+  const onModules = useMemo(() => {
+    const kept = off.length ? modules.filter((d) => inPlayWith(off, (langOfModule(d) || ({} as Lang)).id)) : modules;
+    const made = new Map(modules.map((d, i) => [d.id, i]));
+    const by = MODULE_SORTS[moduleSortKey] || MODULE_SORTS.added;
+    const dir = moduleSortDown ? -1 : 1;
+    return [...kept].sort((a, b) => (by.cmp(a, b, made) * dir) || ((made.get(a.id) || 0) - (made.get(b.id) || 0)));
+  }, [modules, off, langOfModule, moduleSortKey, moduleSortDown]);
+  const moduleSort: ListSort = {
+    value: moduleSortKey,
+    down: moduleSortDown,
+    options: Object.entries(MODULE_SORTS).map(([k, v]) => ({
+      value: k, label: v.label, down: v.down, up: v.up, saysDown: v.saysDown, saysUp: v.saysUp,
+    })),
+    onApply: (value, down) => {
+      setModuleSortKey(value);
+      setModuleSortDown(down);
+    },
+  };
   const onCards = useMemo(
     () => (off.length ? cards.filter((c) => inPlayWith(off, (langOfCard(c) || ({} as Lang)).id)) : cards),
     [cards, off, langOfCard]
@@ -7090,15 +7496,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       null,
     [courses, unitCourse],
   );
-  /* A unit's checklist in a course, as this screen reads it. */
-  const problemsIn = useCallback(
-    (unitId: string, course: Course): UnitProblem[] => {
-      const unit = allModules.find((d) => d.id === unitId);
-      const held = cards.filter((c) => (c.decks || []).includes(unitId));
-      return unitProblems({ cards: held, counting: countingFor(unitId, course), lang: unit ? langOfModule(unit) : null });
-    },
-    [allModules, cards, countingFor, langOfModule],
-  );
   const qualityOf = useCallback(
     (module: Module, pending = false): Quality => {
       const held = cards.filter((c) => (c.decks || []).includes(module.id));
@@ -7135,17 +7532,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const d = openModule ? modules.find((x) => x.id === openModule) : null;
     return d ? qualityOf(d, true) : null;
   }, [openModule, modules, qualityOf]);
-  /* The checklist of every unit on the course on screen, and of the unit
-     open, worked out once per change rather than on every render. */
-  const pathChecks: Map<string, UnitProblem[]> = useMemo(() => {
-    const out: Map<string, UnitProblem[]> = new Map();
-    const course = courseView ? courses.find((c) => c.id === courseView) : null;
-    if (course) for (const u of pathUnits(course, allModules)) out.set(u.id, problemsIn(u.id, course));
-    const open = openModule ? allModules.find((d) => d.id === openModule) : null;
-    const at = open && isPathUnit(open) ? courseOfUnit(open.id) : null;
-    if (open && at && !out.has(open.id)) out.set(open.id, problemsIn(open.id, at));
-    return out;
-  }, [courseView, courses, allModules, openModule, problemsIn, courseOfUnit]);
   /* Narrowed then ordered. ItemList's own search runs after this, over what
      is left, so a search inside a filter behaves the way it reads. */
   const shownCards = useMemo(
@@ -7306,6 +7692,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const pronounTile = (group: PronounGroup, extra?: Node) => (
     <CardTile
       card={group}
+      /* The teacher's grids (0.733): two a row on a phone, one line each. */
+      className="teach"
       lang={languages[group.lang as LangId]}
       meta={<><span className="at-statusbadge">Word set</span>{plural(group.members.length, "pronoun")}</>}
       onClick={() => setPronouning(group.lang as LangId)}
@@ -7345,6 +7733,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     <CardTile
       card={c}
       lang={langOfCard(c)}
+      /* The teacher's grids (0.733, the owner's 5a): two a row on a phone,
+         one line each, and in a card with no meaning, what stands for it. */
+      className="teach"
+      standIn={standIn(c)}
       /* No date on the tile (0.714, the owner's 4a): Sort still orders
          by it. What is left is only what needs looking at. */
       meta={
@@ -7388,10 +7780,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       const titles = (c.decks || [])
         .map((id: string) => (modules.find((d) => d.id === id) || { title: "" }).title)
         .filter(Boolean);
+      /* No meaning written: what stands for it, as on the tile (0.733). */
+      const stand = said.en ? null : standIn(c);
       return {
+        noDecks: "In no module",
         cells: {
           word: said.short,
-          meaning: said.en,
+          meaning: said.en || (stand
+            ? stand.kind === "lat"
+              ? <i className="at-standin">{stand.text}</i>
+              : <span className="at-standin"><Icon name={stand.kind === "picture" ? "image" : "play"} size={14} /> {stand.text}</span>
+            : null),
           kind: cardKindLabel(c),
           decks: titles.join(", "),
           status: (
@@ -7508,7 +7907,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         out.push({ id: k.id, label: k.label, n: used.get(k.id) || 0 });
       }
     }
-    out.push({ id: "none", label: "No subtype", n: used.get("none") || 0 });
+    out.push({ id: "none", label: "Kind not set", n: used.get("none") || 0 });
     return out;
   }, [onCards, langOfCard]);
 
@@ -7516,7 +7915,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * How a list of cards is ordered and what it leaves out.
    *
    * Built once here and handed to every screen that shows cards — the Cards
-   * tab, an open deck, its Manage cards and the cards to add to it —
+   * tab, an open deck and the cards to add to it —
    * because a teacher moving between them is looking at the same material
    * through the same controls, and two copies of this would be two card
    * lists that sort and narrow differently.
@@ -7565,7 +7964,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       label: "Kind",
       value: cardFilter.kinds.length ? "some" : "any",
       quiet: "any",
-      wide: true,
       chip: CARD_KINDS.filter((k) => cardFilter.kinds.includes(k.id)).map((k) => k.label).join(", "),
       onReset: () =>
         setCardFilter((f) => ({
@@ -7574,21 +7972,22 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           subtypes: NO_CARD_FILTER.subtypes,
           sceneKinds: NO_CARD_FILTER.sceneKinds,
         })),
-      /* Ticked rather than pressed, because several at once is the point:
-         words and sentences, without the scenes. A kind's subtypes are
-         offered under it once it is ticked, and only then — "verbs" says
-         nothing about a sentence. */
+      /* Chips, several at once (0.735, the owner's 3a): words and
+         sentences, without the scenes. A kind's subtypes are offered under
+         it once it is lit, and only then — "verbs" says nothing about a
+         sentence. Nothing lit narrows nothing, so no line says so. */
       custom: (
         <div className="at-kindfilter">
-          <CheckList
-            options={CARD_KINDS.map((k) => ({ id: k.id, title: k.label, note: kindCounts.get(k.id) || 0 }))}
+          <ChipPick
+            label="Kind"
+            options={CARD_KINDS.map((k) => ({ value: k.id, label: k.label, note: kindCounts.get(k.id) || 0 }))}
             chosen={cardFilter.kinds}
             onToggle={(id, on) =>
               setCardFilter((f) => ({
                 ...f,
                 kinds: on ? f.kinds.filter((x) => x !== id) : f.kinds.concat([id]),
                 /* A kind let go of takes its subtypes with it, so nothing
-                   out of sight is left narrowing the next time it is ticked. */
+                   out of sight is left narrowing the next time it is lit. */
                 subtypes: on && id === "word" ? [] : f.subtypes,
                 sceneKinds: on && id === "scene" ? [] : f.sceneKinds,
               }))
@@ -7597,8 +7996,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {cardFilter.kinds.includes("word") && (
             <>
               <p className="at-hint">Which words or phrases</p>
-              <CheckList
-                options={subtypesHere.map((t) => ({ id: t.id, title: t.label, note: t.n }))}
+              <ChipPick
+                label="Which words or phrases"
+                options={subtypesHere.map((t) => ({ value: t.id, label: t.label, note: t.n }))}
                 chosen={cardFilter.subtypes}
                 onToggle={(id, on) =>
                   setCardFilter((f) => ({
@@ -7612,10 +8012,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {cardFilter.kinds.includes("scene") && (
             <>
               <p className="at-hint">Which scenes</p>
-              <CheckList
+              <ChipPick
+                label="Which scenes"
                 options={[
-                  { id: "text", title: "Text", note: kindCounts.get("scene:text") || 0 },
-                  { id: "conversation", title: "Conversation", note: kindCounts.get("scene:conversation") || 0 },
+                  { value: "text", label: "Text", note: kindCounts.get("scene:text") || 0 },
+                  { value: "conversation", label: "Conversation", note: kindCounts.get("scene:conversation") || 0 },
                 ]}
                 chosen={cardFilter.sceneKinds}
                 onToggle={(id, on) =>
@@ -7627,7 +8028,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               />
             </>
           )}
-          {!cardFilter.kinds.length && <p className="at-hint">Tick a kind. Until you do, this narrows nothing.</p>}
         </div>
       ),
     },
@@ -7679,7 +8079,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ? cardFilter.deckMode
         : "any",
       quiet: "any",
-      wide: true,
       chip: cardFilter.deckMode === "none"
         ? "In no module"
         : `${cardFilter.deckMode === "out" ? "Not in" : "In"} ${plural(cardFilter.deckIds.length, "module")}`,
@@ -7688,9 +8087,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          teacher has made, and several of them at once. */
       custom: (
         <div className="at-deckfilter">
-          <Segmented
-            size={null}
+          <ChipPick
             label="In or out of the chosen modules"
+            quiet="any"
             options={[
               { value: "any", label: "Any module" },
               { value: "in", label: "In these" },
@@ -7698,7 +8097,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               { value: "none", label: "In no module" },
             ]}
             value={cardFilter.deckMode}
-            onChange={(v) => setCardFilter((f) => ({ ...f, deckMode: v }))}
+            onChange={(v) => setCardFilter((f) => ({ ...f, deckMode: v as typeof f.deckMode }))}
           />
           {cardFilter.deckMode === "none" && (
             <p className="at-hint">Cards that are in no module at all, so no student sees them.</p>
@@ -7740,7 +8139,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          list than every card. */
       value: cardFilter.blankMode,
       quiet: "any",
-      wide: true,
       chip: pickedLabel(BLANK_SIDES, cardFilter.blankMode),
       onReset: () => setCardFilter((f) => ({ ...f, blankMode: NO_CARD_FILTER.blankMode, blankNames: NO_CARD_FILTER.blankNames })),
       /* Which blank is a list as long as the blanks a teacher has written,
@@ -7748,9 +8146,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          above it, learned once. */
       custom: (
         <div className="at-deckfilter">
-          <Segmented
-            size={null}
+          <ChipPick
             label="Which side of a blank a card is on"
+            quiet="any"
             options={BLANK_SIDES}
             value={cardFilter.blankMode}
             onChange={(v: string) => setCardFilter((f) => ({ ...f, blankMode: v }))}
@@ -8044,7 +8442,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const setStatus = (card: Card, to: StatusTo) =>
     run(
       async () => {
-        const r = await API.cardStatus(card.id, to);
+        /* Off a published card, Draft and Ready for review are taken back
+           from students first, then given the status asked for: two calls
+           in order, as the Select panel's Change status makes them. */
+        let r = await API.cardStatus(card.id, to === "unpublish:review" ? "unpublish" : to);
+        const want = to === "unpublish:review" ? "review" : to === "unpublish" ? "draft" : null;
+        if (want && r.card.status !== want) r = await API.cardStatus(card.id, want);
         absorbSaved(r);
         /* The card on screen is the card as the server answered, drawn
            afresh — discarding changes or unpublishing changes its words. */
@@ -8059,7 +8462,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         : to === "discard"
           ? "Changes discarded"
           : to === "unpublish"
-            ? "Unpublished — students no longer see it"
+            ? "Taken back from students — it is a draft"
+            : to === "unpublish:review"
+              ? "Taken back from students — ready for review"
             : to === "review"
               ? "Marked ready for review"
               : "Marked as a draft",
@@ -8243,7 +8648,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               took(frame, true);
               setReviewing(frame);
             }
-            snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
+            snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} put in the group`, "good");
           } finally {
             setBusy(false);
           }
@@ -8748,7 +9153,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         name: "Numbers",
         written: parts.filter((r) => ready.has(r.id)).length,
         total: parts.length,
-        unit: "range",
+        unit: "part",
         decks: inLang.filter((d) => partsNow(d.parts || []).some((p) => ids.has(p))).length,
         open: () => {
           setSetOwner(null);
@@ -8861,7 +9266,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           rows.push({
             key: "numbers",
             title: "Numbers",
-            meta: written === parts.length ? `All ${plural(parts.length, "range")} written` : `${written} of ${plural(parts.length, "range")} written`,
+            meta: written === parts.length ? `All ${plural(parts.length, "part")} written` : written === 0 ? "Not started" : `${written} of ${plural(parts.length, "part")} written`,
             by: n.name,
             open: () => {
               setSetOwner(owner);
@@ -8901,9 +9306,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <>
         {/* One line per tab, matching Modules and Cards (0.725). That any
             teacher here can edit a set is said inside the set instead. */}
-        <Help className="at-mb3">
-          A word set is a ready-made group of cards taught together, like numbers. Fill it in once per language, then add it to a module.
-        </Help>
+        {/* Only while the list is short (0.740, the owner's choice): once
+            there are five, the teacher knows what a word set is. */}
+        {wordSetLangsOn.reduce((n, id) => n + wordSetsOf(id, account.handle).length, 0) < EXPLAIN_UNDER ? (
+          <Help className="at-mb3">
+            A word set is a ready-made group of cards taught together, like numbers. Fill it in once per language, then add it to a module.
+          </Help>
+        ) : null}
         {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
         {several
           ? wordSetLangsOn.map((id) => (
@@ -9165,7 +9574,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const typedTrouble = !held
       ? ""
       : held.kind === "card"
-        ? "A card's ID is that name already, so it cannot be a tag as well."
+        ? "A card's name is that already, so it cannot be a group as well."
         : held.kind === "category"
           ? "That name is spoken for by a kind of word, which every card of that kind fills already."
           : "";
@@ -9181,22 +9590,22 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     };
     return (
       <Screen
-        title={adding ? "Add tags to the selected cards" : "Take tags off the selected cards"}
+        title={adding ? "Add the selected cards to groups" : "Remove the selected cards from groups"}
         onBack={close}
       >
         <Help>
           {adding
-            ? "Tick the tags every selected card should have. Wherever another card has a blank for one of these tags, these cards can fill it."
-            : "Tick the tags to take off every selected card that has them. Sentences that have a blank for a tag keep the blank."}
+            ? "Tick the groups every selected card should be in. Wherever a sentence has a blank for one of these groups, these cards can fill it."
+            : "Tick the groups to take the selected cards out of. Sentences that have a blank for a group keep the blank."}
         </Help>
         {adding && (
           <div className="at-formblock at-mb3">
-            <Field label="New tag" hint={typedTrouble}>
+            <Field label="New group" hint={typedTrouble}>
               <div className="at-blanknew">
                 <input
                   className="at-input"
-                  placeholder="Name a new tag"
-                  aria-label="Name a new tag"
+                  placeholder="Name a new group"
+                  aria-label="Name a new group"
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); makeTag(); } }}
@@ -9221,7 +9630,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           }))}
           chosen={pickedTags}
           onToggle={(id, on) => setPickedTags((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))}
-          empty={adding ? "No tags yet. Create one above." : "None of the selected cards has a tag."}
+          empty={adding ? "No groups yet. Make one above." : "None of the selected cards is in a group."}
         />
         <div className="at-row at-mt5">
           <Button variant="ghost" onClick={close} icon="close">
@@ -9258,10 +9667,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 ({ changed, sentences, full }) =>
                   [
                     changed
-                      ? `${pickedTags.length === 1 ? "Tag" : "Tags"} ${adding ? "added to" : "taken off"} ${plural(changed, "card")}`
+                      ? `${plural(changed, "card")} ${adding ? "added to" : "taken out of"} ${pickedTags.length === 1 ? "a group" : "groups"}`
                       : "Nothing to change — they were already like that",
-                    sentences ? `${plural(sentences, "sentence")} left out: a sentence takes no tags` : "",
-                    full ? `${plural(full, "card")} already had ${MAX_FILLS} tags, the most a card may have` : "",
+                    sentences ? `${plural(sentences, "sentence")} left out: a sentence is in no group` : "",
+                    full ? `${plural(full, "card")} already in ${MAX_FILLS} groups, the most a card may be in` : "",
                   ]
                     .filter(Boolean)
                     .join(". "),
@@ -9453,8 +9862,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         if (saved && Array.isArray(saved.courses))
           setModules((prev) => prev.map((x) => (x.id === d.id ? { ...x, courses: saved.courses } : x)));
         else await refresh(true);
+        /* A unit's place in the course's path comes back too, which its
+           page's Courses rows read (0.740). */
         if (r && r.course && Array.isArray(r.course.decks))
-          setCourses((prev) => prev.map((x) => (x.id === courseId ? { ...x, decks: r.course.decks } : x)));
+          setCourses((prev) => prev.map((x) => (x.id === courseId
+            ? { ...x, decks: r.course.decks, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
+            : x)));
         setModuleDraft((dd) => (dd ? {
           ...dd,
           courses: on ? dd.courses.filter((x) => x !== courseId) : dd.courses.concat([courseId]),
@@ -9471,7 +9884,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
 
   /* A deck's word sets — its number ranges and the language's pronouns —
-     written straight away from the Manage cards page. A deck
+     written straight away from the deck's screen. A deck
      being edited has its draft brought along, so saving the edit does not
      put back what was just changed. */
   const saveBuiltins = async (d: Module, parts: string[], pronounsOn: boolean) => {
@@ -9563,7 +9976,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             lede="Lists every language has, written once for the language. Each range of numbers brings the number words it needs. A set still being written can go in: students get what is written so far.">
             <CheckList
               options={parts.map((r): { id: string; title: string; note?: string; disabled?: boolean } =>
-                ({ id: r.id, title: r.label, note: ready.has(r.id) ? undefined : "Words still to write" }))
+                ({ id: r.id, title: partName(r), note: ready.has(r.id) ? undefined : "Words still to write" }))
                 .concat(pronSet ? [{
                   id: "builtin:pronouns",
                   title: "Pronouns",
@@ -9687,14 +10100,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        — the pronouns are already one entry among them. */
     const numberEntries: NumberPart[] = numberPartsOf(langId)
       .filter((r) => partsNow(d.parts || []).includes(r.id))
-      .map((r) => ({ id: `numbers:${r.id}`, part: r.id, label: r.label, builtin: "numbers" }));
+      .map((r) => ({ id: `numbers:${r.id}`, part: r.id, label: partName(r), builtin: "numbers" }));
     const listed: any[] = (numberEntries as any[]).concat(moduleView ? moduleView.listed : []);
     const listedWhole = numberEntries.length + (moduleView ? moduleView.whole : 0);
     const moduleEmpty = !held.length && !numberEntries.length;
     const matchEntry = (it: any, q: string) =>
       isNumberPart(it) ? it.label.toLowerCase().includes(q) : cardMatches(it, q);
     const numberTile = (n: NumberPart, extra?: Node) => (
-      <div className="at-minicard">
+      <div className="at-minicard teach">
         <div className="at-minikind">Numbers</div>
         <div className="ar">{n.label}</div>
         <div className="at-minimeta"><span className="at-statusbadge">Word set</span></div>
@@ -9715,31 +10128,31 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }}
       />
     );
-    /* Remove, behind a card's three dots on Manage cards, where the Cards
+    /* Remove, behind a card's three dots on the deck's screen, where the Cards
        tab has Delete (0.714). While it is under way the spinner stands in
        for the dots. */
     const removeItem = (it: any): MoreItem => ({
       label: `Remove from this ${kindW}`, icon: "remove", onClick: () => removeFromModule(d, [it]),
     });
     const manageMenu = (it: any) => leaving.has(it.id) ? removeBtn(it) : cardMenu(it, [removeItem(it)], false);
-    /* A card in the deck, read on the deck screen; on Manage cards, with
-       Remove where the Cards tab has Delete. */
-    const moduleTile = (it: any, manage: boolean) =>
+    /* A card in the deck, on the deck's screen, with Remove where the Cards
+       tab has Delete. */
+    const moduleTile = (it: any) =>
       isNumberPart(it)
-        ? numberTile(it, manage ? removeBtn(it) : null)
+        ? numberTile(it, removeBtn(it))
         : isPronounGroup(it)
-        ? pronounTile(it, manage ? removeBtn(it) : null)
-        : manage
-        ? (
+        ? pronounTile(it, removeBtn(it))
+        : (
           <CardTile
             card={it}
             lang={langOfCard(it)}
+            className="teach"
+            standIn={standIn(it)}
             meta={statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}
             onClick={() => openCard(it)}
             corner={manageMenu(it)}
           />
-        )
-        : cardTile(it);
+        );
     const filterNote = (
       <>
         No cards in this {kindW} match the filter.{" "}
@@ -9775,155 +10188,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
     const realIds = (ids: Iterable<string>) => pickedIds(Array.from(ids).filter((x) => !x.startsWith("numbers:")));
 
-    /* ---- Manage cards: the deck's cards laid out as the Cards tab lays
-           out every card, with what changes which cards are in it. ---- */
-    if (managing) {
-      const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
-      return (
-        <Screen title="Manage cards" scrollKey={`manage:${d.id}`}
-          onBack={() => { setManaging(false); setSelCards(new Set()); setCardAction(null); setTagAction(null); }}>
-          <p className="at-hint at-managefor">{d.title}</p>
-          <Notice kind="error">{error}</Notice>
-          <ItemList
-            noun="card"
-            items={listed}
-            total={listedWhole}
-            /* With the deck empty, Import is in the box below instead. */
-            more={moduleEmpty ? [] : [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }]}
-            sort={cardSort}
-            filter={cardFilterProp}
-            size="small"
-            busy={busy}
-            filters={
-              listed.length ? (
-                <div className="at-mt3">
-                  {/* Both labels, and the stylesheet shows the one that
-                      fits on one line (0.728): the long one says where the
-                      cards go, which a phone has no room for. */}
-                  <Button icon="add" className="at-blockbtn at-addexisting"
-                    onClick={() => openAdding(d)}>
-                    <span className="at-longlabel">{`Add existing cards to this ${kindW}`}</span>
-                    <span className="at-shortlabel">Add existing cards</span>
-                  </Button>
-                </div>
-              ) : null
-            }
-            empty={filterNote}
-            emptyPanel={moduleEmpty ? (
-              <Nudge
-                icon="cards"
-                tone="attention"
-                action={
-                  /* Import, icon-only, beside the two worded buttons while
-                     the deck is empty; the toolbar holds it once it is not. */
-                  <div className="at-nudgeacts">
-                    <div className="at-row">
-                      <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
-                      <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
-                    </div>
-                    <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
-                  </div>
-                }
-              >
-                No cards in this {kindW} yet. Make a new one or add cards you already have, so your students have something to practise.
-              </Nudge>
-            ) : undefined}
-            match={matchEntry}
-            onNew={newCard}
-            selected={selCards}
-            onSelectedChange={setSelCards}
-            bulkActions={[
-              { label: `Remove from this ${kindW}`, icon: "folderRemove", onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
-              { label: "Add to another module", icon: "folderAdd", onClick: () => setCardAction("add") },
-              { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
-              { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
-              { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
-              { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
-              {
-                label: "Delete",
-                icon: "delete",
-                danger: true,
-                onClick: (ids) => setConfirm({ kind: "cards", ids: realIds(ids), action: () => {} }),
-              },
-            ]}
-            views={cardViews("teacher-deck", manageMenu, removeBtn)}
-            renderItem={(it) => moduleTile(it, true)}
-          />
-          {cardScreen}
-          {cardAction === "add" && cardActionScreen(d.id)}
-          {exportScreen}
-          {importScreen}
-          {tagAction && tagActionScreen()}
-          {statusAction && statusActionScreen()}
-          {cardsConfirm}
-        </Screen>
-      );
-    }
-    /* A path unit (0.616): its page is a deck's, headed with its number on
-       the path of the course it was opened from, with that course's
-       checklist and Publish above its cards. */
-    const unitIn = isPathUnit(d) ? courseOfUnit(d.id) : null;
-    const unitNo = unitIn ? pathUnits(unitIn, allModules).findIndex((u) => u.id === d.id) + 1 : 0;
-    /* Every course whose path holds it (0.688, the owner's 3a): each gets
-       its own place, checklist and publishing, since a unit is placed,
-       published and opened early separately in each. The course it was
-       opened from comes first. */
-    const unitCourses = isPathUnit(d)
-      ? courses
-        .filter((x) => (x.path || []).includes(d.id))
-        .sort((a, b) => (a.id === (unitIn && unitIn.id) ? -1 : b.id === (unitIn && unitIn.id) ? 1 : 0))
-      : [];
-    const cardText = (id: string) => {
-      const card = lentById.get(id);
-      return card ? String(leadOf(card as never).ar || card.name || "").trim() : id;
+    /* A new card made from the deck's screen goes straight into it. */
+    const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
+    /* A path unit's page (0.740, the owner's choice): it says where the
+       unit stands in each course whose path holds it, and each of those
+       rows opens the course, where the unit is published, put in order
+       and opened early. The checklist, and the per-course blocks that
+       carried it, are gone (see DECISIONS.md, "The audit round"). */
+    const unitCourses = isPathUnit(d) ? courses.filter((x) => (x.path || []).includes(d.id)) : [];
+    const openCourse = (id: string) => {
+      setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setQualityOpen(false); setAddingHow(false);
+      setCourseView(id);
     };
-    const unitDrafts = held.filter((c) => c.status && c.status !== "published").length;
-    const unitLang = langOfModule(d) || null;
-    /* One course's checklist: what the server said, where it said it of
-       this course; else this screen's reading. */
-    const checksIn = (course: Course): UnitProblem[] => {
-      if (serverProblems && serverProblems.unitId === d.id && serverProblems.courseId === course.id) return serverProblems.problems;
-      if (unitIn && course.id === unitIn.id && pathChecks.has(d.id)) return pathChecks.get(d.id) || [];
-      return problemsIn(d.id, course);
-    };
-    /* Advice, not points (A6): blanks whose approved cards are all of one form. */
-    const sameFormIn = (course: Course) => unitLang
-      ? sameFormBlanks(
-        blankFills(held, countingFor(d.id, course), unitLang),
-        (id) => lentById.get(id),
-        dimsOf(unitLang).map((dim) => dim.field),
-      )
-      : [];
-    /* What the server saved of a course's path, put on screen as it is. */
-    const tookPath = (courseId: string, r: any) => {
-      if (r && r.course) {
-        setCourses((prev) => prev.map((x) => (x.id === courseId
-          ? { ...x, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
-          : x)));
-      }
-    };
-    const publishUnit = (course: Course) => {
-      run(async () => {
-        try {
-          const r: any = await API.publishUnit(course.id, d.id);
-          setServerProblems(null);
-          tookPath(course.id, r);
-        } catch (e) {
-          const data = e && typeof e === "object" && "data" in e ? (e as { data?: any }).data : null;
-          if (data && data.error === "unit-not-ready" && Array.isArray(data.problems)) {
-            setServerProblems({ unitId: d.id, courseId: course.id, problems: data.problems });
-            return;
-          }
-          throw e;
-        }
-      }, `${d.title} published in ${course.title}`);
-    };
-    const moveUnit = (course: Course, to: number) =>
-      run(async () => tookPath(course.id, await API.moveUnit(course.id, d.id, to)),
-        `${d.title} is now unit ${to + 1} in ${course.title}`);
-    const openForClass = (course: Course, open: boolean) =>
-      run(async () => tookPath(course.id, await API.openUnit(course.id, d.id, open)),
-        open ? `Opened for ${course.title}` : `Closed for ${course.title}`);
     /* Read and edited on one screen, as a card is: what is shown is the
        saved deck until Edit is pressed, and the draft after. */
     const editing = !!moduleDraft;
@@ -9953,81 +10229,88 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <Screen
         /* What is being done, not which deck: its name is the first
            thing on the screen. */
-        title={editing ? `Edit ${kindW}` : unitIn ? `Unit ${unitNo} · ${d.title}` : KindW}
+        title={isPathUnit(d) ? "Unit" : KindW}
         scrollKey={d.id}
         /* Laid out like a card's screen — see .at-screen.cardform: one
            sheet ruled into sections, each headed at the editor's size with
            what it is for straight under the heading. */
         className="cardform"
-        /* Being edited, the way out is Cancel — a cross where the back
-           arrow was, asking first when there is something to lose. */
-        onBack={
-          editing
-            ? () => (changed ? setDiscardingModule(true) : setModuleDraft(null))
-            : () => { setOpenModule(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); setServerProblems(null); }
-        }
-        backIcon={editing ? "close" : "back"}
-        backLabel={editing ? "Cancel" : "Back"}
-        /* Edit, as on a card being read; Save while editing, which goes
-           back to reading the deck. Both float in the bottom corner — see
-           ScreenFab — and the bar over the deck holds nothing else. */
-        fab={
-          editing
-            ? {
-                icon: "save",
-                label: "Save",
-                off: !shown.title.trim() || !changed,
-                busy: !!busy,
-                onClick: () => {
-                  if (busy || !moduleDraft) return;
-                  if (!changed) snack("No changes to save.");
-                  else if (!shown.title.trim()) snack("Some required fields are missing. They're marked with *.", "warn");
-                  else saveModule(d, moduleDraft);
-                },
-              }
-            : { icon: "edit", label: "Edit", onClick: () => setModuleDraft(draftOf(d)) }
+        /* Back asks first only while a rename is half typed (0.732). */
+        onBack={() => {
+          if (editing && changed) { setDiscardingModule(true); return; }
+          setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setQualityOpen(false); setAddingHow(false);
+        }}
+        backIcon="back"
+        backLabel="Back"
+        /* No Edit and no Save (0.732, the owner's 1a): the name is renamed
+           by its pencil, and Export and Delete wait behind three dots. */
+        action={
+          /* The dots alone, no outline (0.736, the owner's wish), as on
+             a module's tile. */
+          <MoreMenu
+            bare
+            label={`More for this ${kindW}`}
+            title={d.title}
+            items={[
+              /* The course picker, once the unit is in a course: the
+                 page's Courses rows open courses rather than add them. */
+              isPathUnit(d) && unitCourses.length ? { label: "Add to another course", icon: "school", onClick: () => setPickingCourse(true) } : null,
+              { label: "Export", icon: "download", onClick: () => exportModules([d.id]) },
+              { label: `Delete this ${kindW}`, icon: "delete", danger: true, onClick: askDelete },
+            ]}
+          />
         }
       >
             <Notice kind="error">{error}</Notice>
 
-            {/* The facts about the deck, headed the way a card's screen
-                heads "This card", with Export by the heading as it is
-                there. Read, they are the edit's own controls held still —
-                the card's way — and its quality is read either way. */}
+            {/* The deck's name is its heading, with a pencil to rename it
+                where it stands (0.732, the owner's 1a). */}
             <div className="at-formblock">
               <div className="at-formhead">
-                <span className="at-formnum">{`This ${kindW}`}</span>
-                <span className="at-formacts">
-                  <Button reads size="sm" className="iconly" aria-label={`Export this ${kindW}`} title={`Export this ${kindW}`}
-                    onClick={() => exportModules([d.id])}>
-                    <Icon name="download" />
-                  </Button>
-                </span>
-                {/* The language, then what the deck holds on a line of its own,
-                    and, only when some of it sends students nothing, why
+                {editing ? null : <span className="at-formnum">{d.title}</span>}
+                {editing ? null : (
+                  <span className="at-formacts">
+                    <IconButton icon="edit" label={`Rename this ${kindW}`} onClick={() => setModuleDraft(draftOf(d))} />
+                  </span>
+                )}
+                {/* The language and what the deck holds on one line, and,
+                    only when some of it sends students nothing, why
                     (0.563). */}
                 <span className="at-formrole">
-                  <span className="at-formline">{(langOfModule(d) || {}).name}</span>
-                  <span className="at-formline">{moduleSize(d, held.length)}</span>
+                  <span className="at-formline">{`${(langOfModule(d) || {}).name} · ${moduleSize(d, held.length)}`}</span>
                   {(() => {
                     const off = notReaching(d, held);
                     return off ? <span className="at-formline at-notreach">{off.long}</span> : null;
                   })()}
                 </span>
               </div>
-              {/* Who made it and who last changed it (0.711). */}
-              {madeLine(d, account.handle, shortDate) ? <Help>{madeLine(d, account.handle, shortDate)}</Help> : null}
-              <fieldset className="at-cardlock" disabled={!editing}
->
-                <Field label={<>{KindW} name<span className="at-reqstar" aria-hidden="true" /></>}>
-                  <input
-                    className="at-input"
-                    placeholder="e.g. Week 3 · Verbs"
-                    value={shown.title}
-                    onChange={(e) => edit({ title: e.target.value })}
-                  />
-                </Field>
-              </fieldset>
+              {editing ? (
+                <>
+                  <Field label={`${KindW} name`}>
+                    <input
+                      className="at-input"
+                      placeholder="e.g. Week 3 · Verbs"
+                      value={shown.title}
+                      autoFocus
+                      onChange={(e) => edit({ title: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && shown.title.trim() && changed && !busy && moduleDraft) {
+                          e.preventDefault();
+                          saveModule(d, moduleDraft);
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          setModuleDraft(null);
+                        }
+                      }}
+                    />
+                  </Field>
+                  <div className="at-row at-mt3 at-mb3">
+                    <Button variant="primary" size="sm" disabled={!shown.title.trim() || !changed || !!busy}
+                      onClick={() => moduleDraft && saveModule(d, moduleDraft)}>Save</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setModuleDraft(null)}>Cancel</Button>
+                  </div>
+                </>
+              ) : null}
 
                 {/* Which courses carry it, as a card says which decks it
                     is in: the names, each with its way out, and the way to
@@ -10036,7 +10319,58 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     taken out is saved as it is tapped (0.725). */}
                 {/* A My space deck is in no course; in their place, whether its
                     owner practises it (0.545, 59b, 61a). */}
-                {d.personal ? null : (
+                {d.personal ? null : isPathUnit(d) ? (
+                /* A unit's courses, each with its place there (0.740): a
+                   row opens that course, where the unit is arranged. */
+                <Field label="Courses">
+                  {unitCourses.length ? (
+                    <div className="at-unitcourses">
+                      {unitCourses.map((course) => {
+                        const path = pathUnits(course, allModules);
+                        const at = path.findIndex((u) => u.id === d.id);
+                        const live = isLiveIn(course, d.id);
+                        const opened = live && (course.opened || []).includes(d.id);
+                        return (
+                          <button type="button" className="at-unitcourse" key={course.id} data-el="unit-course"
+                            aria-label={`Open ${course.title}`} onClick={() => openCourse(course.id)}>
+                            <span className="at-unitcoursetext">
+                              <b>{course.title}</b>
+                              <i data-el="unit-place">{`Unit ${at + 1} of ${path.length} · ${live ? "Open to students" : "Not open yet"}${opened ? " · Opened early" : ""}`}</i>
+                            </span>
+                            <span className="at-unitcoursego" aria-hidden="true">
+                              Open course
+                              <Icon name="chevronDown" size={18} />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Nudge
+                      icon="school"
+                      tone="attention"
+                      action={
+                        <button type="button" className="at-deckadd" onClick={() => setPickingCourse(true)}>
+                          <Icon name="add" size={17} />
+                          Add it to a course
+                        </button>
+                      }
+                    >
+                      Not in a course yet, so no students can see it. Add it to a course to share it.
+                    </Nudge>
+                  )}
+                  {pickingCourse && (
+                    <AddSheet
+                      title="Courses"
+                      lede="Choose the courses whose students see this unit."
+                      rows={courses.map((c) => ({ id: c.id, title: c.title, on: shown.courses.includes(c.id), saving: moduleSaving[c.id] }))}
+                      none="You aren't teaching a course yet."
+                      onToggle={(id, on) => saveModuleCourse(d, id, on)}
+                      onClose={() => setPickingCourse(false)}
+                    />
+                  )}
+                </Field>
+                ) : (
                 <Field label="Courses" lede={`Students in these courses see this ${kindW}.`}>
                   {!shown.courses.length ? (
                     <Nudge
@@ -10093,10 +10427,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               {/* Only once there is a sentence or a recording to score
                   (0.709); nothing in its place before then. */}
               {openQuality && qualityShown(openQuality) && (
-                <Field label={`${KindW} quality`} lede={QUALITY_LEDE}>
-                  <ModuleQuality quality={openQuality} cards={held}
-                    lang={langOfModule(d) || LANGUAGES[DEFAULT_LANGUAGE]}
-                    onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+                <Field label={`${KindW} quality`}>
+                  <QualityRow quality={openQuality} kindW={kindW} onOpen={() => setQualityOpen(true)} />
                 </Field>
               )}
             </div>
@@ -10123,54 +10455,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               />
             )}
 
-            {unitCourses.map((course) => {
-              const path = pathUnits(course, allModules);
-              const at = path.findIndex((u) => u.id === d.id);
-              const live = isLiveIn(course, d.id);
-              const isOpen = live && (course.opened || []).includes(d.id);
-              const sameForm = sameFormIn(course);
-              return (
-                <div className="at-formblock" data-el="unit-checklist-block" key={course.id}>
-                  <div className="at-formhead">
-                    <span className="at-formnum">{course.title}</span>
-                    <span className="at-formrole" data-el="unit-place">
-                      {`Unit ${at + 1} of ${path.length} · ${live ? "Published" : "Draft"}${isOpen ? " · Open for the class" : ""}`}
-                    </span>
-                  </div>
-                  <div className="at-row at-pathacts at-mb3" data-el="unit-path-actions">
-                    <Button size="sm" variant="ghost" icon="chevronUp" disabled={!!busy || at <= 0}
-                      onClick={() => moveUnit(course, at - 1)}>Move earlier</Button>
-                    <Button size="sm" variant="ghost" icon="chevronDown" disabled={!!busy || at < 0 || at >= path.length - 1}
-                      onClick={() => moveUnit(course, at + 1)}>Move later</Button>
-                    {live ? (
-                      <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => openForClass(course, !isOpen)}>
-                        {isOpen ? "Close for the class" : "Open for the class"}
-                      </Button>
-                    ) : null}
-                  </div>
-                  <UnitChecklist
-                    live={live}
-                    problems={checksIn(course)}
-                    drafts={unitDrafts}
-                    textOf={cardText}
-                    busy={busy}
-                    onPublish={() => publishUnit(course)}
-                  />
-                  {sameForm.length ? (
-                    <Field label="Forms">
-                      <Help>These blanks always take the same form. Adding cards of another gender or number would give more practice:</Help>
-                      <ul className="at-checklist">
-                        {sameForm.map((b, i) => <li key={i}>{`"${cardText(b.cardId)}": ${b.slot}`}</li>)}
-                      </ul>
-                    </Field>
-                  ) : null}
-                </div>
-              );
-            })}
-
-            {/* The cards, word sets among them, to read: which cards
-                the deck holds is changed on Manage cards. */}
-            <Section title="Cards" lede={moduleEmpty ? undefined : "Tap a card to see it."}>
+            {/* The cards, word sets among them: read, added, selected and
+                removed here, since Manage cards folded into this screen
+                (0.732, the owner's 1a). */}
+            <Section title="Cards">
             {/* A word set the deck holds that is still being written
                 (0.569): what is missing, and the way straight to the set.
                 Students already get what is written, so it says so rather
@@ -10216,52 +10504,99 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 </div>
               ));
             })()}
-            <ItemList
-              noun="card"
-              items={listed}
-              total={listedWhole}
-              tools={moduleEmpty ? null : (
-                <Button variant="primary" icon="cards" onClick={() => setManaging(true)}>
-                  {`Manage this ${kindW}'s cards`}
-                </Button>
-              )}
-              sort={cardSort}
-              filter={cardFilterProp}
-              size="small"
-              busy={busy}
-              empty={filterNote}
-              emptyPanel={moduleEmpty ? (
-                <Nudge
-                  icon="cards"
-                  tone="attention"
-                  action={<Button variant="primary" icon="cards" onClick={() => setManaging(true)}>{`Manage this ${kindW}'s cards`}</Button>}
-                >
-                  No cards in this {kindW} yet. Add some so your students have something to practise.
-                </Nudge>
-              ) : undefined}
-              match={matchEntry}
-              views={cardViews("teacher-deck", (c) => cardActions(c))}
-              renderItem={(it) => moduleTile(it, false)}
-            />
+        <ItemList
+          noun="card"
+          items={listed}
+          total={listedWhole}
+          /* In the three dots whether or not the module is empty (0.740):
+             the empty box holds the two ways to fill it and nothing else. */
+          more={[{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }]}
+          sort={cardSort}
+          filter={cardFilterProp}
+          size="small"
+          busy={busy}
+          empty={filterNote}
+          emptyPanel={moduleEmpty ? (
+            <Nudge
+              icon="cards"
+              tone="attention"
+              action={
+                /* Exactly two buttons (0.740, the owner's choice): restoring
+                   from a backup file is in the list's three dots. */
+                <div className="at-row">
+                  <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
+                  <Button icon="add" onClick={() => openAdding(d)}>Cards you already have</Button>
+                </div>
+              }
+            >
+              No cards in this {kindW} yet. Make a new one or add cards you already have, so your students have something to practise.
+            </Nudge>
+          ) : undefined}
+          match={matchEntry}
+          /* One green + for both ways of filling a module (0.736, the
+             owner's choice): it asks which, in place of a second button
+             under the list. */
+          onNew={() => setAddingHow(true)}
+          selected={selCards}
+          onSelectedChange={setSelCards}
+          bulkActions={[
+            { label: `Remove from this ${kindW}`, icon: "folderRemove", onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
+            { label: "Add to another module", icon: "folderAdd", onClick: () => setCardAction("add") },
+            { label: "Add to groups", icon: "tagAdd", onClick: () => setTagAction("add") },
+            { label: "Remove from groups", icon: "tagRemove", onClick: () => setTagAction("remove") },
+            { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
+            { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
+            {
+              label: "Delete",
+              icon: "delete",
+              danger: true,
+              onClick: (ids) => setConfirm({ kind: "cards", ids: realIds(ids), action: () => {} }),
+            },
+          ]}
+          views={cardViews("teacher-deck", manageMenu, removeBtn)}
+          renderItem={moduleTile}
+        />
             </Section>
 
-            {/* At the foot while editing, away from Save, as the deck list
-                keeps it on the deck's own row. */}
-            {editing && (
+            {/* Who made it and who last changed it (0.711), at the foot
+                since 0.732. */}
+            {madeLine(d, account.handle, shortDate) ? (
               <div className="at-formblock at-mt5">
-                <div className="at-formhead">
-                  <span className="at-formnum">{`Delete ${kindW}`}</span>
-                </div>
-                <p className="at-dangerline">{`Deleting a ${kindW} is permanent and cannot be undone.`}</p>
-                <Button variant="danger" icon="delete" onClick={askDelete}>
-                  {`Delete ${kindW}`}
-                </Button>
+                <Help>{madeLine(d, account.handle, shortDate)}</Help>
               </div>
-            )}
+            ) : null}
+
+        {/* The advice behind the quality row (0.736), on its own screen.
+            Drawn before the card's, so a card opened from it comes up
+            over it and Back returns to the advice. */}
+        {qualityOpen && openQuality && qualityShown(openQuality) && (
+          <Screen title={`${KindW} quality`} onBack={() => setQualityOpen(false)} className="cardform">
+            <div className="at-formblock">
+              <Help>{QUALITY_LEDE}</Help>
+              <ModuleQuality quality={openQuality} cards={held}
+                lang={langOfModule(d) || LANGUAGES[DEFAULT_LANGUAGE]}
+                onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+            </div>
+          </Screen>
+        )}
+
+        {/* What the green + adds (0.736): the module's kind and its name
+            in quotes, since italics do not exist in every script. */}
+        {addingHow && (
+          <PickSheet title={`Add to the ${kindW} \u201c${d.title}\u201d`} className="at-addhow" onClose={() => setAddingHow(false)}>
+            <div className="at-sheetacts">
+              <SheetAction icon="add" label="New card" note={`Write a new card in this ${kindW}`}
+                onClick={() => { setAddingHow(false); newCard(); }} />
+              <SheetAction icon="cards" label="Cards you already have" note="Choose from your other cards"
+                onClick={() => { setAddingHow(false); openAdding(d); }} />
+            </div>
+          </PickSheet>
+        )}
 
         {cardScreen}
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
+        {importScreen}
         {tagAction && tagActionScreen()}
         {statusAction && statusActionScreen()}
 
@@ -10312,7 +10647,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           only where the App admin switched them on (0.722). */}
       <div className="at-decklist2">
         {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
-          <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+          <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} icon={k.icon} onOpen={() => {
             setChoosingKind(false);
             setNewKind(k.kind);
             setNaming("new");
@@ -10352,7 +10687,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       const next = r && r.course;
       if (!next || next.id !== c.id) return;
       setCourses((prev) => prev.map((x) => (x.id === c.id
-        ? { ...x, decks: next.decks || [], path: next.path, pathLive: next.pathLive, opened: next.opened }
+        ? { ...x, decks: next.decks || x.decks || [], path: next.path, pathLive: next.pathLive, opened: next.opened }
         : x)));
     };
     const tookModule = (r: any) => {
@@ -10362,40 +10697,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ? prev.map((d) => (d.id === saved.id ? { ...d, ...saved, courses: saved.courses || d.courses } : d))
         : prev.concat([{ ...saved, cardCount: (saved.cardIds || []).length }])));
     };
-    const pathSection = (
-      <PathSection
-        course={c}
-        units={units}
-        problemsOf={(id) => pathChecks.get(id) || []}
-        qualityOf={(u) => qualities.get(u.id) || qualityOf(u)}
-        spare={allModules.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
-        othersOf={(id) => courses.filter((x) => x.id !== c.id && (x.decks || []).includes(id)).length}
-        busy={busy}
-        onOpen={(id) => { setUnitCourse(c.id); setOpenModule(id); }}
-        onCreate={(title) => run(async () => {
-          const r = await API.createUnit(c.id, title);
-          tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
-          tookCourse(r);
-        }, `${title} added to the path`)}
-        onAdd={(id) => run(async () => {
-          const r = await API.attachModule(id, c.id);
-          tookModule(r);
-          tookCourse(r);
-        })}
-        onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
-        onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
-          open ? "Opened for the class" : "Closed for the class")}
-        onRemove={(id) => run(async () => {
-          const r = await API.detachModule(id, c.id);
-          tookModule(r);
-          tookCourse(r);
-        })}
-        onDelete={(id) => run(async () => {
-          await API.deleteModule(id);
-          await refresh(true);
-        })}
-      />
-    );
     const people = (title: string, list: string[], none: Node) => (
       <Field label={`${title} · ${list.length}`}>
         {list.length ? (
@@ -10509,29 +10810,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             {courseTab === "course" && (
             <div role="tabpanel" aria-label="course">
 
-            <div className="at-formblock">
+            {/* The course's name is the heading, with its language and how
+                many students it has under it (0.740, the owner's choice). */}
+            <div className="at-formblock" data-el="course-head">
               <div className="at-formhead">
-                <span className="at-formnum">This course</span>
+                <span className="at-formnum">{c.title}</span>
+                <span className="at-formrole">
+                  <span className="at-formline">{`${languageName(languages, c.language)} · ${plural(c.students.length, "student")}`}</span>
+                </span>
               </div>
-              <Field label="Course name">
-                <p className="at-fieldvalue">{c.title}</p>
-              </Field>
-              <Field label="Language">
-                <p className="at-fieldvalue">{languageName(languages, c.language)}</p>
-              </Field>
             </div>
 
-            {/* What the course teaches, as a deck says which courses carry
-                it: the names, each with its way out, and the way to add
-                another on the end of the row. A name opens its deck. */}
-            <div className="at-formblock">
+            {/* What the course teaches, in one list (0.740, the owner's
+                choice): its units, studied in order, then its decks,
+                studied in any order. See CourseModules. */}
+            <div className="at-formblock" data-el="course-modules">
               <div className="at-formhead">
                 <span className="at-formnum">Modules</span>
-                <span className="at-formrole">
-                  {mine.length
-                    ? "Students in this course see these modules. Tap one to open it."
-                    : "Students in this course see the modules you add here."}
-                </span>
               </div>
               {courseOff && (
                 <div className="at-mb3">
@@ -10555,24 +10850,66 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 </div>
               )}
-              {/* The course's modules as a row of names, or, empty, one way to
-                  fill it (0.727, the owner's 1a–4a): Add a module where there
-                  are modules to add, whose list can make a new one too, and
-                  Create a module where there are none. Either way a new one
-                  is asked its kind, put in this course and opened. */}
-              {mine.length ? (
-                moduleSwitch(false)
-              ) : (
-                <Nudge
-                  icon="folder"
-                  tone="attention"
-                  action={plainModules.length ? moduleSwitch(true) : (
-                    <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
-                  )}
-                >
-                  Nothing here yet. Add a module to give your students something to practise.
-                </Nudge>
-              )}
+              {/* Empty, one way to fill it (0.727, the owner's 1a–4a): Add a
+                  module where there are modules to add, whose list can make
+                  a new one too, and Create a module where there are none.
+                  Above both groups while the course has nothing at all. */}
+              {!mine.length && !units.length ? (
+                <div className="at-mb3">
+                  <Nudge
+                    icon="folder"
+                    tone="attention"
+                    action={plainModules.length ? moduleSwitch(true) : (
+                      <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
+                    )}
+                  >
+                    Nothing here yet. Add a module to give your students something to practise.
+                  </Nudge>
+                </div>
+              ) : null}
+              <CourseModules
+                course={c}
+                units={units}
+                decks={mine}
+                spareUnits={allModules.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
+                deckChoices={plainModules}
+                othersOf={(id) => courses.filter((x) => x.id !== c.id && (x.decks || []).includes(id)).length}
+                busy={busy}
+                saving={moduleSaving}
+                onOpen={(id) => { if (units.some((u) => u.id === id)) setUnitCourse(c.id); setOpenModule(id); }}
+                onCreateUnit={(title) => run(async () => {
+                  const r = await API.createUnit(c.id, title);
+                  tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
+                  tookCourse(r);
+                }, `${title} added to ${c.title}`)}
+                onAddUnit={(id) => run(async () => {
+                  const r = await API.attachModule(id, c.id);
+                  tookModule(r);
+                  tookCourse(r);
+                })}
+                onPublish={(id) => {
+                  const title = (units.find((u) => u.id === id) || { title: "The unit" }).title;
+                  run(async () => tookCourse(await API.publishUnit(c.id, id)), `${title} is open to students in ${c.title}`);
+                }}
+                onEmptyPublish={() => snack("Add a card first", "warn")}
+                onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
+                onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
+                  open ? "Opened early" : "Students reach it in order again")}
+                onRemove={(id) => {
+                  const title = (modules.find((d) => d.id === id) || allModules.find((d) => d.id === id) || { title: "The module" }).title;
+                  run(async () => {
+                    const r = await API.detachModule(id, c.id);
+                    tookModule(r);
+                    tookCourse(r);
+                  }, `${title} taken out of ${c.title}`);
+                }}
+                onDelete={(id) => run(async () => {
+                  await API.deleteModule(id);
+                  await refresh(true);
+                })}
+                onToggleDeck={toggleModule}
+                onCreateDeck={createHere}
+              />
               {kindSheet}
             </div>
             {/* Only the student code lives here. The teacher code hands over
@@ -10592,9 +10929,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 hint="Share this with a class so they can join and study."
               />
             </div>
-
-            {pathSection}
-
 
             </div>
             )}
@@ -10771,12 +11105,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }}
                 />
               ) : null}
-              emptyLead={
-                courses.length
-                  ? "None of your courses is in the languages switched on. The language button at the top brings the others back."
-                  : "You aren't teaching a course yet. Ask your administrator to add you, or join with a teacher code below."
-              }
-              joinTitle="Join a course as a teacher"
+              emptyLead={courses.length ? "None of your courses is in the languages switched on. The language button at the top brings the others back." : undefined}
+              /* Join as a button at the foot of My courses and a panel
+                 (0.733, the owner's choice): the code box is wanted once
+                 per course, not every visit. */
+              noneAtAll={courses.length === 0}
+              searchFrom={6}
+              joinButton={{
+                label: "Join another course",
+                first: "Join a course",
+                title: courses.length ? "Join another course" : "Join a course",
+                none: "You aren't teaching a course yet. Ask your administrator to add you, or join with a teacher code.",
+              }}
               joinHint="Paste a teacher code another teacher or your administrator gave you."
               joinPlaceholder="Teacher code"
               joinNote={joinNote}
@@ -10882,13 +11222,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   filter still finds the sentences. A line saying what a card
                   is, taken off in 0.714, is back in 0.725 as one of three
                   matching lines, one per tab (the owner's wording). */}
-              <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
+              {/* Counted over the whole list, not what a search or filter
+                  leaves (0.740). */}
+              {onListed < EXPLAIN_UNDER ? (
+                <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
+              ) : null}
 
               <ItemList
                 noun="card"
                 items={listedCards}
                 total={onListed}
-                more={cards.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
+                more={cards.length && !mineSide ? [{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }] : []}
                 sort={cardSort}
                 filter={cardFilterProp}
                 size="small"
@@ -10918,7 +11262,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         }}>
                           New card
                         </Button>
-                        <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
+                        <IconButton icon="upload" label="Restore from a backup file" onClick={() => setImporting(true)} />
                       </div>
                     }
                   >
@@ -10938,8 +11282,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 bulkActions={[
                   { label: "Add to a module", icon: "folderAdd", onClick: () => setCardAction("add") },
                   { label: "Remove from a module", icon: "folderRemove", onClick: () => setCardAction("remove") },
-                  { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
-                  { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
+                  { label: "Add to groups", icon: "tagAdd", onClick: () => setTagAction("add") },
+                  { label: "Remove from groups", icon: "tagRemove", onClick: () => setTagAction("remove") },
                   { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
                   { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
@@ -11132,13 +11476,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 />
               )}
 
-              {mineSide ? null : (
+              {mineSide || onModules.length >= EXPLAIN_UNDER ? null : (
                 <Help>A module is a group of cards. Add it to a course to teach it.</Help>
               )}
 
               <ItemList
                 noun="module"
                 items={onModules}
+                sort={moduleSort}
                 size="large"
                 busy={busy}
                 empty={
@@ -11168,7 +11513,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 /* A personal set is on New module's sheet again (0.722), not
                    here. */
-                more={modules.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
+                more={modules.length && !mineSide ? [{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }] : []}
                 onNew={mineSide ? undefined : newModule}
                 selected={selModules}
                 onSelectedChange={setSelModules}
@@ -11216,6 +11561,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   return (
                     <Tile
                       title={d.title}
+                      /* Every module says what kind it is, right after its
+                         name (0.729, the owner's 1a, 3a, 4a). */
+                      badge={<span className="at-kindbadge" data-el="module-kind">{moduleKindCap(d)}</span>}
                       /* One line under the name (0.715, the owner's 1c):
                          what in it needs looking at, who can see it, and
                          its quality score last (0.720, the owner's wish:
@@ -11244,13 +11592,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         ) : (
                           "Not in a course yet — nobody can see it"
                         );
+                        /* A module's kind is its badge, by the name (0.731):
+                           "Unit" and "Personal set" are off this line. */
                         const parts = [
-                          /* A unit says so (0.688, the owner's 1b): its place
-                             on each path is on its own screen. */
-                          isPathUnit(d) ? <span key="u" data-el="unit-label">Unit</span> : null,
                           waiting ? <span key="w">{waiting}</span> : null,
                           lost ? <span key="l" className="at-lostcount">{`${plural(lost, "card")} missing a recording`}</span> : null,
-                          !d.personal && d.set ? <span key="s">Personal set</span> : null,
                           <span key="r">{reach}</span>,
                           score !== null ? <span key="q" data-el="module-score">{`score: ${score}`}</span> : null,
                         ].filter(Boolean) as React.ReactElement[];
@@ -11474,7 +11820,7 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
     };
   }, [load, reach]);
   return (
-    <Screen title="Number system" onBack={onBack}>
+    <Screen title={`Numbers · ${name}`} onBack={onBack}>
       <Help>Fetching what is written for {name}…</Help>
       {error ? <Notice kind="warn">{error}</Notice> : null}
     </Screen>

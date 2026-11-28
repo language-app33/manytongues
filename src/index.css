@@ -515,7 +515,7 @@ button {
   .at.auto .at-mark-loops { display:none !important; }
 }
 
-.at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; box-shadow: var(--nav-shadow); justify-content:center; }
+.at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:13px; font-weight:800; box-shadow: var(--nav-shadow); justify-content:center; }
 .at-modecaret { color: var(--brass); display:inline-flex; transition: transform 150ms; }
 .at-modecaret.up { transform: rotate(180deg); }
 .at-modemenu { position:absolute; top:46px; left:0; min-width:170px; background: var(--surface);
@@ -735,6 +735,10 @@ button {
 .at-sheetfoot > .at-btn { width:100%; }
 /* In a sheet the pickers are the sheet's own, not a panel inside it. */
 .at-sheetbody > .at-filterbar { padding:0; border:0; background:none; }
+/* The Sort panel's Order (0.735, the owner's 1a): the one switch under the
+   rows, full width, in ordinary letters rather than the track's capitals. */
+.at-sortorder { margin-top:16px; }
+.at-sortorder .at-seg { text-transform:none; letter-spacing:0; font-size:15px; font-weight:700; }
 /* ---- pictures in practice ----
    The prompt: large enough to recognise the thing at a glance, its own
    shape inside a frame the height of a phrase prompt's worth of room. The
@@ -780,6 +784,14 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    button grows to share its row by default, which stretched this one
    across half the sheet — on the blank sheet and the tag sheet alike. */
 .at-sheettop .at-icon { flex:0 0 auto; width:44px; min-height:44px; padding:0; }
+/* Just the cross (0.737, the owner's 1b): no outline and no tile behind
+   it. The 44px square stays as the tap area; only its edges are no longer
+   drawn. With a mouse, the cross takes the accent colour on hover, since
+   there is no border left to light up. */
+.at-sheettop .at-icon { border:0; background:transparent; }
+@media (hover: hover) {
+  .at-sheettop .at-icon:hover { color: var(--accent); }
+}
 .at-sheet > .at-hint { margin:4px 0 12px; }
 .at-sheet > .at-input { width:100%; }
 
@@ -958,8 +970,13 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 
 /* Icons sit inside buttons at the text baseline. */
 .at-ic { flex:0 0 auto; vertical-align:-4px; }
-.at-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family: var(--ui); font-size:16px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; background: var(--raised); color: var(--text); border:2px solid var(--line); border-radius: var(--r); padding:14px 22px; cursor:pointer; transition: transform 60ms, background 120ms; min-height:52px; }
+/* Buttons are in ordinary letters (0.740, the owner's choice): only the
+   one main green button of a screen — the primary variant — keeps its
+   capitals, so it is the one that stands out. Labels, small capital
+   headings and badges keep theirs; they are not buttons. */
+.at-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family: var(--ui); font-size:15px; font-weight:800; letter-spacing:0; background: var(--raised); color: var(--text); border:2px solid var(--line); border-radius: var(--r); padding:14px 22px; cursor:pointer; transition: transform 60ms, background 120ms; min-height:52px; }
 .at-btn.sm { gap:6px; }
+.at-btn.primary { text-transform:uppercase; letter-spacing:.03em; font-size:16px; }
 .at-icon { display:inline-flex; align-items:center; justify-content:center; flex:1; border:2px solid var(--line); border-radius: var(--r-sm); background: var(--raised); color: var(--ink); font-size:14px; line-height:1; padding:7px 0; cursor:pointer; }
 /* The outline without the fill, matching .at-btn.ghost — for an icon button
    standing in a row beside ghost buttons. */
@@ -1100,7 +1117,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    any is. */
 .at-toolbar .at-filterbtn { position:relative; font-family: var(--ui); font-size:14px; font-weight:700; }
 .at-toolbar .at-filterbtn > .at-filtercount { position:absolute; top:-6px; right:-6px; }
-.at-filterbtn.on { border-color: var(--brass); color: var(--brass); }
+/* Green while any filter is on (0.735): the same green as a lit chip in
+   the panel, so green says one thing — this list is narrowed. */
+.at-filterbtn.on { border-color: var(--jade); color: var(--jade); background: var(--jade-bg); }
+.at-filterbtn.on > .at-filtercount { background: var(--jade); color: var(--onjade); }
 .at-filterbtn.open, .at-donebtn { border-color: var(--accent); color: var(--accent); }
 /* The screen's own worded button, on a row of its own over the bar. */
 .at-toolsrow { flex-wrap:wrap; }
@@ -1141,8 +1161,10 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   letter-spacing:0; text-transform:none; color: var(--ink); }
 
 .at-personname { font-size:14px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
-/* A course's People tab (0.707): the name, and the handle under it. */
-.at-personname .at-handle { display:block; font-size:12px; font-weight:400; color: var(--muted); }
+/* A course's People tab (0.707): the name, and the handle under it, in
+   the ordinary font as other small muted text is (0.740), not the
+   typewriter font a code is written in. */
+.at-personname .at-handle { display:block; font-family: var(--ui); font-size:13px; font-weight:400; color: var(--muted); }
 .at-panel .at-decklist2 .at-deckcard { background: var(--raised); }
 /* Dialog titles and screen titles are the same rank, so they are the same
    size — a modal is a small screen, not a different species. */
@@ -1208,6 +1230,15 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-deckmain { flex:1 1 0; min-width:0; }
 .at-decktitle { font-size:18px; font-weight:800; overflow-wrap:anywhere; }
 .at-deckmeta { font-size:13px; color: var(--muted); margin-top:3px; }
+/* A tile's title with a badge after it (0.729): the badge follows the
+   name, and goes to the next line when a long name needs the width. */
+.at-decktitlerow { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.at-decktitlerow > .at-decktitle { min-width:0; }
+/* What kind of module a tile is — Deck, Unit or Personal set — in the
+   outline of a tag (.at-tag), made small (0.729, the owner's 4a). */
+.at-kindbadge { display:inline-flex; align-items:center; font-family: var(--ui); font-size:11px;
+  font-weight:800; line-height:1.2; white-space:nowrap; border-radius:999px; padding:3px 8px;
+  background: var(--tag-bg); border:1.5px solid var(--tag-line); color: var(--brass); }
 @media (max-width: 480px) {
   .at-deckrow2:has(> .at-deckacts > :nth-child(3)) { flex-wrap:wrap; }
   .at-deckrow2:has(> .at-deckacts > :nth-child(3)) > .at-deckmain { flex-basis:100%; }
@@ -1216,6 +1247,11 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 
 .at-openrow .at-deckrow2, .at-openrow .at-deckmain,
 .at-openrow .at-decktitle, .at-openrow .at-deckmeta { display:block; }
+/* A kind on the New module panel (0.733): its picture beside its words,
+   at the top of them, and the description on as many lines as it takes. */
+.at-openrow.withicon .at-deckrow2 { display:flex; align-items:flex-start; gap:12px; }
+.at-openrow.withicon .at-deckmain { flex:1 1 0; }
+.at-kindicon { flex:none; width:40px; height:40px; border-radius: var(--r-sm); background: var(--jade-bg); color: var(--jade); display:grid; place-items:center; }
 
 .at-flagfoot > .at-hint { margin:0; }
 
@@ -1223,6 +1259,37 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   font-size:16px; }
 .at-deckacts .at-btn { flex:0 0 auto; }
 
+/* A course's Modules (0.740): the two groups' small capital labels, a
+   unit row's controls at its right, and the dashed full-width add buttons
+   under each group. On a phone a unit row with Publish, two arrows and
+   three dots puts its controls on a line of their own under the name. */
+.at-eyebrow.at-modgroup { margin:22px 0 10px; }
+.at-formhead + .at-eyebrow.at-modgroup, .at-mb3 + .at-eyebrow.at-modgroup { margin-top:4px; }
+.at-unitacts { display:flex; align-items:center; }
+/* The three dots in the row's top right corner, and the arrows then
+   Publish along the row's foot, at its right (0.741). */
+.at-unitrow .at-deckrow2 { align-items:flex-start; }
+.at-unitrow .at-deckacts { margin-top:-8px; margin-right:-8px; }
+.at-unitfoot { display:flex; align-items:center; justify-content:flex-end; gap:2px; margin-top:6px; }
+.at-unitfoot:empty { display:none; }
+.at-unitfoot > .at-icon { flex:0 0 auto; min-width:40px; width:40px; height:40px; padding:0; border:none; background:none; }
+.at-unitfoot > .at-btn { margin-left:4px; white-space:nowrap; padding:9px 12px; }
+/* "Open to students" on one line on the narrowest phones (0.743). */
+@media (max-width: 360px) {
+  .at-unitfoot > .at-icon { min-width:34px; width:34px; }
+  .at-unitfoot > .at-btn { padding:9px 10px; letter-spacing:0; font-size:13px; }
+}
+.at-addwide { display:flex; width:100%; justify-content:center; margin-top:10px; }
+/* A unit's courses (0.740): one plain row per course, its place under the
+   name, and the words "Open course" with an arrow at the right. */
+.at-unitcourses { display:flex; flex-direction:column; gap:8px; }
+.at-unitcourse { display:flex; align-items:center; gap:12px; width:100%; text-align:left; font:inherit; color:inherit;
+  border:2px solid var(--line); border-radius: var(--r-lg); background: var(--raised); padding:12px 14px; cursor:pointer; }
+.at-unitcourse:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.at-unitcoursetext { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-unitcoursetext i { font-style:normal; font-size:13px; color: var(--muted); }
+.at-unitcoursego { flex:none; display:inline-flex; align-items:center; gap:2px; font-size:14px; font-weight:700; color: var(--accent); }
+.at-unitcoursego svg { transform: rotate(-90deg); }
 .at-keyfield { letter-spacing:.02em; }
 /* Whether a deck is reaching anyone, at a glance. */
 /* No rule above it (0.715, the owner's 2b): it sits under the tile's text
@@ -1230,7 +1297,7 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
 /* A three-dots button with no outline (0.720, the owner's wish, on a
    module's tile): the icon alone, the 44px it can be pressed in kept. */
-.at-morebtn.bare { border-color: transparent; }
+.at-morebtn.bare, .at-morebtn.bare.on { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }
 .at-reachtext b { color: var(--ink); font-weight:700; }
 /* A card shown rather than edited: label on the left, value on the right,
@@ -1380,6 +1447,28 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   padding:0; flex:none; color: var(--muted); }
 .at-minicorner .at-morebtn:hover, .at-minicorner .at-morebtn.on { color: var(--ink); }
 .at-minicard.cornered > .ar, .at-minicard.cornered > .at-minikind { padding-right:26px; }
+/* The teacher's card grids (0.733, the owner's 5a): two a row on a phone,
+   every tile the same height, the word and the meaning one line each, cut
+   with … — thinner outlines and more room. Only the teaching side passes
+   `teach`; the learner's tiles are as they were. */
+.at-cardgrid:has(> * > .at-minicard.teach) { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+.at-minicard.teach { border-width:1px; padding:10px 12px; gap:2px; }
+.at-minicard.teach .ar, .at-minicard.teach .at-minien { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.at-minicard.teach .at-minien { min-height:1.4em; }
+/* Selected keeps its colour at the thinner edge, and gains a ring inside
+   it so it still stands out from the tiles beside it. */
+.at-minicard.teach.on { border-width:1px; box-shadow: inset 0 0 0 1px var(--jade); }
+.at-tilewrap.picked > .at-minicard.teach { box-shadow: inset 0 0 0 1px var(--accent); }
+/* The badge for a card students cannot fully see yet, at the tile's foot:
+   its own width, wrapping rather than cut ("Changes ready for review"). */
+.at-minicard.teach .at-minimeta { white-space:normal; overflow:visible; text-overflow:clip;
+  display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px; }
+.at-minicard.teach .at-minimeta:empty { display:none; }
+.at-minicard.teach .at-statusbadge { margin:0; max-width:100%; white-space:normal; }
+/* What stands for a missing meaning: a transliteration in italics, or a
+   small picture or play mark before "Picture" or "Recording". */
+.at-minien.standin svg, .at-standin svg { vertical-align:-2px; }
+.at-standin { color: var(--muted); }
 /* The tick that puts something into a bulk selection. */
 .at-ckbox.pick { position:absolute; top:8px; right:8px; width:22px; height:22px;
   border:2px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
@@ -1417,6 +1506,30 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-cardtable .at-grouprow > th { font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.06em;
   text-transform:uppercase; color: var(--muted); padding-top:12px; }
 .at-cardtable .at-grouprow span { font-weight:700; letter-spacing:0; color: var(--faint); }
+
+/* The table's view on a phone, as a list (0.733, the owner's choice): one
+   card a row, its meaning and where it is on the left, its word on the
+   right, cut with … at half the row. */
+.at-cardrows { display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+.at-cardrow { display:flex; align-items:center; gap:10px; padding:8px 12px; background: var(--surface);
+  border:1px solid var(--line); border-radius: var(--r-sm); color: var(--text); min-width:0; }
+.at-cardrow.opens { cursor:pointer; }
+.at-cardrow.picked { background: var(--tag-bg); border-color: var(--accent); }
+.at-cardrow:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-cardrow .at-ckbox.pick { position:static; flex:none; }
+.at-cardrow-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-cardrow-meaning { font-size:14px; font-weight:700; overflow-wrap:anywhere; }
+.at-cardrow-sub { font-size:12px; color: var(--muted); line-height:1.5; }
+.at-cardrow-status:not(:empty) { margin-inline-start:6px; }
+.at-cardrow-status .at-statusbadge, .at-cardrow-status .at-statuspill { vertical-align:1px; }
+.at-cardrow-word { flex:0 1 auto; max-width:50%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-cardrow-word .ar { font-size:calc(18px * var(--sscale, 1)); }
+.at-cardrow-acts { flex:none; display:flex; }
+.at-cardrow-acts .at-morebtn { border:none; background:transparent; width:32px; height:32px;
+  min-height:32px; padding:0; flex:none; color: var(--muted); }
+.at-cardrows > .at-grouprow { font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.06em;
+  text-transform:uppercase; color: var(--muted); padding:8px 2px 0; }
+.at-cardrows > .at-grouprow span { font-weight:700; letter-spacing:0; color: var(--faint); }
 
 .at-ckbox { flex-shrink:0; width:24px; height:24px; border-radius:7px; border:2px solid var(--line);
   display:inline-flex; align-items:center; justify-content:center; background: var(--well);
@@ -1555,8 +1668,8 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
    than one you should — and a brass pill would pull the eye every time the
    menu opened. */
 .at-cact { border:2px solid var(--line); background:none; color: var(--muted); cursor:pointer;
-  border-radius:999px; padding:5px 11px; font-family: var(--ui); font-size:11px; font-weight:800;
-  letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; flex:none; }
+  border-radius:999px; padding:5px 11px; font-family: var(--ui); font-size:13px; font-weight:800;
+  white-space:nowrap; flex:none; }
 .at-cact:hover { background: var(--raised); color: var(--text); }
 /* A row that names a choice rather than being one: no hover, no pointer,
    because the thing you tap is the picker underneath it. */
@@ -1803,64 +1916,48 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-status { font-family: var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
   color: var(--jade); border-top:1px solid var(--line); padding:10px 0 4px; margin-top:4px; }
 .at-status.warn { color: var(--rose); }
-.at-undo { position: fixed; left:50%; transform: translateX(-50%);
-  bottom: calc(84px + env(safe-area-inset-bottom)); z-index:60;
-  background: var(--surface); border:1px solid var(--line); border-radius:8px;
-  padding:10px 14px; display:flex; align-items:center; gap:14px;
-  box-shadow: var(--nav-shadow); max-width: calc(100% - 24px); font-size:13px; }
-.at-undo .what { color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* The snackbar: the undo bar's shape, because that is already this app's
-   way of saying "something floating, and temporary". It sits above
-   everything (--z-toast) — a confirmation hidden behind the screen that
-   triggered it is worth nothing — and it is the only thing at that layer,
-   so nothing has to be ordered against it.
+/* Every message at the foot of the screen — the snackbar, "No connection"
+   with Retry, and "Working…" — is one size and one shape (0.747, the
+   owner's 1b, 2, 3a, 4a): the larger size the connection bar always had,
+   full width up to 560px, a coloured edge on the left saying what kind of
+   message it is. They had grown apart into five sizes, from a 103px pill
+   to a 73px-tall bar, and a message with a button stood taller than one
+   without. The min-height is the bar with its Retry button, so a line of
+   text alone, an Undo or a Retry all come out the same height.
 
-   pointer-events is left alone: the dismiss button is the one thing in it
-   worth tapping, and the pill is small and low enough not to sit on
-   anything. */
-.at-snack { position: fixed; left:50%; transform: translateX(-50%);
+   It sits above everything (--z-toast) — a confirmation hidden behind the
+   screen that triggered it is worth nothing. pointer-events is left
+   alone: its buttons are the things in it worth tapping. */
+.at-snack, .at-reachbar, .at-working { position: fixed; left:50%; transform: translateX(-50%);
   bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
-  background: var(--surface); border:1px solid var(--line); border-left-width:3px;
-  border-radius:8px; padding:11px 8px 11px 14px;
-  display:flex; align-items:center; gap:10px;
-  box-shadow: var(--nav-shadow);
-  /* Sized like the bulk bar rather than shrunk to its text: a pill that
-     hugs three words is easy to miss, and a message the width of the page
-     is read without hunting for it. Capped short of the 700px content
-     column, which one sentence cannot fill without looking empty. */
-  width: calc(100% - 24px); max-width: 560px;
-  font-family: var(--ui); font-size:14px; font-weight:600; color: var(--text);
-  animation: at-snack-in 160ms ease-out; }
-/* Takes the slack, so the dismiss button sits hard right rather than
-   trailing the text across a half-empty pill. */
-.at-snack .msg { flex:1; min-width:0; overflow-wrap:anywhere; }
-.at-snackundo { border:0; background:none; cursor:pointer; padding:4px 8px; border-radius:8px;
-  font: inherit; font-weight:800; color: var(--brass); }
-.at-snackundo:hover { background: var(--raised); }
-.at-snack.good { border-left-color: var(--jade); }
-.at-snack.warn { border-left-color: var(--rose); }
-.at-snack.info { border-left-color: var(--brass); }
-.at-snackx { border:0; background:none; padding:4px; margin:-4px 0; cursor:pointer;
-  color: var(--muted); display:inline-flex; flex:none; border-radius:6px; }
-.at-snackx:hover { color: var(--text); }
-@keyframes at-snack-in { from { opacity:0; transform: translate(-50%, 10px); }
-  to { opacity:1; transform: translate(-50%, 0); } }
-@media (prefers-reduced-motion: reduce) { .at-snack { animation: none; } }
-/* Can't reach the server (0.636): the snackbar's place and look, larger,
-   and staying — it holds Retry, so it cannot go on a timer. Above the
-   ordinary snackbar's spot, which moves up over it while it is shown so
-   the two never sit on each other. */
-.at-reachbar { position: fixed; left:50%; transform: translateX(-50%);
-  bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
-  background: var(--surface); border:1px solid var(--line); border-left:4px solid var(--rose);
-  border-radius:10px; padding:16px 10px 16px 16px;
+  background: var(--surface); border:1px solid var(--line); border-left:4px solid var(--brass);
+  border-radius:10px; padding:10px 10px 10px 16px; min-height:73px;
   display:flex; align-items:center; gap:14px;
   box-shadow: var(--nav-shadow);
   width: calc(100% - 24px); max-width: 560px;
   font-family: var(--ui); font-size:16px; color: var(--text);
   animation: at-snack-in 160ms ease-out; }
+@keyframes at-snack-in { from { opacity:0; transform: translate(-50%, 10px); }
+  to { opacity:1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .at-snack, .at-reachbar, .at-working { animation: none; } }
+/* The message takes the slack, so the buttons sit hard right. */
+.at-snack .msg, .at-reachbar .msg { flex:1; min-width:0; overflow-wrap:anywhere; }
+.at-snack .msg { font-weight:600; }
+.at-snack.good { border-left-color: var(--jade); }
+.at-snack.warn { border-left-color: var(--rose); }
+.at-snack.info { border-left-color: var(--brass); }
+.at-snackundo { flex:none; border:0; background:none; cursor:pointer; padding:10px 12px; border-radius:8px;
+  font: inherit; font-size:15px; font-weight:800; color: var(--brass); }
+.at-snackundo:hover { background: var(--raised); }
+.at-snackx { border:0; background:none; padding:4px; margin:-4px 0; cursor:pointer;
+  color: var(--muted); display:inline-flex; flex:none; border-radius:6px; }
+.at-snackx:hover { color: var(--text); }
+/* Can't reach the server (0.636): staying, because it holds Retry, and
+   above the ordinary snackbar's spot, which moves up over it while it is
+   shown so the two never sit on each other. */
+.at-reachbar { border-left-color: var(--rose); }
 .at-reachbar > .at-ic { color: var(--rose); flex:none; }
-.at-reachbar .msg { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; overflow-wrap:anywhere; }
+.at-reachbar .msg { display:flex; flex-direction:column; gap:3px; }
 .at-reachbar .msg strong { font-weight:700; }
 .at-reachbar .detail { font-size:13px; color: var(--muted); }
 .at-reachretry { flex:none; border:0; cursor:pointer; padding:10px 18px; border-radius:8px;
@@ -1875,21 +1972,11 @@ html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); 
 html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
   max-height: calc(100vh - 224px - env(safe-area-inset-bottom));
   max-height: calc(100dvh - 224px - env(safe-area-inset-bottom)); }
-@media (prefers-reduced-motion: reduce) { .at-reachbar { animation: none; } }
-/* "Working…" while a space is fetching or a save is in flight. The
-   snackbar's place and the snackbar's manners — it sits over the content
-   rather than in it, so nothing on the page moves for it, and the
-   confirmation that follows a slow save arrives in the same spot. Quieter
-   than a snack, because it is not news: no coloured edge, and the dashed
-   border the busy notice has always used. */
-.at-working { position: fixed; left:50%; transform: translateX(-50%);
-  bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
-  margin:0; padding:10px 16px; border-radius:999px;
-  background: var(--surface); border:2px dashed var(--line);
-  box-shadow: var(--nav-shadow);
-  font-family: var(--ui); font-size:13px; font-weight:700; color: var(--muted);
-  animation: at-snack-in 160ms ease-out; }
-@media (prefers-reduced-motion: reduce) { .at-working { animation: none; } }
+/* "Working…" while a space is fetching or a save is in flight, in the
+   snackbar's place so the confirmation that follows a slow save arrives
+   in the same spot. Quieter than a snack, because it is not news: a grey
+   edge and grey words. */
+.at-working { margin:0; border-left-color: var(--muted); font-weight:700; color: var(--muted); }
 
 /* The word being asked for, under the phrase it is missing from. */
 .at-ctxmeaning { font-family: var(--ui); font-size:17px; font-weight:700; color: var(--text-soft);
@@ -1911,12 +1998,28 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
    its own to go on, it collapsed to nothing and its options spilled out
    over each other. A column gives it the group's width to work with, and
    the bar wraps the groups. */
-.at-filtergroup { display:flex; flex-direction:column; align-items:stretch; gap:6px;
-  flex:1 1 150px; min-width:0; }
-/* A group with a list in it rather than a few buttons — which decks a card
-   is in — takes the bar's whole width: shared with three others it would be
-   a column of ticks two words wide. */
-.at-filtergroup.wide { flex:1 1 100%; }
+/* Every group full width, one under another (0.735, the owner's 2a): its
+   chips wrap across the panel rather than squeezing into a column. */
+.at-filtergroup { display:flex; flex-direction:column; align-items:stretch; gap:8px;
+  flex:1 1 100%; min-width:0; }
+/* Chips (ChipPick): rounded, in ordinary letters, wrapping as they need.
+   Lit means narrowing; nothing lit narrows nothing. */
+.at-chippick { display:flex; flex-wrap:wrap; gap:8px; }
+.at-chipopt { display:inline-flex; align-items:center; gap:6px; min-height:36px;
+  padding:7px 12px; border:1px solid var(--line); border-radius:999px;
+  background: var(--surface); color: var(--text-soft);
+  font-family: var(--ui); font-size:14px; font-weight:700; letter-spacing:0; text-transform:none;
+  cursor:pointer; transition: background 120ms, color 120ms, border-color 120ms, transform 60ms; }
+/* Only where there is a real hover: on a phone it would stick to the chip
+   last tapped, and a chip just let go of would still look picked. */
+@media (hover: hover) {
+  .at-chipopt:hover:not(:disabled):not(.on) { color: var(--text); border-color: var(--text-soft); }
+}
+.at-chipopt.on { border-color: var(--jade); background: var(--jade-bg); color: var(--text); }
+.at-chipopt:active:not(:disabled) { transform: translateY(1px); }
+.at-chipopt:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-chipopt:disabled { cursor:default; opacity:.5; }
+.at-chipnote { font-size:12px; font-weight:600; color: var(--muted); }
 
 .at-kindfilter .at-hint, .at-deckfilter .at-hint { margin:0; }
 .at-deckfilter .at-ticklist { max-height:40vh; overflow-y:auto; }
@@ -2055,7 +2158,7 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-btn.danger { background: var(--rose); border-color: var(--rose); color:#fff; }
 .at-btn.ghost { background:transparent; border-color: var(--line); }
 .at-btn.wide { width:100%; }
-.at-btn.sm { padding:9px 14px; font-size:13px; min-height:0; border-radius: var(--r-sm);
+.at-btn.sm { padding:9px 14px; font-size:14px; min-height:0; border-radius: var(--r-sm);
   letter-spacing:.02em; }
 /* Fading a filled button took its label down with it, leaving jade-on-jade
    that was barely readable. Disabled now drops to the plain surface and
@@ -2944,6 +3047,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-todoacts { display:flex; flex-wrap:wrap; gap:8px; }
 .at-empty2 .at-hint { margin:0 auto; max-width: 46ch; }
 .at-empty2 .at-row { justify-content:center; margin-top: var(--s4); }
+/* Teaching's To do with nothing in it (0.733, the owner's choice): the
+   same box and cup on one row, a third of the height, so the courses
+   under it come up the screen. */
+.at-empty2.slim { display:flex; align-items:center; gap: var(--s3); text-align:left; padding: var(--s3) var(--s4); }
+.at-empty2.slim .at-emptyart { margin:0; flex:none; }
+.at-empty2.slim .at-teaart { width:48px; }
+.at-empty2.slim .at-hint { margin:0; }
 /* --- Segmented: pick one of a few ---
 
    One control, not a row of buttons. It was three separate pills with a
@@ -2966,7 +3076,7 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
   padding:3px; gap:3px; container-type: inline-size; }
 .at-seg { flex:1 1 0; min-width: min-content; display:inline-flex; align-items:center;
   justify-content:center; gap:6px;
-  font-family: var(--ui); font-weight:800; letter-spacing:.03em; text-transform:uppercase;
+  font-family: var(--ui); font-weight:800;
   white-space:nowrap;
   background: var(--raised); border:2px solid transparent; border-radius:9px;
   color: var(--text-soft); cursor:pointer; padding:9px 6px; min-height:38px;
@@ -3010,12 +3120,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    three labels where the button holds one, so an even split starved it
    and pushed its options to the smallest type they have. */
 .at-row > .at-segmented { flex:2 1 auto; }
-/* Beside its own label in the sort-and-filter bar, a picker is one item in
-   a wrapping row rather than a block of its own: it takes the width its
-   options need and the bar wraps around it. Left at full width it was
-   squeezed into whatever the group had left and stacked its options one
-   per line. */
-.at-filtergroup .at-segmented { width:auto; flex:0 1 auto; }
 /* --- Stat: one big number --- */
 .at-stat2 { display:block; }
 .at-stat2 .at-statvalue { font-family: var(--serif); font-size: var(--fs-stat); font-weight:600; line-height:1.05; margin:0; color: var(--text); }
@@ -3596,6 +3700,12 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* And the first of them has nothing above it to be ruled off from, as the
    editor's first block has none. */
 .at-screen.cardform .at-screeninner > .at-section:first-child { border-top:0; }
+/* A section that follows the screen's opening words — the Numbers lede
+   above Parts, Check a number's above The number — keeps room above its
+   rule, as much as the head leaves above those words, so the rule has room
+   either side. The band's own margin zeroed it and the rule sat on the
+   last line of the lede (0.734). */
+.at-screen.cardform .at-screeninner > :not(.at-section) + .at-section { margin-top:18px; }
 .at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
   font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
   color: var(--ink); }
@@ -3723,7 +3833,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   background: color-mix(in srgb, var(--jade) 14%, transparent); }
 .at-trainchoice:disabled .at-trainchoiceico, .at-trainchoice.off .at-trainchoiceico { color: var(--faint);
   background: var(--well); }
-.at-trainchoicename { font-size:16px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; line-height:1.2; }
+.at-trainchoicename { font-size:16px; font-weight:800; line-height:1.2; }
 .at-trainchoicenote { font-size:13.5px; font-weight:500; line-height:1.35; color: var(--muted); text-wrap: pretty; }
 .at-trainchoicestatus { font-size:13.5px; font-weight:700; line-height:1.35; color: var(--jade); }
 .at-trainchoice:active:not(:disabled):not(.off) { transform: translateY(1px); }
@@ -3744,7 +3854,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end; gap:12px;
   pointer-events:none; z-index:4; transition: bottom 160ms ease-out; }
 /* A message at the foot of the window lifts the button over it. */
-.at:has(.at-snack) .at-fabrow { bottom: calc(148px + env(safe-area-inset-bottom)); }
+.at:has(.at-snack) .at-fabrow { bottom: calc(176px + env(safe-area-inset-bottom)); }
 .at-fab { pointer-events:auto; display:inline-flex; align-items:center; gap:8px;
   height:56px; min-width:56px; padding:0 16px; border-radius:18px;
   background: var(--jade); color: var(--onjade); border:0;
@@ -3876,3 +3986,50 @@ p.at-pathhome { cursor:default; font-weight:700; }
 .at-pathunitstate { margin:0; color: var(--muted); font-size:13px; white-space:nowrap; }
 .at-pathunitstate i { font-style:normal; opacity:.75; }
 .at-unithead { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+
+/* --- Switch: on or off, sliding (0.735, the owner's 7a) ---
+   The track is 46×28; the button around it is padded to a 44px target so
+   a thumb does not have to find the track itself. */
+.at-switch { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  min-height:44px; min-width:46px; padding:8px 0; background:none; border:0; cursor:pointer; }
+.at-switch > span { position:relative; display:block; width:46px; height:28px; border-radius:999px;
+  background: var(--shade); transition: background 150ms; }
+.at-switch > span::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px;
+  border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition: transform 150ms; }
+.at-switch.on > span { background: var(--jade); }
+.at-switch.on > span::after { transform: translateX(18px); }
+.at-switch:focus-visible { outline:none; }
+.at-switch:focus-visible > span { outline:3px solid var(--brass); outline-offset:2px; }
+.at-switch:disabled { cursor:default; opacity:.5; }
+@media (prefers-reduced-motion: reduce) {
+  .at-switch > span, .at-switch > span::after { transition:none; }
+}
+
+/* Another accepted answer, as a worded link under the last box on a card's
+   Basic tab (0.735, the owner's 9a). */
+/* Green and bold with a +, no underline (0.738, the owner's 4b): an action
+   on this screen, like Clear on a list's line, not a link away. */
+.at-addanswer { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; margin-top:8px;
+  padding:4px 0; min-height:36px; background:none; border:0; cursor:pointer;
+  font-family: var(--ui); font-weight:800; font-size:15px; color: var(--accent); }
+.at-addanswer:hover { color: var(--text); }
+.at-addanswer:focus-visible { outline:3px solid var(--brass); outline-offset:2px; border-radius:6px; }
+
+/* TileChoice (0.738, the owner's 2b): a picture, a name and a line, a tick
+   on the chosen one, as the New module panel's kinds are drawn. */
+.at-tilechoices { display:flex; flex-direction:column; gap:10px; }
+.at-tilechoice { display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  padding:12px; border:1px solid var(--line); border-radius: var(--r); background: var(--surface);
+  font:inherit; color: var(--text); cursor:pointer; transition: background 120ms, border-color 120ms; }
+.at-tilechoice.on { border-color: var(--jade); background: var(--jade-bg); }
+.at-tilechoice:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-tilechoice:disabled { cursor:default; opacity:.6; }
+@media (hover: hover) { .at-tilechoice:hover:not(:disabled):not(.on) { border-color: var(--text-soft); } }
+.at-tilechoiceico { flex:none; width:40px; height:40px; border-radius: var(--r-sm); display:grid; place-items:center;
+  background: var(--raised); color: var(--text-soft); }
+.at-tilechoice.on .at-tilechoiceico { background: var(--jade); color: var(--onjade); }
+.at-tilechoicetext { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-tilechoicetext > b { font-size:16px; font-weight:800; }
+.at-tilechoicetext > i { font-style:normal; font-size:14px; color: var(--text-soft); line-height:1.35; }
+.at-tilechoicetick { flex:none; color: var(--jade); display:grid; }
+@media (prefers-reduced-motion: reduce) { .at-tilechoice { transition:none; } }

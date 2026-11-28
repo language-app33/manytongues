@@ -177,10 +177,12 @@ test("neverAskedAlone: practice switched off, or a name kind", () => {
   assert.equal(neverAskedAlone({}), false);
 });
 
-/* ---- phase 2: the checklist a unit must clear to be published ---- */
+/* ---- what counts as taught by a unit's place on the path ----
+   The checklist these once fed (R7, R9, R10) was withdrawn in 0.740; what
+   counts toward a unit still feeds its quality score. */
 
-import { countingCards, heldFillers, MIN_FILLERS, MIN_SENTENCES, unitProblems } from "../src/path.ts";
-import { sentencesOf, holedParts } from "../src/review.ts";
+import { countingCards, heldFillers } from "../src/path.ts";
+import * as pathModule from "../src/path.ts";
 import { LANGUAGES } from "../src/languages.ts";
 
 const vi = LANGUAGES["vi"];
@@ -194,76 +196,25 @@ const food = (id, word, over = {}) => ({
 const frame = (id, verb) => ({
   id, lang: "vi", forms: [{ id, ar: `tôi ${verb} {{food}}`, en: `I ${verb} {{food}}`, lat: "" }],
 });
-/** A sentence with no blank. @param {string} id */
-const plain = (id) => ({ id, lang: "vi", forms: [{ id, ar: `xin chào ${id}`, en: `hello ${id}`, lat: "" }] });
-
-/**
- * The card with its review approving exactly the sentences whose blank is
- * filled by one of `ids`, out of `pool`.
- * @param {any} card @param {any[]} pool @param {string[]} ids
- */
-const approving = (card, pool, ids) => {
-  const ok = holedParts(card).flatMap((part) =>
-    sentencesOf(card, part, pool, vi).list.filter((s) => ids.includes(s.took.food.card)).map((s) => s.key));
-  return { ...card, review: { ok, no: [] } };
-};
 
 const five = ["pho", "com", "banh", "bun", "che"].map((id) => food(id, id));
-/** Five frames approving every food in `pool`. @param {any[]} pool */
-const fiveFrames = (pool, ids = pool.filter((c) => c.fills).map((c) => c.id)) =>
-  ["an", "nau", "mua", "thich", "ghet"].map((v, i) => approving(frame(`s${i}`, v), pool, ids));
 
-test("the checklist's thresholds are the owner's five and five", () => {
-  assert.equal(MIN_SENTENCES, 5);
-  assert.equal(MIN_FILLERS, 5);
+test("the withdrawn checklist's rules are gone (0.740)", () => {
+  for (const name of ["unitProblems", "MIN_SENTENCES", "MIN_FILLERS", "problemLine", "draftsLine", "sameFormBlanks", "blankFills"]) {
+    assert.equal(/** @type {any} */ (pathModule)[name], undefined, name);
+  }
 });
 
-test("a unit that satisfies everything has nothing to fix", () => {
-  const frames = fiveFrames(five);
-  const cards = [...five, ...frames];
-  assert.deepEqual(unitProblems({ cards, counting: cards, lang: vi }), []);
-});
-
-test("four sentences with a blank: one more is wanted", () => {
-  const frames = fiveFrames(five).slice(0, 4);
-  const cards = [...five, ...frames];
-  const p = unitProblems({ cards, counting: cards, lang: vi });
-  assert.deepEqual(p.filter((x) => x.kind === "few-sentences"), [{ kind: "few-sentences", have: 4, need: 5 }]);
-});
-
-test("a sentence with no blank does not count toward the five", () => {
-  const frames = fiveFrames(five).slice(0, 4);
-  const cards = [...five, ...frames, plain("hi")];
-  const p = unitProblems({ cards, counting: cards, lang: vi });
-  assert.ok(p.some((x) => x.kind === "few-sentences" && x.have === 4));
-});
-
-test("a blank with five fitting cards but three approved is short", () => {
-  const frames = fiveFrames(five);
-  frames[0] = approving(frame("s0", "an"), five, ["pho", "com", "banh"]);
-  const cards = [...five, ...frames];
-  const p = unitProblems({ cards, counting: cards, lang: vi });
-  assert.deepEqual(p, [{ kind: "blank-short", cardId: "s0", partId: "s0", slot: "food", have: 3, need: 5 }]);
-});
-
-test("a blank's five may come from an earlier unit, or from names kept anywhere", () => {
+test("names kept in no deck count toward a unit", () => {
   const mine = five.slice(0, 3);
-  const earlier = five.slice(3);
-  const pool = [...mine, ...earlier];
-  const frames = fiveFrames(pool);
-  assert.deepEqual(unitProblems({ cards: [...mine, ...frames], counting: [...pool, ...frames], lang: vi }), []);
-
   const names = [food("an-name", "Lan", { category: "name", drill: false }), food("minh", "Minh", { category: "person" })];
-  const withNames = [...mine, ...names];
-  const framesN = fiveFrames(withNames);
   const course = { id: "c", decks: ["u1"], path: ["u1"], pathLive: {} };
   const counting = countingCards({
     course, modules: [unit("u1")], unitId: "u1",
-    cards: [...mine.map((c) => ({ ...c, decks: ["u1"] })), ...names.map((c) => ({ ...c, decks: [] })), ...framesN.map((c) => ({ ...c, decks: ["u1"] }))],
+    cards: [...mine.map((c) => ({ ...c, decks: ["u1"] })), ...names.map((c) => ({ ...c, decks: [] }))],
     moduleIdsOf: (c) => c.decks,
   });
-  assert.deepEqual(unitProblems({ cards: [...mine, ...framesN], counting, lang: vi }), [],
-    "two names in no deck make up the five");
+  assert.deepEqual(counting.map((c) => c.id).sort(), ["an-name", "banh", "com", "minh", "pho"]);
 });
 
 test("a word only in a later unit is not counted, even in an approved sentence", () => {
@@ -271,42 +222,10 @@ test("a word only in a later unit is not counted, even in an approved sentence",
   const course = { id: "c", decks: ["u1", "u2", "u3"], path: ["u1", "u2", "u3"], pathLive: { u1: 1, u2: 1, u3: 1 } };
   const inUnit = (/** @type {any} */ c, /** @type {string} */ u) => ({ ...c, decks: [u] });
   const all = [...five.slice(0, 4).map((c) => inUnit(c, "u2")), inUnit(five[4], "u3")];
-  const frames = fiveFrames(all).map((c) => inUnit(c, "u2"));
+  const frames = ["an", "nau"].map((v, i) => inUnit(frame(`s${i}`, v), "u2"));
   const counting = countingCards({ course, modules: units, unitId: "u2", cards: [...all, ...frames], moduleIdsOf: (c) => c.decks });
   assert.ok(!counting.some((c) => c.id === five[4].id), "the later unit's word is not among what counts");
-  const p = unitProblems({ cards: [...all.slice(0, 4), ...frames], counting, lang: vi });
-  assert.equal(p.filter((x) => x.kind === "blank-short").length, 5);
-  assert.ok(p.every((x) => x.kind !== "blank-short" || x.have === 4));
-});
-
-test("a sentence card with no review has nothing approved", () => {
-  const frames = fiveFrames(five);
-  const { review: _r, ...bare } = frames[0];
-  frames[0] = bare;
-  const cards = [...five, ...frames];
-  const p = unitProblems({ cards, counting: cards, lang: vi });
-  assert.deepEqual(p.map((x) => x.kind), ["blank-short"]);
-  assert.equal(/** @type {any} */ (p[0]).have, 0);
-});
-
-test("a word that fills no approved sentence of its own unit is unused; a name never is", () => {
-  const extra = food("lau", "lau", { fills: ["soup"] });
-  const name = food("hoa", "Hoa", { category: "name", fills: ["who"] });
-  const frames = fiveFrames(five);
-  const cards = [...five, ...frames, extra, name];
-  const p = unitProblems({ cards, counting: cards, lang: vi });
-  assert.deepEqual(p, [{ kind: "word-unused", cardId: "lau" }]);
-});
-
-test("two texts in one unit are one too many", () => {
-  const text = (/** @type {string} */ id) => ({
-    id, lang: "vi", sceneKind: "text", speakers: [], ar: "", en: id,
-    lines: [{ id: `${id}-1`, ar: "tôi ăn phở", en: "I eat pho" }],
-  });
-  const frames = fiveFrames(five);
-  const cards = [...five, ...frames, text("t1"), text("t2")];
-  const p = unitProblems({ cards, counting: cards, lang: vi });
-  assert.deepEqual(p, [{ kind: "two-finals", have: 2 }]);
+  assert.equal(counting.filter((c) => c.fills).length, 4);
 });
 
 test("numbers count toward a blank when a unit up to this one holds their part", () => {
@@ -319,10 +238,7 @@ test("numbers count toward a blank when a unit up to this one holds their part",
   const counter = (/** @type {string} */ id, /** @type {string} */ v) => ({
     id, lang: "vi", forms: [{ id, ar: `tôi ${v} {{count}}`, en: `I ${v} {{count}}`, lat: "" }],
   });
-  const approve = (/** @type {any} */ c) => {
-    const ok = holedParts(c).flatMap((part) => sentencesOf(c, part, fillers, vi).list.map((s) => s.key));
-    return { ...c, review: { ok, no: [] }, decks: ["u2"] };
-  };
+  const approve = (/** @type {any} */ c) => ({ ...c, decks: ["u2"] });
   const frames = ["dem", "co", "mua", "ban", "lay"].map((v, i) => approve(counter(`n${i}`, v)));
   const course = { id: "c", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 } };
   const build = (/** @type {string[]} */ parts) => countingCards({
@@ -330,17 +246,15 @@ test("numbers count toward a blank when a unit up to this one holds their part",
     cards: frames, moduleIdsOf: (c) => c.decks || [], fillers,
   });
   const held = build(["numbers:0-9"]);
-  assert.deepEqual(unitProblems({ cards: frames, counting: held, lang: vi }), []);
+  assert.equal(held.filter((c) => String(c.id).startsWith("num-")).length, 5);
   const none = build([]);
   assert.equal(heldFillers(fillers, new Set()).length, 0);
-  const p = unitProblems({ cards: frames, counting: none, lang: vi });
-  assert.equal(p.length, 5);
-  assert.ok(p.every((x) => x.kind === "blank-short" && x.have === 0));
+  assert.equal(none.filter((c) => String(c.id).startsWith("num-")).length, 0);
 });
 
 /* ---- phase 4: the teacher's screens ---- */
 
-import { problemLine, draftsLine, deleteUnitLine, sameFormBlanks, blankFills } from "../src/path.ts";
+import { deleteUnitLine } from "../src/path.ts";
 import { cardSentences } from "../src/review.ts";
 
 test("what counts toward unit 2: unit 1's words and names anywhere, not unit 3's", () => {
@@ -358,34 +272,20 @@ test("what counts toward unit 2: unit 1's words and names anywhere, not unit 3's
   assert.deepEqual(ids, ["early", "lan", "mine"]);
 });
 
-test("the same unit in two courses can be clear in one and short in the other", () => {
+test("the same unit in two courses counts an earlier unit only where it is published", () => {
   const units = ["u1", "u2"].map(unit);
   const inU = (/** @type {any} */ c, /** @type {string} */ u) => ({ ...c, decks: [u] });
-  const words = [...five.slice(0, 3).map((c) => inU(c, "u2")), ...five.slice(3).map((c) => inU(c, "u1"))];
-  const frames = fiveFrames(words).map((c) => inU(c, "u2"));
-  const all = [...words, ...frames];
-  const own = all.filter((c) => c.decks.includes("u2"));
+  const all = [...five.slice(0, 3).map((c) => inU(c, "u2")), ...five.slice(3).map((c) => inU(c, "u1"))];
   /* In A, unit 1 is published before it; in B it is a draft there. */
   const a = { id: "a", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 } };
   const b = { id: "b", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: {} };
-  const judge = (/** @type {any} */ course) => unitProblems({
-    cards: own, lang: vi,
-    counting: countingCards({ course, modules: units, unitId: "u2", cards: all, moduleIdsOf: (c) => c.decks }),
-  });
-  assert.deepEqual(judge(a), []);
-  assert.ok(judge(b).some((p) => p.kind === "blank-short"));
+  const count = (/** @type {any} */ course) =>
+    countingCards({ course, modules: units, unitId: "u2", cards: all, moduleIdsOf: (c) => c.decks }).length;
+  assert.equal(count(a), 5);
+  assert.equal(count(b), 3);
 });
 
-test("the checklist is said in the owner's words", () => {
-  const text = (/** @type {string} */ id) => ({ s1: "tôi ăn {{food}}", w1: "phở" })[id] || id;
-  assert.equal(problemLine({ kind: "few-sentences", have: 4, need: 5 }, text), "Add 1 more sentence with a blank (4 of 5)");
-  assert.equal(problemLine({ kind: "few-sentences", have: 2, need: 5 }, text), "Add 3 more sentences with a blank (2 of 5)");
-  assert.equal(problemLine({ kind: "blank-short", cardId: "s1", partId: "s1", slot: "food", have: 3, need: 5 }, text),
-    '"tôi ăn {{food}}": the blank food has 3 of 5 approved cards from this unit or earlier ones');
-  assert.equal(problemLine({ kind: "word-unused", cardId: "w1" }, text), '"phở" is not used in any sentence of this unit');
-  assert.equal(problemLine({ kind: "two-finals", have: 2 }, text), "A unit can have only one text or conversation");
-  assert.equal(draftsLine(1), "1 card is still a draft and is not counted");
-  assert.equal(draftsLine(3), "3 cards are still drafts and are not counted");
+test("deleting a unit held by other courses is said in the owner's words", () => {
   assert.equal(deleteUnitLine(1), "This unit is also in 1 other course. Deleting it removes it from both.");
   assert.equal(deleteUnitLine(2), "This unit is also in 2 other courses. Deleting it removes it from all of them.");
 });
@@ -397,19 +297,4 @@ test("the review screen's sentences are not narrowed by the path", () => {
   const s = frame("s", "an");
   const listed = cardSentences(s, [...five, later], vi).flatMap((p) => p.list.map((x) => x.took.food.card));
   assert.ok(listed.includes("later"));
-});
-
-test("advice on forms lists a blank whose approved cards all share one form", () => {
-  const ar = LANGUAGES["ar-PS"];
-  const noun = (/** @type {string} */ id, /** @type {string} */ gender) => ({ id, forms: [{ id, ar: id, gender, number: "singular" }] });
-  /** @type {Map<string, any>} */
-  const byId = new Map([["a", noun("a", "m")], ["b", noun("b", "m")], ["c", noun("c", "f")]]);
-  const fills = [
-    { cardId: "s1", partId: "s1", slot: "x", cards: ["a", "b"] },
-    { cardId: "s2", partId: "s2", slot: "y", cards: ["a", "c"] },
-  ];
-  const fields = (ar.grammar || []);
-  assert.deepEqual(sameFormBlanks(fills, (id) => byId.get(id), fields).map((b) => b.cardId), ["s1"]);
-  assert.deepEqual(sameFormBlanks(fills, (id) => byId.get(id), []), [], "a language with no grammar says nothing");
-  assert.ok(Array.isArray(blankFills([], [], vi)));
 });

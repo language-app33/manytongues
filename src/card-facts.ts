@@ -712,7 +712,7 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "category",
     on: "card",
-    label: "What subtype",
+    label: "Kind of word",
     what: "What the teacher says the word is — a noun, a verb, a name. It decides which table the card is offered and which blanks it fills without anybody ticking one.",
     reader: "both",
     shown: (value, ctx) => {
@@ -809,8 +809,9 @@ export const CARD_FACTS: FieldRule[] = [
       "It holds a schedule and no words: what it is asked is made up when the question is dealt and thrown away with the sitting.",
     reader: "both",
     shown: (value) => {
-      const range = value as { label?: string } | null;
-      return range && range.label ? [range.label] : [];
+      const range = value as { kind?: string; label?: string } | null;
+      /* A part of the numbers by its range, as partName says it (0.736). */
+      return range && range.label ? [range.kind === "numbers" ? `Numbers · ${range.label}` : range.label] : [];
     },
   },
   {
@@ -862,7 +863,7 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "ref",
     on: "card",
-    label: "The card's ID",
+    label: "A name for this exact card",
     what: "The name the teacher gave this card, so another card's sentence can borrow this word by name rather than any word of a kind.",
     reader: "teacher",
     shown: (value) => {
@@ -873,7 +874,7 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "fills",
     on: "card",
-    label: "Tags",
+    label: "Groups",
     what: "The blanks this card says it fills, which is nowhere in its words: the teacher's answer to what kind of hole this word stands in.",
     reader: "teacher",
     shown: (value) => fillNames({ fills: value }),

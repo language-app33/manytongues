@@ -37,7 +37,7 @@ import { Build } from "./build.ts";
 import { chunksOf, nounTextOf } from "./compose.ts";
 import type { VerbSpec } from "../types.ts";
 
-export const HE_COMPOSER_VERSION = 1;
+export const HE_COMPOSER_VERSION = 2;
 
 const run = (from: number, to: number, step: number): number[] => {
   const out: number[] = [];
@@ -53,7 +53,7 @@ const PAIRED: FormKey[] = ["standalone", "m", "f", "construct.m", "construct.f"]
 export const HE_SLOTS: SlotSpec[] = [
   ...run(0, 10, 1).map((v) => ({
     slot: `unit.${v}`,
-    formKeys: v === 0 ? COUNTING : v === 1 || v === 10 ? GENDERED : v === 2 ? PAIRED : BOUND,
+    formKeys: v === 0 ? COUNTING : v === 1 ? GENDERED : v === 2 ? PAIRED : BOUND,
     label: String(v),
     group: "units",
     hint:
@@ -215,13 +215,24 @@ function scale(b: Build, count: number, unit: number, name: string, countKey: Fo
   if (whole) return whole;
   if (count === 1) return b.word(`${name}.1`, "standalone");
   if (count === 2) return b.word(`${name}.2`, "standalone");
-  /* Three to nine take the bound form and the scale's plural. **Ten does
-     not** — it is counted the masculine way with the scale's singular
-     after it, which is what this app has said since 0.152 and is what a
-     port has no business changing on its own. The written language would
-     have the bound form here too; that is a question for whoever reads
-     the Hebrew table, and it is in the backlog under their name. */
-  if (count >= 3 && count <= 9) {
+  /* Three to nine take the bound form and the scale's plural, and so does
+     **ten in front of thousands**, as the written language has it. Until
+     0.742 ten was counted the masculine way with the singular after it,
+     which is what every Hebrew system written before then says.
+
+     So the bound way is taken only once the teacher has written ten's
+     box for "before thousands". An empty box keeps the old wording whole
+     rather than borrowing the masculine for it: the masculine ten with
+     the plural would be wrong both ways, and a number that changes under a student's feet on its
+     own is worse than one that waits for its teacher. The gap is reported
+     so the editor can show it. Millions and billions count ten the
+     masculine way and are not touched (`countKey` is "m" for them). */
+  const boundTen =
+    count === 10 && countKey === "construct.m" && b.written("unit.10", "construct.m");
+  if (count === 10 && countKey === "construct.m" && !boundTen) {
+    b.warn({ code: "missing-form", slot: "unit.10", formKey: "construct.m" });
+  }
+  if ((count >= 3 && count <= 9) || boundTen) {
     const said = b.word(`unit.${count}`, countKey);
     const word = b.word(`${name}.n`, "standalone");
     return [said, word].filter(Boolean).join(" ");

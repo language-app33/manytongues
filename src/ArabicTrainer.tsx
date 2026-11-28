@@ -1169,7 +1169,7 @@ const STUDENT_COLUMNS = [
   { key: "word", label: "Card" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
-  { key: "subtype", label: "Subtype" },
+  { key: "subtype", label: "Kind of word" },
   { key: "level", label: "Level" },
 ];
 function studentViews(
@@ -8622,7 +8622,11 @@ function ctx() {
   if (!Ctx) return null;
   if (!audioCtx) audioCtx = new Ctx();
   // Browsers start it suspended until you've interacted with the page.
-  if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+  /* Anything but running is woken, not only "suspended" (0.730): an iPhone
+     has a state of its own, "interrupted", for a call, Siri or the app
+     going to the background, and does not always come back from it by
+     itself — so the sounds stayed silent until the app was reopened. */
+  if (audioCtx.state !== "running" && audioCtx.state !== "closed") audioCtx.resume().catch(() => {});
   return audioCtx;
 }
 
@@ -12050,8 +12054,6 @@ export default function ArabicTrainer() {
   const retryAt: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
   const retryFor = useRef(500);
   const inputRef: React.MutableRefObject<HTMLInputElement | null> = useRef(null);
-  const undoTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
-  const [lastDeleted, setLastDeleted] = useState<Item[] | null>(null);
   /* Every short-lived message the app says, here and in the teaching and
      admin screens below, which reach it through SnackbarProvider. */
   const snack = useSnackbarState();
@@ -15994,20 +15996,6 @@ export default function ArabicTrainer() {
       });
   }
 
-  function undoDelete() {
-    if (!lastDeleted || !lastDeleted.length) return;
-    // A later `updated` than the tombstone, so the restore also wins on
-    // any device that already received the deletion.
-    const restored = lastDeleted.map((it) => ({ ...it, updated: now() }));
-    const tombstones = { ...(data.tombstones || {}) };
-    for (const it of restored) delete tombstones[it.id];
-    persist({ ...data, items: items.concat(restored), tombstones });
-    sfx("pop");
-    setLastDeleted(null);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-  }
-
-
   /* The one prep, set, changed or cleared from its screen — see Prep.
      Called a goal wherever the learner reads it (0.681, the owner's 1b);
      still a prep in the code, where renaming it would touch the stored
@@ -18268,20 +18256,6 @@ export default function ArabicTrainer() {
           </p>
         )}
       </div>
-
-      {lastDeleted && lastDeleted.length > 0 && (
-        <div className="at-undo">
-          <span className="what">
-            {lastDeleted.length === 1
-              ? `Deleted “${leadOf(lastDeleted[0]).en || leadOf(lastDeleted[0]).ar || leadOf(lastDeleted[0]).lat}”`
-              : `Deleted ${lastDeleted.length} items`}
-          </span>
-          <Button size="sm" onClick={undoDelete}>
-            Undo
-          </Button>
-        </div>
-      )}
-
 
       {updateWaiting && !updateLater && !inExercise && (
         /* In the band across the top, where it is seen, rather than as a
@@ -21610,7 +21584,7 @@ function Guide() {
  * a User is what everyone else sees, and the key is the one part of it
  * that never leaves the device that signed in.
  */
-function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: (name: string) => void }) {
+function AccountPanel({ me, onRename, children }: { me: User & { key: string }; onRename: (name: string) => void; children?: React.ReactNode }) {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   /* A student's private sign-in link (0.638): built here from the key, never sent anywhere. */
@@ -21737,6 +21711,8 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
           )}
         </FormField>
       ) : null}
+      {/* Sign out, as the last thing in this section (0.740). */}
+      {children}
     </div>
   );
 }
@@ -22532,8 +22508,22 @@ function SettingsScreen({ kind, onClose, sets = [], onOpenSet, ...rest }: {
         <Guide />
       ) : (
         <>
-          {/* One screen: how the app behaves first, then you. */}
-          <AppPreferences {...rest} />
+          {/* One screen, in the owner's order (0.740): your account first,
+              with Sign out at its end; then what you practise with; then
+              how it looks; then the version and the danger zone. */}
+          <AccountSettings {...rest} part="account" />
+          <AppPreferences
+            {...rest}
+            media={
+              <DeviceMedia
+                allClipIds={rest.allClipIds || []}
+                onDevice={rest.onDevice ?? null}
+                allImageIds={rest.allImageIds || []}
+                imagesOnDevice={rest.imagesOnDevice ?? null}
+                onDownloaded={rest.onDownloaded}
+              />
+            }
+          />
           {/* Your answers in each personal set, only where you hold one. */}
           {sets.length > 0 && onOpenSet && (
             <>
@@ -22543,7 +22533,7 @@ function SettingsScreen({ kind, onClose, sets = [], onOpenSet, ...rest }: {
               ))}
             </>
           )}
-          <AccountSettings {...rest} />
+          <AccountSettings {...rest} part="rest" />
         </>
       )}
     </Screen>
@@ -22660,11 +22650,11 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
     [clips ? plural(clips, "recording") : "", images ? plural(images, "picture") : ""].filter(Boolean).join(" and ");
 
   return (
-    <div className="at-formblock">
-      <div className="at-formhead">
-        <span className="at-formnum">Recordings and pictures on this device</span>
-        <span className="at-formrole">These are the recordings and pictures saved on your device so you can keep practicing without an internet connection.</span>
-      </div>
+    /* A field of When you practise since 0.740, no longer a section of
+       its own. */
+    <div className="at-field at-mt3">
+      <label className="at-label">Recordings and pictures on this device</label>
+      <p className="at-fieldlede">These are the recordings and pictures saved on your device so you can keep practicing without an internet connection.</p>
       <p className="at-devicefigures">
         {stats ? (held ? `${both(stats.clips, stats.images)}, ${formatBytes(stats.bytes)}` : "Nothing saved yet.") : "Counting…"}
       </p>
@@ -22743,7 +22733,11 @@ function AccountSettings({
   allImageIds = [],
   imagesOnDevice = null,
   onDownloaded,
+  part = "rest",
 }: {
+  /** Which half to draw (0.740): your account, with Sign out at its end,
+      heads the screen; the version and the danger zone close it. */
+  part?: "account" | "rest";
   account: User & { key: string };
   onRename: (name: string) => void;
   onReset?: () => void;
@@ -22767,18 +22761,39 @@ function AccountSettings({
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  if (part === "account") {
+    return (
+      <>
+        <AccountPanel me={account} onRename={onRename}>
+          {/* Signing out is ordinary housekeeping, not a danger: it leaves
+              everything on the server exactly as it is. */}
+          <FormField label="Sign out" lede="Make sure to save your sign-in key somewhere before signing out!">
+            <Button onClick={() => setLoggingOut(true)}>Sign out</Button>
+          </FormField>
+        </AccountPanel>
+        {loggingOut && (
+          <ConfirmModal
+            title="Sign out of this device?"
+            danger={false}
+            confirmLabel="Sign out"
+            body={
+              <p>
+                You'll need your sign-in key{account.keyOnly === false ? " or your sign-in link" : ""} to get back in, and nobody can recover it for you except
+                your space's admin. Your account, courses and progress stay exactly as they are.
+              </p>
+            }
+            onCancel={() => setLoggingOut(false)}
+            onConfirm={() => {
+              setLoggingOut(false);
+              onLogOut();
+            }}
+          />
+        )}
+      </>
+    );
+  }
   return (
     <>
-      <AccountPanel me={account} onRename={onRename} />
-
-      <DeviceMedia
-        allClipIds={allClipIds}
-        onDevice={onDevice}
-        allImageIds={allImageIds}
-        imagesOnDevice={imagesOnDevice}
-        onDownloaded={onDownloaded}
-      />
-
       {/* Which version this is, and the check for a newer one. */}
       <div className="at-formblock">
         <div className="at-formhead">
@@ -22786,37 +22801,6 @@ function AccountSettings({
         </div>
         <AppVersion />
       </div>
-
-      {/* Signing out is ordinary housekeeping, not a danger: it leaves
-          everything on the server exactly as it is. */}
-      <div className="at-formblock">
-        <div className="at-formhead">
-          <span className="at-formnum">Sign out</span>
-          <span className="at-formrole">
-            Make sure to save your sign-in key somewhere before logging out!
-          </span>
-        </div>
-        <Button onClick={() => setLoggingOut(true)}>Log out</Button>
-      </div>
-
-      {loggingOut && (
-        <ConfirmModal
-          title="Log out of this device?"
-          danger={false}
-          confirmLabel="Log out"
-          body={
-            <p>
-              You'll need your sign-in key{account.keyOnly === false ? " or your sign-in link" : ""} to get back in, and nobody can recover it for you except
-              your space's admin. Your account, courses and progress stay exactly as they are.
-            </p>
-          }
-          onCancel={() => setLoggingOut(false)}
-          onConfirm={() => {
-            setLoggingOut(false);
-            onLogOut();
-          }}
-        />
-      )}
 
       {/* Headed like the others, with its heading as the button that opens
           it — the way a folded form opens in the card editor. */}
@@ -22957,26 +22941,37 @@ function AccountSettings({
  * decide is now decided beside the session builder, which is the only place
  * that ever read them.
  */
-function AppPreferences({ settings, setSetting }: {
+function AppPreferences({ settings, setSetting, media }: {
   settings: Settings;
   setSetting: (key: string, value: any) => void;
+  /** Recordings and pictures on this device, drawn under the sounds. */
+  media?: React.ReactNode;
 }) {
+  const appearance = (
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Appearance</span>
+      </div>
+      <FormField label="Theme">
+        <Segmented
+          options={[{ value: "auto", label: "Follow device" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
+          value={(settings.theme || "auto")}
+          onChange={(v) => setSetting("theme", v)}
+        />
+      </FormField>
+    </div>
+  );
   return (
     <>
       {/* Headed and explained the way the card editor and Account settings
           are: each section's name at heading size, and each field's
           explanation straight under its name, before the control. */}
+      {/* The practising settings together, under one heading (0.740,
+          the owner's choice). */}
       <div className="at-formblock">
         <div className="at-formhead">
-          <span className="at-formnum">Appearance</span>
+          <span className="at-formnum">When you practise</span>
         </div>
-        <FormField label="Theme">
-          <Segmented
-            options={[{ value: "auto", label: "Follow device" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
-            value={(settings.theme || "auto")}
-            onChange={(v) => setSetting("theme", v)}
-          />
-        </FormField>
         <FormField
           label="On-screen keyboard"
           lede="Display an on-screen keyboard for the language you're learning."
@@ -22987,12 +22982,6 @@ function AppPreferences({ settings, setSetting }: {
             onChange={(v) => setSetting("keyboard", v)}
           />
         </FormField>
-      </div>
-
-      <div className="at-formblock">
-        <div className="at-formhead">
-          <span className="at-formnum">Feedback</span>
-        </div>
         <FormField
           label="Sounds"
           lede="The short sounds the app plays after you answer an exercise."
@@ -23029,7 +23018,9 @@ function AppPreferences({ settings, setSetting }: {
             </Button>
           </div>
         </FormField>
+        {media}
       </div>
+      {appearance}
     </>
   );
 }

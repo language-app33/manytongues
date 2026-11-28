@@ -8297,6 +8297,14 @@ already gives "cards before sentences" without a second rule.
 a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
 hundreds of lines for nothing; the new thing is a *path unit* in code.
 
+**0.740: the checklist is withdrawn.** The owner withdrew rules R7, R9
+and R10 — five sentences with a blank, enough approved cards for each
+blank, every word used, one closing scene — because the checklist added
+complexity and confusion. A unit now publishes when it holds at least one
+card (or word-set part); the server refuses only an empty one. The text
+below records why the rules were shaped as they were while they stood;
+see "The audit round" at the end for the rest of what changed with them.
+
 **0.614: the checklist counts what the path has taught, and only what a
 teacher approved.** A blank needs five different cards (R10), and a card
 counts only where a teacher approved a sentence it fills (R11) and it
@@ -9636,3 +9644,391 @@ a phone, a new order needs Apply, and every bulk action is one press
 further. Nothing was removed. `menus` and `count` went from `ItemList`'s
 inputs for `sort`, `filter` and `total`.
 
+## Simpler teacher screens (0.732)
+
+The owner chose each of these on a page of mock-ups (answers `1a, 2b→7a,
+3b, 4a, 5a, 6 none, 7a, 8a, 9a`).
+
+- **Manage cards folded into the module's screen.** A module had two
+  screens over the same cards: one to read them and one to change which
+  they were. The reading one now holds what the managing one did — New
+  card, Add existing cards, Select, Import, Remove from this module — and
+  the managing one is gone. The list is the Cards tab's list, with the
+  same bar, so there is one way to work a list of cards.
+- **Edit replaced by a pencil and a menu.** The module's only fields were
+  its name and its courses, and the courses already saved as they were
+  tapped (0.725). So Edit opened a whole mode for one text box. The name
+  is the heading, and its pencil turns it into a box with Save and Cancel
+  in place; Export and Delete went behind three dots on the title line.
+  Back still asks first when a rename is half typed. Cost: Rename, Export
+  and Delete are each one press further.
+- **A card being read is still the locked editor**, with the card drawn on
+  top. `docs/PROPOSAL-view-only-parity.md` made reading the editor held
+  still so that reading never falls behind editing; that is kept. What
+  changed is only what the Basic tab opens with while locked: a hero (the
+  word, how it is said, what it means, Export behind its dots), with "This
+  card", the advanced tick-box, the stars and the no-vowel-marks note held
+  back until Edit. The note became a "to improve" list with a button that
+  turns the screen to editing. The hero sits above the fields' lock, so its
+  dots work while the rest is held still.
+- **The Content block is hidden only when the hero already says all of
+  it**: one spelling, one way of saying it, one English, nothing recorded
+  or pictured (`onlyWords`). A card with more keeps the block, so nothing
+  on it is out of sight while it is read.
+- **"What is practised" in words while read.** A table of tick-boxes that
+  cannot be ticked read as a form to fill in; one line per form saying
+  where it comes up reads as a fact. Edit brings the tick-boxes back.
+- **Not changed:** the exercise tiles on the Exercises tab, and the
+  Advanced tab, which a card being read shows as before. Courses, which
+  already save on tap, are untouched.
+- **Two departures from the mock-ups.** The line "Students choose and write
+  this word" was a misreading of the Description's own role line, so it is
+  not shown; the Description shows only when one is written. The card's
+  first tab keeps its name, "Basic".
+
+## A simpler teacher Home, New module panel and Cards list (0.733)
+
+All chosen by the owner on a page of mock-ups. Everything here is switched
+on only by the teaching side (a prop or the `teach` class), so the
+learner's Courses page and card grids look and behave as before.
+
+- **Join is a button at the foot of My courses, opening a panel.** A
+  teacher joins a course once; the code box was a whole section on every
+  visit to Home. A teacher with no course at all sees a box saying so with
+  the same button, since the empty list was the screen's whole message.
+  `CoursesPage` takes `joinButton` and `noneAtAll`; without them it draws
+  the old join box, which is what the learner keeps.
+- **The caught-up band kept its cup but went slim.** The cup says "done,
+  not broken"; the height said nothing and pushed My courses down.
+- **Search from six courses.** Five fit on a phone and are read, not
+  searched. `ItemList` now draws no search box at all without `match`
+  (every other list passes one), so "no search" leaves no empty bar.
+- **The three descriptions lead with "independent" and "builds on".**
+  That is the real difference between a deck and a unit. Sharing between
+  courses is not, since a unit can be on several courses' paths too, so
+  neither description mentions it. The personal set's leads with what it
+  is for — words that differ per student — and the owner's example. Each
+  kind has a picture: cards, a new `path` icon (three stops climbing), a
+  person.
+- **Two tiles a row, the three dots kept.** One line for the word and one
+  for the meaning keeps every tile the same height, so the grid reads as a
+  grid; a longer word is a tap away. The dots stay because Edit and
+  Remove on a tile are what a teacher reaches for there. The cost is six
+  to eight cards a phone screen where twelve showed.
+- **A stand-in for a missing meaning.** A card with no English left a
+  blank line that read as broken. Its transliteration is the next best
+  thing to read it by; a picture or recording card says so. `standIn` in
+  `cards.ts`, shared by the tile and the table.
+- **A list on a phone, the table kept for wide screens.** A five-column
+  table scrolled sideways on a phone and showed two columns. The list
+  gives the same facts in a row; sorting moves to the Sort control, which
+  every list already has. `CardRows` shares the table's press, hold and
+  key handling rather than copying it, and `useNarrow` says no where there
+  is no `matchMedia`, so the smoke walk keeps checking the table.
+
+## Chips for filters, rows for Sort, the funnel, and the Exercises tab (0.735)
+
+The owner chose each of these on a page of mock-ups (answers 1a, 2a, 3a,
+4a, 6a, 7a, 8a, 9a, 10a).
+
+- **Filters are chips, with no "Any".** Every Filter group drew a segmented
+  track with "Any" lit green, so a list narrowing nothing looked as busy as
+  one narrowed three ways. Now nothing lit means a group narrows nothing,
+  a lit chip pressed again lets go, and green means one thing: this is
+  narrowing the list. The Filter button turns the same green (it was
+  gold) while anything is. `ChipPick` does both kinds of group — one at a
+  time, with the "none" value left undrawn, and several at once for Kind
+  and its subtypes — so Kind's tick list and its "Tick a kind" line went.
+  The module and blank lists under "In these" / "Leaves one" stay tick
+  lists: they are as long as the teacher's material.
+- **Sort kept its Apply and its two steps**, as rows and one switch. "Sort
+  by" is `RadioGroup` rows with a mark; "Order" is one `Segmented` in
+  ordinary letters whose words follow the row picked. A list reordering
+  behind the panel while a teacher is still choosing is still the thing
+  Apply prevents (0.728).
+- **A funnel for filtering, the sliders kept for settings.** The Filter
+  button and `FilterMenu`'s default are the funnel. The other uses of
+  `tune` were checked one by one: the course's Exercises tab, a card's
+  Advanced tab, the admin space, Build a session, a session's Mode and a
+  card's subtype are settings, not filters, and keep it. The Modules list's
+  "who made it" filter already had its own picture (a person) and keeps it.
+- **The translation choice as four rows that explain themselves.** Each tap
+  changes what students get at once, so each choice says what it does
+  before it is made rather than after.
+- **"What this asks" over folded groups under a preset; everything open
+  under Custom.** A preset decides the switches, so under one the groups
+  are for reading — a row each with its count, opened one at a time, a
+  tick, a dash or "Where needed" per exercise. Under Custom the teacher
+  decides, so every exercise is on show with its switch. The old "locked"
+  rows inside the Custom list could no longer be reached and were removed.
+- **The sliding switch is used on this tab only.** The OFF / ON pair it
+  replaces was used nowhere else in the app, so `Switch` changes one
+  screen; it is in the shared library for the next on/off.
+- **The Basic tab's three small changes**, only while a card is written: a
+  line under "Build an advanced card" saying what it is for; a worded link
+  under the last answer, shown once that answer has text, in place of the
+  bare + in the heading (which read as adding a language, and an empty
+  second box was never what was meant); and Description folded to one row
+  with Add. Whether it starts folded is decided once, when the block first
+  draws, so emptying the boxes while typing does not fold them away. The
+  links keep the + button's accessible name, "Add another accepted
+  answer". The Advanced tab's forms keep their + and − column.
+- **Card name was deliberately left required and first.**
+- An English description is still kept only beside one in the language
+  itself; that rule (`storedDescription`) is unchanged, so a card saved
+  with only the English opens with Description folded again.
+
+
+## A calmer module screen and a more rewarding Numbers set (0.736)
+
+All chosen by the owner on a page of mock-ups.
+
+- **Quality as a row and a screen, so the cards are on the first screen.**
+  The score and three cards of advice stood between a module's name and
+  its cards. The row (`QualityRow`) says the score, how many ways there
+  are to raise it and how many sentences to look at, with the same bar
+  (`QualityBar`, drawn from `qualityPlan` so the row and the screen agree).
+  The advice (`ModuleQuality`) moved to a `Screen` of its own, drawn
+  before the card's so a card opened from a word comes up over it and
+  Back returns to the advice. The row is white and outlined like a tile:
+  it opens something, it is not chosen.
+- **Advice as rows, compared by their points.** Closed, each piece of
+  advice is its picture, what to do and its points, so the three can be
+  weighed at a glance; open, it says why and lists its words. The "+2" on
+  each word chip told how many more sentences the word needs; it was
+  noise next to the word, and it lives on in the chip's `title`, which a
+  computer shows on pointing and a screen reader reads.
+- **One + inside a module.** The green + used to make a new card at once
+  and a second button under the list added existing ones. The + now asks
+  which (`PickSheet` with two `SheetAction` rows). The panel names the
+  module's kind and its name in curly quotes — "Add to the deck “At
+  home”" — rather than in italics, because italics do not exist in every
+  script a module can be named in. The Cards tab's own + is untouched: a
+  card made there belongs to no module yet. The empty module's box keeps
+  its two buttons.
+- **A finished part is marked by a tick, never by the green outline and
+  fill.** Green outline and fill mean "chosen" everywhere else in the app
+  (a course pill, a ticked row). A finished part is an ordinary tile with
+  a solid green tick before its name.
+- **A fixed sample line.** A finished part shows its first four numbers
+  as the app says them, always from the start of the part, so the line
+  does not change between visits (the owner asked). In the language's own
+  numerals where it has them, one line, cut with … when long.
+- **The headline has no box.** "Students can count to 19" is a statement,
+  not something to press, so it is large text on the page with a muted
+  line and a row of steps, and no fill or border. It counts the unbroken
+  run of finished parts from the start, because a later part ready on its
+  own does not let a student count up to it. Before anything is written it
+  asks for the first part's missing words, counted as that part's tile
+  counts them, so the two never disagree. There is no number-to-words
+  helper, so it says "10 words", not "ten words".
+- **The moment of finishing.** The editor keeps, in a ref, which parts
+  were open when it opened and after each save that went through; a save
+  that opens a part says so in one message (the last part named, "and N
+  more" for the rest) and marks the tile "Just finished" with one soft
+  glow, held in state that dies with the editor, so leaving Numbers clears
+  it. No animation under `prefers-reduced-motion`.
+- **Parts named by their range.** "Numbers" before each part was said six
+  times under a screen already called Numbers. The labels are data in
+  `NUMBER_RANGES`; `partName` puts "Numbers · " back wherever a part's
+  name stands alone (its screen's title, its entry in a module, the word
+  set picker, its skill card), and `spanWords` gives the figures for
+  sentences ("A number from 0 to 9"), where "Thousands and millions"
+  would not read.
+- **Rows only for numbers with exactly two forms.** Two boxes fit side by
+  side on a phone; three do not, and one has nothing to sit beside. So 3
+  to 19 are rows under column headings, and 0, 1 and 2 keep a box each,
+  with a single form now labelled too so it looks like its neighbours. A
+  run of numbers with the same explanation and the same number of boxes
+  shares one explanation above it. The boxes keep their names
+  (`"3, counting"`), which the tests and screen readers go by.
+
+## Follow-ups to 0.735: the Filter line, tiles, "If needed", the add links (0.738)
+
+Chosen on a page of options (answers 1a, 2b, 3a, 4b, 5a, 6b).
+
+- **One line at the top of the Filter panel, not one per group.** "Tap to
+  show only matching cards." The chips that hide cards instead ("Not in
+  these", "Fills none") say so in their own names; a line under every
+  group was seven lines saying "show only". Kept to six words at the
+  owner's request (shorten it); "tap again to undo" is left to be found.
+- **`TileChoice` for the translation choice.** The owner asked whether the
+  four were in the newest component; they were in the older tick rows.
+  The newest is the New module panel's tile (picture, name, line), so
+  `TileChoice` draws that as a real radio group with a tick on the chosen
+  one. `RadioGroup` stays for plainer choices in a form, such as Sort by.
+  Two pictures were drawn for it: `english` (EN in a box) and
+  `englishLittle` (EN with only the box's corners).
+- **"If needed", defined once above the list.** "Where needed" did not say
+  what decided the need. The definition sits above the groups only under
+  Little translation, the one place the term appears, headed "In the list
+  below" and with the term drawn exactly as in the rows, so it reads as a
+  key to what follows rather than as a note about the choice above (the
+  owner's note on 3a).
+- **The add-answer links lost their underline.** They had taken the app's
+  general link style (`at-linkbtn`), which reads as going somewhere else.
+  Green, bold and a + picture, as Clear on a list's line, says "do this
+  here". Their accessible name is unchanged.
+
+## The audit round: course, unit, card status and wording
+
+**28 November 2026** · `src/spaces.tsx`, `src/card-editor.tsx`, `src/path.ts`,
+`server/api/courses.js`, the two stylesheets (0.740)
+
+Every choice here was made by the owner on a page of mock-ups.
+
+**One Modules list on a course.** A course's screen had a Modules section
+of chips with crosses and a separate Path section below the join code, so
+what a course teaches was in two places that looked unlike each other. Now
+one Modules section holds everything, as rows of one kind: the units
+under "Units, studied in order", then the decks under "Decks, studied in
+any order". The labels say the one thing a teacher has to know about the
+difference, in the words a student would use. The course's name is the
+heading, with its language and number of students under it.
+
+**Publish is on the unit's row.** An unpublished unit is one no student
+sees, so the button that changes that sits where the unit is listed,
+beside its arrows and its three dots. On an empty unit it is grey and says
+"Add a card first" when pressed, rather than being a dead button.
+
+**The checklist is withdrawn** (see "Units: a course's path", 0.740). With
+it went the two pieces of advice that stood beside it on a unit's screen:
+how many of its cards were still drafts, and which blanks always took the
+same form.
+
+**A unit's screen reports; the course arranges.** A unit can be in several
+courses, each placing and publishing it separately, and its screen used to
+carry a block of controls per course. Now it says where it stands in each
+("Beginners A1 · Unit 1 of 3 · Draft") and each row opens that course,
+where it is ordered and published. A unit in no course says so in the
+amber box, with "Add it to a course".
+
+**The status panel is today's choices with a line each, and no Unpublish
+step.** A published card goes straight to Draft or Ready for review; Draft
+there is what Unpublish was, with its confirmation, and Ready for review is
+that followed by marking it for review, made as two calls in order — the
+same two the Select panel's Change status already made. No row is red;
+Discard changes still asks first.
+
+**"Groups" for tags, and "a name for this exact card" for its ID.** A
+teacher reads "group" wherever the screen meant a set of words a blank can
+take any of. Nothing stored, no CSS class and no `{{…}}` a teacher types
+changed. The ID is folded away as optional until Add is pressed.
+
+**Capitals for the one main button.** Every button was in capitals, so no
+button stood out. Now only the primary variant keeps them; every other
+button, on both sides of the app, is in ordinary letters at 15px.
+
+**What the owner chose to leave alone:** where the student code sits; a
+module's line in the Modules list; the length of a card's Advanced tab;
+the recording screen; student flags, student progress and adding many
+cards at once.
+
+**0.741: the rows, tidier.** The owner asked that a row not repeat what its
+heading says, so "Unit ·" and "Deck ·" left the line under the name; the
+three dots moved to the row's top right corner, where they sit on every
+other tile; and Publish moved after the arrows, so the arrows stay in the
+same place whether a unit is a draft or published. What the button says is
+an open question to the owner.
+
+## Hebrew's ten thousand takes the bound form, once it is written
+
+**28 November 2026** · `src/numbers/he-IL.ts` (`scale`, `HE_SLOTS`),
+`src/numbers/build.ts` (`written`) (0.742)
+
+Since 0.152 Hebrew counted ten thousand the masculine way with the singular
+after it, and the port to systems kept that on purpose, with a note in the
+backlog for whoever read the Hebrew table. It has been read: the written
+language puts the bound form of ten in front of the plural, as three to
+nine already did.
+
+**The bound way is taken only when ten's new box is written.** Ten gets the
+"before thousands" box that three to nine have. A system without it, which
+is every Hebrew system written before this release, says exactly what it
+said, and reports the box as missing (a gap that does not stop anything
+being asked). The alternative, falling back to the masculine ten with the
+plural, would produce a hybrid that is wrong both ways, and would change a
+learner's numbers without their teacher having done anything.
+
+**Thousands only.** Millions and billions count ten the masculine way and
+are untouched; ten million is in the golden table to prove it.
+
+**The cost:** the golden table, which was a fence against any change in
+what a Hebrew learner sees, has one row changed and says so. A student who
+learnt the old wording sees the new one once their teacher writes the box,
+with no warning beyond the teacher's own edit. The composer's version goes
+to 2; nothing compares it yet.
+
+**0.743: "Open to students".** A unit's button and status say "Open to
+students" / "Not open yet" instead of Publish / Published / Draft, the
+owner's 1a, because a card's Publish is a different act. Chosen knowing it
+sits beside "Open it early" and "Open course"; the stored field is still
+`pathLive` and the server action still `publish-unit`.
+
+## Hebrew verbs: one "I", "we" and "they" in the past and future
+
+**28 November 2026** · `src/verbs.ts` (`joinedInRow`, `keepsApartIn`,
+`personAt`, `foldedAt`), `src/types.ts` (`VerbPerson.joinsIn`),
+`src/languages.ts` (`HE_SUBJECT_PERSONS`), `src/card-editor.tsx`
+(`VerbTable`), `src/shared.tsx` (`ReadTable`) (0.746)
+
+Hebrew's verb table has twelve columns, every person with a gender of its
+own, because the present really differs by gender in every person: כותב
+and כותבת. In the past and future, *I*, *we* and *they* do not: כתבתי,
+כתבנו and כתבו are anybody's. The teacher typed each twice and the
+student was taught and asked each twice, under "I (m)" and "I (f)", as if
+they differed.
+
+**The mechanism Arabic's one *I* uses (0.456), decided per row.** Arabic's
+`joins` is for a whole column: if any row has a different word, the whole
+column is kept apart. That cannot serve Hebrew, whose feminine column is
+always needed in the present. So a column may declare `joinsIn`, the rows
+in which it joins; there the column is a copy unless a different word is
+written, row by row and column by column. The column itself always
+stands. Four helpers in `src/verbs.ts` are the one answer to both kinds of
+join, and every screen asks them: the table, the drills, the read-out, a
+sentence about a woman speaker, a learner's device and the editor.
+
+**Why the present keeps both boxes:** it is the one tense in which every
+person changes with gender, and joining it would teach a woman the man's
+word about herself, which is what 0.261 and 0.309 put right.
+
+**Why *you (f pl)* was left alone:** the written language has a feminine
+plural *you* in the past and future (כתבתן beside כתבתם). Spoken Hebrew
+often uses the masculine for both, but that is a teacher's choice to make
+by typing the same word, not the app's to make for everyone.
+
+**Nothing is migrated.** An old card keeps its duplicate boxes in storage
+until its teacher next saves it; the editor opens it already folded, and a
+student's device folds it when it reads the card, keeping whichever of the
+two schedules the student had got further with. That is how Arabic's
+change worked.
+
+**The cost:** two rules now sit behind one field. A join is decided per
+row for Hebrew and per column for Arabic, and anyone reading `joins` has
+to know which kind a column has. A verb whose past "I" truly has two
+forms needs the teacher to tick it and write the second word; until then
+the second box is not shown in those rows.
+
+
+## Every message at the foot of the screen is one bar (0.747)
+
+Measured on a phone, the floating messages had drifted into five sizes:
+the snackbar (41 tall, 49 with Undo), a "Working…" pill hugging its word
+(103 wide, 40 tall), the connection bar with Retry (73 tall, bigger type),
+and a "Deleted … Undo" bar that shrank to its text.
+
+The owner chose the connection bar's size for all of them (1b), with the
+connection bar simply matching it (2), and "Working…" as the same bar,
+quieter (4a). So `.at-snack`, `.at-reachbar` and `.at-working` share one
+rule; the left edge's colour says the kind, and `min-height` is the bar
+with its Retry, so a line alone, an Undo or a Retry come out the same
+height. A longer message still grows rather than being cut. The cost: a
+plain "Saved" is twice as tall as it was and covers more of the screen
+for its four seconds, and the floating Edit/Save button lifts higher to
+stay clear (148 to 176).
+
+The "Deleted … Undo" bar (3a: make it the ordinary bar) turned out to be
+unreachable: nothing had set what it shows since the word list's delete
+was reworked, so it was removed rather than restyled. If the word list
+gets an Undo after delete again, it goes through the snackbar's `undo`.

@@ -37,12 +37,9 @@ import { tickCapitals } from "../../src/capitals.ts";
 import { storedDescription, takesDescription } from "../../src/description.ts";
 /* A course's path (0.613): every rule of it is in path.ts, read here the
    way the app reads it. */
-import { countingCards, drawsFrom, isLiveIn, neverAskedAlone, unitProblems } from "../../src/path.ts";
-import { LANGUAGES } from "../../src/languages.ts";
+import { isLiveIn } from "../../src/path.ts";
 /* Personal sets (0.629): the one reader of what a teacher saves. */
 import { readSet } from "../../src/sets.ts";
-import { fillerCards } from "../../src/numbers/generate.ts";
-import { countedNouns, withNouns } from "../../src/numbers/nouns.ts";
 
 /* Locking a deck is set aside for now: a locked deck's flag is kept, but
    nothing is refused because of it. Turn back on to bring locks back. */
@@ -5311,8 +5308,14 @@ async function handle(req) {
       const moduleId = String(body.deckId || "");
       if (!(course.path || []).includes(moduleId)) return json({ error: "not-on-path" }, 404);
       if (isLiveIn(course, moduleId)) return json({ ok: true, course });
-      const problems = await unitCheck(course, moduleId);
-      if (problems.length) return json({ error: "unit-not-ready", problems }, 409);
+      /* 0.740: the owner withdrew the publishing checklist (five sentences
+         with a blank, enough cards for each blank, every word used, one
+         closing scene): it added complexity and confusion. A unit publishes
+         once it holds something to study, a card or a word-set part. */
+      const unitModule = await readJson(store, K.deck(moduleId));
+      if (!unitModule || (!(await moduleCardIds(unitModule)).length && !(unitModule.parts || []).length)) {
+        return json({ error: "unit-empty" }, 409);
+      }
       const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
         fresh && (fresh.path || []).includes(moduleId) && !isLiveIn(fresh, moduleId)
           ? { ...fresh, pathLive: { ...(fresh.pathLive || {}), [moduleId]: Date.now() } }
@@ -5338,71 +5341,6 @@ async function handle(req) {
       });
       await taught();
       return json({ ok: true, course: next || (await readCourse(store, course.id)) });
-    }
-
-    /**
-     * The publishing checklist of one unit in one course, judged on what
-     * its students would actually receive: published cards only, as they
-     * are sent. What may count toward a blank's five is the cards of this
-     * unit and the published units before it here, every card never asked
-     * on its own in the libraries of the unit's owner and the course's
-     * teachers, and the number values of the parts those units hold — see
-     * countingCards in path.ts.
-     * @param {Course} course
-     * @param {string} moduleId
-     */
-    async function unitCheck(course, moduleId) {
-      const modules = (await readManyJson(store, (course.path || []).map((id) => K.deck(id)))).filter(Boolean);
-      const unitModule = modules.find((d) => d.id === moduleId);
-      if (!unitModule) return [{ kind: "few-sentences", have: 0, need: 5 }];
-      const from = drawsFrom(course, modules, moduleId);
-      /** @type {Map<string, string[]>} */
-      const modulesOf = new Map();
-      for (const d of modules) {
-        if (!from.has(d.id)) continue;
-        for (const id of await moduleCardIds(d)) modulesOf.set(id, (modulesOf.get(id) || []).concat([d.id]));
-      }
-      const ids = [...modulesOf.keys()];
-      const rows = await readManyJson(store, ids.map((id) => K.card(id)));
-      /** @type {Map<string, any>} */
-      const byId = new Map();
-      rows.forEach((c, i) => {
-        if (c && inScope(c) && isPublished(c)) byId.set(ids[i], studentView(c));
-      });
-      const owners = [...new Set([unitModule.owner, ...(course.teachers || [])])].filter(Boolean);
-      for (const owner of owners) {
-        /** @type {string[]} */
-        const lib = (await readJson(store, K.myCards(owner))) || [];
-        const libRows = await readManyJson(store, lib.filter((id) => !byId.has(id)).map((id) => K.card(id)));
-        for (const c of libRows) {
-          if (c && inScope(c) && isPublished(c) && neverAskedAlone(c) && !byId.has(c.id)) byId.set(c.id, studentView(c));
-        }
-      }
-      const lang = LANGUAGES[/** @type {import("../../src/types.ts").LangId} */ (unitModule.lang || course.language || "")] || null;
-      /* The number values a blank may be filled with, from the system the
-         unit's numbers come from — counted with that teacher's nouns, as
-         the teacher's own screen counts them. */
-      const numLang = unitModule.lang || course.language || "";
-      const numOwner = unitModule.numbersFrom || unitModule.owner;
-      const index = await systemIndex(numOwner);
-      const sysRow = index.numbers[numLang] ? await readJson(store, K.numSys(index.numbers[numLang])) : null;
-      const sys = sysRow ? readNumberSystem(sysRow) : null;
-      /** @type {any[]} */
-      let fillers = [];
-      if (sys) {
-        /** @type {string[]} */
-        const lib = (await readJson(store, K.myCards(numOwner))) || [];
-        const nounRows = (await readManyJson(store, lib.map((id) => K.card(id)))).filter((c) => c && inScope(c));
-        fillers = fillerCards(composerFor(numLang), withNouns(sys, countedNouns(nounRows, numLang)));
-      }
-      const all = [...byId.values()];
-      const counting = countingCards({
-        course, modules: modules, unitId: moduleId, cards: all,
-        moduleIdsOf: (c) => modulesOf.get(String(c.id)) || [],
-        fillers,
-      });
-      const own = (await moduleCardIds(unitModule)).map((id) => byId.get(id)).filter(Boolean);
-      return unitProblems({ cards: own, counting, lang });
     }
 
     /* ================= courses ================= */

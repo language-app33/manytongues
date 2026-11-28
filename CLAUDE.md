@@ -96,8 +96,9 @@ artifact page rather than the chat, as the next section says):
   can answer the whole set in a line ("1a, 2b, 3a"). This holds even for an
   open question: suggest likely answers as options; the owner can still
   write their own.
-- Every question ends with the recommended option, named by its letter,
-  and a very short reason why — a sentence at most.
+- The recommendation is part of the recommended option itself, never a
+  separate line or item after the options: that option is labelled
+  "Recommended" and carries the very short reason why, a sentence at most.
 - Concise and non-technical, in the same plain terms as above.
 
 ## Questions and proposals go in an artifact, not in the chat
@@ -117,14 +118,28 @@ than a line or two, or a picture would help, it goes in a page.
 What the page holds:
 
 - The same format as above: numbered questions or decisions, lettered
-  options, the recommended option marked with its very short reason.
+  options.
+- **The recommendation lives inside the recommended option**, both in how
+  it looks and in words: that option stands out from the others at a
+  glance (a badge and a highlight, on its mock-up too where it has one),
+  and the word "Recommended" and the very short reason are written in it.
+  Never a separate "Recommended: b" line or box beside the options.
 - **A picture wherever one is relevant.** A change the owner would see in
   the app is shown as a realistic mock-up in the app's real look, at phone
-  size, one per option where the options look different. Anything else
-  (behaviour, order of steps, what is stored) gets a simple sketch, or
-  none if it would add nothing.
-- Under every question: the options as a choice the owner selects on the
-  page, including "none of these", and a box for a comment or note.
+  size. Anything else (behaviour, order of steps, what is stored) gets a
+  simple sketch, or none if it would add nothing.
+- **Every option gets its own mock-up**, not one picture for the question
+  and not a picture of the recommended option only. If a question has
+  options a, b and c that would look different in the app, there are three
+  mock-ups, side by side or one after another, so they can be compared.
+  The only options without one are those with nothing to see.
+- **Choosing is done on the pictures wherever possible.** Where the
+  options have mock-ups or sketches, the owner taps the picture itself to
+  select that option, and the chosen one is plainly marked; no separate
+  list of choices repeated in text underneath. Options with nothing to
+  show are chosen from their text.
+- Every question also offers "none of these", and has a box for a comment
+  or note.
 - **One button that copies every answer and note to the clipboard** as a
   short text ("1a, 2b: note…") the owner pastes back into the chat. It
   must work on a phone, and show what was copied or that copying failed.
@@ -134,9 +149,13 @@ Follow-up questions go in **a new version of the same page**, not a new
 page and not the chat: the earlier decisions stay on it, shown as settled
 with the owner's notes, and the new questions carry on the numbering.
 
-**When a page is shared, the chat message is extremely short**: a line
-saying what the page is for and how many questions it holds, and the link.
-Do not repeat the questions, the options or the reasoning in the chat.
+**No long text in the chat. Whenever a page is shared or updated, the
+reply in the chat is one very short sentence and the link to the page,
+and nothing else.** This holds every time: for the first version, and for
+every later version after the owner pastes answers or asks for a change.
+Do not repeat or summarise the questions, the options, the reasoning or
+what changed on the page in the chat; anything worth saying goes on the
+page itself.
 
 ## How to propose fixes
 
@@ -149,8 +168,9 @@ questions, every time, and in an artifact page as the section above says:
   the owner can answer "1b, 2a" and be understood. Never 1.1 and 1.2.
 - Each fix says, in the same plain terms as above, what changes for the
   people using the app and what it costs or gives up.
-- Each thing to decide ends with the recommended fix, named by its letter,
-  and a very short reason why.
+- The recommendation is part of the recommended fix itself, never a
+  separate line or item after the fixes: that fix is labelled
+  "Recommended" and carries the very short reason why.
 
 Where there is only one sensible fix, still say which it is and why, rather
 than presenting it as a list of one.

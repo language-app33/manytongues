@@ -32,7 +32,7 @@
  * the numerals that agree with a feminine word are written. The tab says
  * so rather than opening onto boxes that would render nothing.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Lang } from "./types.ts";
 import type {
   CountedNoun,
@@ -46,15 +46,15 @@ import type {
   TimeStyle,
   TwoWords,
 } from "./numbers/types.ts";
-import { MINUTE_MARKS, NUMBER_CEILING, countingOf, partsNow } from "./numbers/types.ts";
+import { MINUTE_MARKS, NUMBER_CEILING, countingOf, partName, partsNow, spanWords } from "./numbers/types.ts";
 import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { blocking, countable, countingWarnings, probeOf, rangeChecks, renderAsk, seeded } from "./numbers/range.ts";
 import { readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import type { RangeCheck } from "./numbers/range.ts";
-import { figureOf, homesOf, partTags } from "./numbers/generate.ts";
+import { figureOf, homesOf, partProgress, partTags } from "./numbers/generate.ts";
 import { readNouns, withNouns } from "./numbers/nouns.ts";
 import type { ReadNoun } from "./numbers/nouns.ts";
-import { Button, ConfirmModal, ModuleSwitch, Help, Icon, Meta, Notice, Screen, Section, Segmented, Tile, plural } from "./shared.tsx";
+import { Button, ConfirmModal, ModuleSwitch, Help, Icon, Meta, Notice, Screen, Section, Segmented, Tile, plural, useSnackbar } from "./shared.tsx";
 import { dimsFor } from "./languages.ts";
 import { RecordingScreen, ScriptInput } from "./card-editor.tsx";
 
@@ -289,6 +289,17 @@ export function NumberSystemEditor({
   }, [composer, connecting]);
   const labels = useMemo(() => new Map(slotSpecs.map((s) => [s.slot, s.label])), [slotSpecs]);
   const checks = useMemo(() => (composer ? rangeChecks(composer, counted) : []), [composer, counted]);
+  /*
+   * The moment a part becomes ready (0.736, the owner's choice): the parts
+   * open when the screen opened, and after each save that went through, so
+   * a save can tell which it has just finished. Those are said in a
+   * message and marked "Just finished" on their tiles until the teacher
+   * leaves Numbers.
+   */
+  const snack = useSnackbar();
+  const openIds = (cs: RangeCheck[]) => new Set(cs.filter((c) => c.range.kind === "numbers" && c.open).map((c) => c.range.id));
+  const wasOpen = useRef<Set<string>>(openIds(checks));
+  const [justReady, setJustReady] = useState<Set<string>>(() => new Set());
   /* Boxes that used to be two, where the teacher wrote a different word in
      each — see TwoWords. Asked on the part each number is in, and named on
      the front screen so nobody has to go looking. */
@@ -321,7 +332,7 @@ export function NumberSystemEditor({
 
   if (!composer) {
     return (
-      <Screen title="Number system" onBack={onClose}>
+      <Screen title={`Numbers · ${lang.name}`} onBack={onClose}>
         <Notice kind="warn">
           Nobody has written down how {lang.name} builds its numbers yet, so there is nothing to
           fill in. Everything else about the language still works.
@@ -349,11 +360,30 @@ export function NumberSystemEditor({
      button once there is nothing left for it to do. */
   const save = async (): Promise<boolean> => {
     let ok = true;
-    if (numbersDirty) ok = !!(await onSave("numbers", draft)) && ok;
+    /* What is open as this is saved: the draft is what is being saved. */
+    const savedChecks = checks;
+    if (numbersDirty) {
+      const numbersOk = !!(await onSave("numbers", draft));
+      ok = numbersOk && ok;
+      if (numbersOk) finished(savedChecks);
+    }
     if (clockDirty && clock) ok = !!(await onSave("times", clock)) && ok;
     setFailed(!ok);
     return ok;
   };
+  /* Which parts a save has just made ready, said once in a message that
+     names the last of them and what to write next. */
+  function finished(now: RangeCheck[]) {
+    const parts = now.filter((c) => c.range.kind === "numbers");
+    const fresh = parts.filter((c) => c.open && !wasOpen.current.has(c.range.id));
+    wasOpen.current = openIds(now);
+    if (!fresh.length) return;
+    const last = fresh[fresh.length - 1];
+    const next = parts.find((c) => !c.open && /still to write$/.test(partStatus(c, now, homes, labels)));
+    const who = fresh.length > 1 ? `${last.range.label} and ${fresh.length - 1} more are ready.` : `${last.range.label} is ready.`;
+    snack(`${who} Students can now be asked these numbers.${next ? ` Next: ${next.range.label}.` : ""}`, "good");
+    setJustReady((was) => new Set([...was, ...fresh.map((c) => c.range.id)]));
+  }
 
   /*
    * Off an editing screen, with something unsaved: asked rather than
@@ -571,27 +601,29 @@ export function NumberSystemEditor({
     /* Nothing on this screen is edited, so it has no Save: each part, the
        clock and the numbers written out by hand open on a screen of their
        own, and are saved there. */
-    <Screen title="Number system" onBack={leave(onClose)} className="cardform">
-      {sharedNote ? <Help>{sharedNote}</Help> : null}
+    <Screen title={`Numbers · ${lang.name}`} onBack={leave(onClose)} className="cardform">
       <NumbersTab
         lang={lang}
         draft={draft}
         checks={checks}
+        slots={slotSpecs}
+        render={(n) => composer.render(n, counted)}
+        justReady={justReady}
         homes={homes}
         labels={labels}
         twoWords={twoWords}
         connecting={
           connecting.length
             ? connecting.every((s) => s.optional || written(draft, s))
-              ? "ready"
-              : "not written yet"
+              ? "Ready"
+              : "Not written yet"
             : null
         }
         time={
           timeComposer
             ? hourReady
-              ? "ready"
-              : "waiting on the numbers that go with a feminine word"
+              ? "Ready"
+              : "Needs the numbers that go with a feminine word first"
             : null
         }
         onOpen={setPart}
@@ -599,6 +631,9 @@ export function NumberSystemEditor({
         onFix={() => setFixing(true)}
         onCheck={() => setTrying(true)}
       />
+      {/* Small print at the foot since 0.736: the headline is what this
+          screen opens on. */}
+      {sharedNote ? <Help className="at-mt5">{sharedNote}</Help> : null}
     </Screen>
   );
 
@@ -643,9 +678,10 @@ function PartBlock({ title, role, children }: { title: string; role?: React.Reac
 /**
  * Where one part stands, in a few words a tile can carry.
  *
- * "ready", or what it is waiting for — and where that is a word another
- * part holds, which part: 11 to 99 cannot be said without seven, and the
- * box for seven is on 0 to 10's screen, not this one. Counting has a line
+ * "Ready", how many of its own words are still to write, or which other
+ * part it needs first: 11 to 99 cannot be said without seven, and the
+ * box for seven is on 0 to 10's screen, not this one. One plain line
+ * since 0.732 (the owner's 7a), where it used to name the words. Counting has a line
  * of its own — see countingStatus — because it never holds a part back.
  */
 export function partStatus(
@@ -654,7 +690,7 @@ export function partStatus(
   homes: Map<string, string>,
   labels: Map<string, string>,
 ): string {
-  if (check.open) return "ready";
+  if (check.open) return "Ready";
   const stops = blocking(check.warnings as never) as { code: string; slot?: string; detail?: string }[];
   const partLabel = (id: string) => {
     if (id === CONNECTING) return "Connecting words";
@@ -664,20 +700,12 @@ export function partStatus(
   const missing = [...new Set(stops.map((w) => w.slot || "").filter(Boolean))];
   const borrowed = missing.filter((slot) => homes.get(slot) && homes.get(slot) !== check.range.id);
   const own = missing.filter((slot) => !borrowed.includes(slot));
-  const named = (slots: string[]) =>
-    slots.length > 2
-      ? `${slots.slice(0, 2).map((s) => labels.get(s) || s).join(", ")} and ${slots.length - 2} more`
-      : slots.map((s) => labels.get(s) || s).join(" and ");
-  if (borrowed.length) {
-    const first = homes.get(borrowed[0]) || "";
-    const there = borrowed.filter((s) => homes.get(s) === first);
-    return `waiting on ${partLabel(first)}: ${named(there)}`;
-  }
-  if (own.length) return `waiting on ${named(own)}`;
+  if (borrowed.length) return `Needs ${partLabel(homes.get(borrowed[0]) || "")} first`;
+  if (own.length) return `${plural(own.length, "word")} still to write`;
   /* Nothing of its own missing, and still shut: an earlier part is, and
      the parts open in order. */
   const before = checks.find((c) => !c.open && c.range.kind === "numbers" && c !== check);
-  return before ? `waiting on ${before.range.label}` : waitingOn(check.warnings);
+  return before ? `Needs ${before.range.label} first` : waitingOn(check.warnings);
 }
 
 /**
@@ -693,7 +721,9 @@ export function countingStatus(check: RangeCheck, labels: Map<string, string>): 
   const counting = check.counting;
   if (!counting) return null;
   if (counting.open) return "Counting: ready";
-  if (!check.open) return "Counting: once the numbers are ready";
+  /* Nothing until the part's own numbers are: its own line says what they
+     need, and this would only say it again (0.732). */
+  if (!check.open) return null;
   const stops = blocking(counting.warnings as never) as { code: string; slot?: string; detail?: string }[];
   if (stops.some((w) => w.detail === "no nouns to count")) return "Counting: waiting on a noun card";
   const faces = [...new Set(
@@ -705,10 +735,22 @@ export function countingStatus(check: RangeCheck, labels: Map<string, string>): 
   return `Counting: ${waitingOn(counting.warnings, labels)}`;
 }
 
-function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, time, onOpen, onTime, onFix, onCheck }: {
+/** The tick before a finished part's name (0.736): a solid green circle,
+    never the green outline and fill that mean "chosen" elsewhere. */
+function DoneTick() {
+  return <span className="at-numtick" aria-hidden="true"><Icon name="check" size={16} /></span>;
+}
+
+function NumbersTab({ lang, draft, checks, slots, render, justReady, homes, labels, twoWords, connecting, time, onOpen, onTime, onFix, onCheck }: {
   lang: Lang;
   draft: NumberSystem;
   checks: RangeCheck[];
+  /** Every box the language has, for how much of a part is written. */
+  slots: SlotSpec[];
+  /** A number as the app says it, for a finished part's sample line. */
+  render: (n: number) => { text: string; warnings: { code: string; slot?: string }[] };
+  /** The parts a save made ready since Numbers was opened. */
+  justReady: Set<string>;
   homes: Map<string, string>;
   labels: Map<string, string>;
   /** Boxes that used to be two and still hold two different words. */
@@ -727,58 +769,138 @@ function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, 
   /* The parts that hold a question about two words, in their own order. */
   const asking = parts.filter((c) => twoWords.some((q) => q.n >= c.range.from && q.n <= c.range.to));
   const yours = Object.keys(draft.overrides).length;
+  /* The next part worth writing, marked "Start here"; a part that needs
+     another first is drawn fainter (0.732, the owner's 7a). */
+  const statusOf = (c: RangeCheck) => partStatus(c, checks, homes, labels);
+  const next = parts.find((c) => !c.open && /still to write$/.test(statusOf(c)));
+
+  /*
+   * What students can do now, as a headline with no box (0.736, the
+   * owner's choice): how far the unbroken run of finished parts from the
+   * start lets them count, then how many parts are ready and which is
+   * next, and a step for each part that fills in.
+   */
+  const ready = parts.filter((c) => c.open).length;
+  let upTo: RangeCheck | null = null;
+  for (const c of parts) {
+    if (!c.open) break;
+    upTo = c;
+  }
+  /* The words the first part still needs, counted as its tile counts
+     them, so the two never disagree. */
+  const first = parts[0];
+  const firstMissing = first ? Number((/^(\d+) words? still to write$/.exec(statusOf(first)) || [])[1] || 0) : 0;
+  const headline = !ready
+    ? `Write ${plural(firstMissing, "word")} to begin`
+    : upTo && upTo === parts[parts.length - 1]
+    ? "Students can count past a billion"
+    : upTo
+    ? `Students can count to ${upTo.range.to.toLocaleString("en")}`
+    : `${plural(ready, "part")} ready`;
+  const sub = !ready
+    ? "The app builds every number from a few words. Any part you finish works straight away."
+    : `${ready} of ${parts.length} parts ready.${next ? ` Next: ${next.range.label}.` : ""}`;
+
+  /* A finished part's first numbers as the app says them: always the
+     same four from the start of the part, so the line does not change
+     between visits (the owner asked). */
+  const sampleOf = (range: Range): string => {
+    const out: string[] = [];
+    for (let n = range.from; n < range.from + 4 && n <= range.to; n += 1) {
+      const said = render(n);
+      if (!said.text || blocking(said.warnings as never).length) continue;
+      out.push(`${lang.numerals ? lang.numerals(n) : n.toLocaleString("en")} ${said.text}`);
+    }
+    return out.length ? `${out.join(" · ")}…` : "";
+  };
 
   return (
     <>
-      <Help>
-        Write the words {lang.name} builds its numbers out of and the app makes the rest. Open a
-        part to write its words: with zero to nine written the app can ask anything up to nine,
-        and so on up. <b>Nothing here has to be finished</b> — whatever is written works, and
-        each part says what it is still waiting for.
-      </Help>
+      <div className="at-numhero">
+        <h3 className="at-numherotitle">{headline}</h3>
+        <p className="at-numherosub">{sub}</p>
+        <div className="at-numsteps" aria-hidden="true">
+          {parts.map((c) => <i key={c.range.id} className={c.open ? "on" : undefined} />)}
+        </div>
+      </div>
 
       {asking.length ? (
         <Notice kind="warn">
-          {`For ${plural(twoWords.length, "number")} you wrote one word before a masculine noun and another before a feminine one. ${lang.name} uses the same word before both, so there is now one box. Choose the word you say in ${asking.map((c) => c.range.label.toLowerCase()).join(" and ")}. Until you do, your students are asked exactly what they were before.`}
+          {`For ${plural(twoWords.length, "number")} you wrote one word before a masculine noun and another before a feminine one. ${lang.name} uses the same word before both, so there is now one box. Choose the word you say in the numbers ${asking.map((c) => spanWords(c.range)).join(" and ")}. Until you do, your students are asked exactly what they were before.`}
           <div className="at-row at-mt3">
             {asking.map((c) => (
               <Button key={c.range.id} size="sm" onClick={() => onOpen(c.range.id)}>
-                {`Open ${c.range.label}`}
+                {`Open ${partName(c.range)}`}
               </Button>
             ))}
           </div>
         </Notice>
       ) : null}
 
-      <Section title="Parts" className="at-mt5">
-        <div className="at-numparts">
-          {parts.map((check) => (
-            <Tile
-              key={check.range.id}
-              title={check.range.label}
-              meta={
-                <span className="at-numstates">
-                  <span className="at-numstate" data-open={check.open ? "" : undefined}>
-                    {partStatus(check, checks, homes, labels)}
+      {/* No "Parts" heading over them since 0.736: the headline says what
+          they are. */}
+      <div className="at-numparts at-mt5">
+          {parts.map((check) => {
+            const status = statusOf(check);
+            const just = justReady.has(check.range.id);
+            const sample = check.open ? sampleOf(check.range) : "";
+            const progress = !check.open && /still to write$/.test(status)
+              ? partProgress(check.range.id, slots, homes, draft)
+              : null;
+            const badge = just
+              ? <span className="at-statusbadge">Just finished</span>
+              : check === next
+              ? <span className="at-statusbadge">Start here</span>
+              : undefined;
+            const tile = (
+              <Tile
+                key={check.range.id}
+                title={check.open ? <>{<DoneTick />}{check.range.label}</> : check.range.label}
+                badge={badge}
+                meta={
+                  <span className="at-numstates">
+                    {check.open && sample ? (
+                      <span className="at-numstate at-numsample1" lang={lang.id} dir={lang.direction}>{sample}</span>
+                    ) : (
+                      <span className="at-numstate" data-open={check.open ? "" : undefined}>
+                        {status}
+                      </span>
+                    )}
+                    {progress && progress.total ? (
+                      <span className="at-numbar"><i style={{ width: `${Math.round((progress.written / progress.total) * 100)}%` }} /></span>
+                    ) : null}
+                    {countingStatus(check, labels) ? (
+                      <span
+                        className="at-numstate"
+                        data-open={check.counting && check.counting.open ? "" : undefined}
+                      >
+                        {countingStatus(check, labels)}
+                      </span>
+                    ) : null}
                   </span>
-                  {countingStatus(check, labels) ? (
-                    <span
-                      className="at-numstate"
-                      data-open={check.counting && check.counting.open ? "" : undefined}
-                    >
-                      {countingStatus(check, labels)}
-                    </span>
-                  ) : null}
-                </span>
-              }
-              onOpen={() => onOpen(check.range.id)}
-            />
-          ))}
+                }
+                onOpen={() => onOpen(check.range.id)}
+              />
+            );
+            /* Named for a screen reader as what it is and that it is
+               ready, the sample line being in another language. */
+            const wrapped = (
+              <div
+                key={check.range.id}
+                className={[/^Needs /.test(status) ? "at-numwait" : "", check.open ? "at-numdone" : "", just ? "at-numjust" : ""].filter(Boolean).join(" ") || undefined}
+                aria-label={check.open ? `${check.range.label}, ready${just ? ", just finished" : ""}` : undefined}
+                role={check.open ? "group" : undefined}
+              >
+                {tile}
+              </div>
+            );
+            return wrapped;
+          })}
           {connecting !== null ? (
             <Tile
-              title="Connecting words"
+              title={connecting === "Ready" ? <>{<DoneTick />}Connecting words</> : "Connecting words"}
               meta={
-                <span className="at-numstate" data-open={connecting === "ready" ? "" : undefined}>
+                <span className="at-numstate" data-open={connecting === "Ready" ? "" : undefined}>
                   {connecting}
                 </span>
               }
@@ -787,19 +909,18 @@ function NumbersTab({ lang, draft, checks, homes, labels, twoWords, connecting, 
           ) : null}
           {time !== null ? (
             <Tile
-              title="Telling the time"
+              title={time === "Ready" ? <>{<DoneTick />}Telling the time</> : "Telling the time"}
               meta={
-                <span className="at-numstate" data-open={time === "ready" ? "" : undefined}>
+                <span className="at-numstate" data-open={time === "Ready" ? "" : undefined}>
                   {time}
                 </span>
               }
               onOpen={onTime}
             />
           ) : null}
-        </div>
-      </Section>
+      </div>
 
-      <Section title="When the app gets one wrong" className="at-mt5">
+      <Section title="Fix a number" className="at-mt5">
         <div className="at-numparts">
           <Tile
             title="Correct how a number is said"
@@ -1006,7 +1127,7 @@ function PartScreen({
   ) : null;
 
   return (
-    <Screen title={range.label} onBack={onClose} action={saveButton} className="cardform">
+    <Screen title={partName(range)} onBack={onClose} action={saveButton} className="cardform">
       {note}
       {/* First, as a card's editor puts them near the top: where this part
           goes decides whether anybody is ever asked it. */}
@@ -1031,8 +1152,8 @@ function PartScreen({
             />
           ) : (
             <Help>
-              Nothing new to write here: {range.label.toLowerCase()} is built out of the words in{" "}
-              {earlier.length ? earlier.map((c) => c.range.label.toLowerCase()).join(" and ") : "the other parts"},
+              Nothing new to write here: the numbers {spanWords(range)} are built out of the words in{" "}
+              {earlier.length ? `the numbers ${earlier.map((c) => spanWords(c.range)).join(" and ")}` : "the other parts"},
               including the forms they take inside a bigger number.
             </Help>
           )}
@@ -1210,66 +1331,117 @@ function WordGrid({ lang, draft, setDraft, slots, onRecord, countedAt }: {
   /** The number counting a thing, where the part is counted with. */
   countedAt?: (n: number) => { text: string; en: string } | null;
 }) {
+  /*
+   * Cut into runs of numbers that share an explanation and a number of
+   * boxes (0.736, the owner's choice). A run's explanation is said once,
+   * above it, where 3 to 9 used to say the same sentence seven times. A
+   * run of numbers with exactly two boxes is drawn as rows: the number,
+   * then its two boxes side by side under the run's column headings. One
+   * box (0) or three (1 and 2) keep a box of their own, stacked full
+   * width, since three boxes in a row would be too narrow on a phone.
+   */
+  const runs: SlotSpec[][] = [];
+  for (const slot of slots) {
+    const last = runs[runs.length - 1];
+    if (last && last[0].hint === slot.hint && last[0].formKeys.length === slot.formKeys.length) last.push(slot);
+    else runs.push([slot]);
+  }
+  const formsOf = (slot: SlotSpec) => (draft.lexemes[slot.slot] || { forms: {} as Record<string, string> }).forms as Record<string, string | undefined>;
+  /* Where the number has a box for its word before a noun, the example
+     waits for that box: until it is filled the phrase is made from a word
+     the teacher has not said, and shows nothing about whether the box is
+     right. */
+  const countedOf = (slot: SlotSpec) => {
+    const n = figureOf(slot.label);
+    const forms = formsOf(slot);
+    const beforeNoun = slot.formKeys.filter((key) => key.startsWith("construct."));
+    const waiting = beforeNoun.length > 0 && !beforeNoun.some((key) => (forms[key] || "").trim());
+    return countedAt && n != null && !waiting ? countedAt(n) : null;
+  };
+  const countBlock = (slot: SlotSpec) => {
+    const counted = countedOf(slot);
+    return counted ? (
+      <div className="at-numcount">
+        <span className="at-label">Examples of counting things</span>
+        <span className="at-numsaid" lang={lang.id} dir={lang.direction}>
+          {counted.text}
+        </span>
+        {counted.en ? <Meta>{counted.en}</Meta> : null}
+      </div>
+    ) : null;
+  };
+  const figure = (slot: SlotSpec) => (
+    <>
+      <span>{slot.label}</span>
+      {numeralFor(lang, slot.label) ? (
+        <span className="at-numheadfig" lang={lang.id} dir={lang.direction}>
+          {numeralFor(lang, slot.label)}
+        </span>
+      ) : null}
+    </>
+  );
+  /* One box: the word, and once it is typed, how it sounds and its
+     recording under it, in the same column. */
+  const cell = (slot: SlotSpec, key: FormKey, labelled: boolean) => (
+    <div className="at-numcell" key={key}>
+      {labelled ? <span className="at-label">{faceLabel(slot, key)}</span> : null}
+      <ScriptInput
+        lang={lang}
+        value={formsOf(slot)[key] || ""}
+        label={`${slot.label}, ${faceLabel(slot, key)}`}
+        compact
+        onChange={(v) => setDraft((d) => withWord(d, slot.slot, key, v))}
+      />
+      {formsOf(slot)[key] ? (
+        <div className="at-numsound">
+          <LatInput
+            lang={lang}
+            value={(draft.lexemes[slot.slot].lat || {})[key] || ""}
+            of={`${slot.label}, ${faceLabel(slot, key)}`}
+            onChange={(v) => setDraft((d) => withLat(d, slot.slot, key, v))}
+          />
+          <Button size="sm" onClick={() => onRecord(slot.slot, key)}>
+            {((draft.lexemes[slot.slot].audio || {})[key] || []).length
+              ? "Recording ✓"
+              : "Record"}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
   return (
     <div className="at-numtiles">
-      {slots.map((slot) => {
-        const n = figureOf(slot.label);
-        /* Where the number has a box for its word before a noun, the
-           example waits for that box: until it is filled the phrase is
-           made from a word the teacher has not said, and shows nothing
-           about whether the box is right. */
-        const forms = (draft.lexemes[slot.slot] || { forms: {} }).forms;
-        const beforeNoun = slot.formKeys.filter((key) => key.startsWith("construct."));
-        const waiting = beforeNoun.length > 0 && !beforeNoun.some((key) => (forms[key] || "").trim());
-        const counted = countedAt && n != null && !waiting ? countedAt(n) : null;
+      {runs.map((run) => {
+        const hint = run[0].hint;
         return (
-          <div className="at-part at-numtile" key={slot.slot}>
-            <p className="at-groupline at-numhead">
-              <span>{slot.label}</span>
-              {numeralFor(lang, slot.label) ? (
-                <span className="at-numheadfig" lang={lang.id} dir={lang.direction}>
-                  {numeralFor(lang, slot.label)}
-                </span>
-              ) : null}
-            </p>
-            {slot.hint ? <p className="at-hint at-numhint">{slot.hint}</p> : null}
-            {slot.formKeys.map((key) => (
-              <div className="at-numcell" key={key}>
-                {slot.formKeys.length > 1 ? <span className="at-label">{faceLabel(slot, key)}</span> : null}
-                <ScriptInput
-                  lang={lang}
-                  value={(draft.lexemes[slot.slot] || { forms: {} }).forms[key] || ""}
-                  label={`${slot.label}, ${faceLabel(slot, key)}`}
-                  compact
-                  onChange={(v) => setDraft((d) => withWord(d, slot.slot, key, v))}
-                />
-                {(draft.lexemes[slot.slot] || { forms: {} }).forms[key] ? (
-                  <div className="at-numsound">
-                    <LatInput
-                      lang={lang}
-                      value={(draft.lexemes[slot.slot].lat || {})[key] || ""}
-                      of={`${slot.label}, ${faceLabel(slot, key)}`}
-                      onChange={(v) => setDraft((d) => withLat(d, slot.slot, key, v))}
-                    />
-                    <Button size="sm" onClick={() => onRecord(slot.slot, key)}>
-                      {((draft.lexemes[slot.slot].audio || {})[key] || []).length
-                        ? "Recording ✓"
-                        : "Record"}
-                    </Button>
-                  </div>
-                ) : null}
+          <React.Fragment key={run[0].slot}>
+            {hint ? <p className="at-hint at-numhint at-numrunhint">{hint}</p> : null}
+            {run[0].formKeys.length === 2 ? (
+              <div className="at-numrun">
+                <div className="at-numrowhead">
+                  <span />
+                  {run[0].formKeys.map((key) => <span className="at-label" key={key}>{faceLabel(run[0], key)}</span>)}
+                </div>
+                {run.map((slot) => (
+                  <React.Fragment key={slot.slot}>
+                    <div className="at-numrow at-numpair">
+                      <p className="at-numrowfig">{figure(slot)}</p>
+                      {slot.formKeys.map((key) => cell(slot, key, false))}
+                    </div>
+                    {countBlock(slot)}
+                  </React.Fragment>
+                ))}
               </div>
-            ))}
-            {counted ? (
-              <div className="at-numcount">
-                <span className="at-label">Examples of counting things</span>
-                <span className="at-numsaid" lang={lang.id} dir={lang.direction}>
-                  {counted.text}
-                </span>
-                {counted.en ? <Meta>{counted.en}</Meta> : null}
-              </div>
-            ) : null}
-          </div>
+            ) : (
+              run.map((slot) => (
+                <div className="at-part at-numtile" key={slot.slot}>
+                  <p className="at-groupline at-numhead">{figure(slot)}</p>
+                  {slot.formKeys.map((key) => cell(slot, key, true))}
+                  {countBlock(slot)}
+                </div>
+              ))
+            )}
+          </React.Fragment>
         );
       })}
     </div>
@@ -1439,26 +1611,26 @@ function PartTags({ range, open, counts }: { range: Range; open: boolean; counts
       : name === counting[1]
         ? "Any number in its counting form, from any part"
         : name === counting[0]
-          ? `A number in its counting form, from ${range.label.toLowerCase()}`
-          : `A number from ${range.label.toLowerCase()}`;
+          ? `A number in its counting form, from ${spanWords(range)}`
+          : `A number from ${spanWords(range)}`;
   return (
-    <PartBlock title="Filling blanks" role="How this part can be used to fill blanks in sentence cards">
+    <PartBlock title="Use in sentences" role="A sentence can leave a gap for any word in a group, like colours or foods.">
       <div className="at-part">
-        <p className="at-groupline">The part&rsquo;s tags</p>
+        <p className="at-groupline">Groups</p>
         <Help>
-          Wherever a sentence card has a blank for one of these tags, this part fills it with one of
+          Wherever a sentence card has a blank for one of these groups, this part fills it with one of
           its numbers, written out
-          {counting.length ? <>, or for the counting tags in the form a number takes before a noun</> : null}.
+          {counting.length ? <>, or for the counting groups in the form a number takes before a noun</> : null}.
           {counting.length ? (
             <>
-              {" "}A counting tag brings no noun: write the noun yourself. Put a noun blank straight after it, as in{" "}
+              {" "}A counting group brings no noun: write the noun yourself. Put a noun blank straight after it, as in{" "}
               <span className="at-blankname">{`{{${counting[0]}}} {{animal}}`}</span>, and the number counts that
               noun, in the form the number calls for: &ldquo;3 dogs&rdquo;.
             </>
           ) : null}
         </Help>
         <div className="at-ticklist at-cardtags">
-          <p className="at-eyebrow">Default tags</p>
+          <p className="at-eyebrow">From the kind of card</p>
           <Help>These follow from the part, and are the same in every language.</Help>
           <div className="at-tagchips">
             {[own, general, ...counting].map((name) => (

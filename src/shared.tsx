@@ -21,7 +21,7 @@ import type { Reader, TableGroup } from "./card-facts.ts";
 import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSaid, dimText, EXAMPLES_CEILING,
   examplesOf, fillersOn, IN_NO_MODULE, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
-import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { colOf, foldJoined, NO_PARTNER, personAt, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
 import { dismissReach, holdReach, isUnreachable, reachState, releaseReach, retryReach, showReach, watchReach } from "./reach.ts";
 import type { ReachState } from "./reach.ts";
@@ -101,6 +101,8 @@ export function confirmStrength({ permanent, affectsOthers, name }: {
    ------------------------------------------------------------------ */
 
 const ICONS: Record<string, string> = {
+  /* Three stops joined by a line, climbing: a course's path (0.733). */
+  path: "M6 15.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM18 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM7.4 15.2l2.4-2.4 1.4 1.4-2.4 2.4zM13.4 9.2l2.4-2.4 1.4 1.4-2.4 2.4z",
   /* An empty ring of dashes: not out yet — the draft beside Published's
      tick. */
   draft: "M20.92 13.17A9 9 0 0 1 19.14 17.48L17.55 16.26A7 7 0 0 0 18.94 12.91zM17.48 19.14A9 9 0 0 1 13.17 20.92L12.91 18.94A7 7 0 0 0 16.26 17.55zM10.83 20.92A9 9 0 0 1 6.52 19.14L7.74 17.55A7 7 0 0 0 11.09 18.94zM4.86 17.48A9 9 0 0 1 3.08 13.17L5.06 12.91A7 7 0 0 0 6.45 16.26zM3.08 10.83A9 9 0 0 1 4.86 6.52L6.45 7.74A7 7 0 0 0 5.06 11.09zM6.52 4.86A9 9 0 0 1 10.83 3.08L11.09 5.06A7 7 0 0 0 7.74 6.45zM13.17 3.08A9 9 0 0 1 17.48 4.86L16.26 6.45A7 7 0 0 0 12.91 5.06zM19.14 6.52A9 9 0 0 1 20.92 10.83L18.94 11.09A7 7 0 0 0 17.55 7.74z",
@@ -113,9 +115,19 @@ const ICONS: Record<string, string> = {
     "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
   edit:
     "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  /* English in a box: a course that shows English (0.738, the owner's 2b);
+     the same letters with only the box's corners, a course that shows a
+     little of it. Pictures for the Exercises tab's choices. */
+  english:
+    "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM4 6v12h16V6zM6.5 8H11v1.6H8.3v1.6h2.4v1.6H8.3v1.6H11V16H6.5zM12.5 8h1.7l2.3 4.4V8h1.7v8h-1.7l-2.3-4.4V16h-1.7z",
+  englishLittle:
+    "M2 4h5v2H4v3H2zM17 4h5v5h-2V6h-3zM22 20h-5v-2h3v-3h2zM2 20v-5h2v3h3v2zM6.5 8H11v1.6H8.3v1.6h2.4v1.6H8.3v1.6H11V16H6.5zM12.5 8h1.7l2.3 4.4V8h1.7v8h-1.7l-2.3-4.4V16h-1.7z",
+  /* A funnel: Filter, everywhere (0.735, the owner's 4a). `tune` stays for
+     settings: the Exercises tab, a card's Advanced tab. */
+  filter: "M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39c.51-.66.04-1.61-.79-1.61H5.04c-.83 0-1.3.95-.79 1.61z",
   tune:
     "M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z",
-  /* Ordering a list. `tune` beside it is what
+  /* Ordering a list. `filter` beside it is what
      narrowing one looks like, so the three buttons over a card list read as
      three different jobs rather than three shades of the same one. */
   sort: "M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z",
@@ -813,12 +825,15 @@ export function Section({ title, count, lede, action, children, className = "", 
 /* --- Empty --------------------------------------------------------
    Sixteen different ad-hoc versions of "there is nothing here",
    fifteen of which did not use the class that existed for it. */
-export function Empty({ title, children, action, art }: { title?: Node; children?: Node; action?: Node;
+export function Empty({ title, children, action, art, slim }: { title?: Node; children?: Node; action?: Node;
   /** A small picture above the words, where the screen is otherwise bare
       (0.642: the home screen with nothing to practise). */
-  art?: Node }) {
+  art?: Node;
+  /** On one row, picture beside the words, about a third of the height:
+      a quiet To do on Teaching's Home (0.733). */
+  slim?: boolean }) {
   return (
-    <div className="at-empty2">
+    <div className={`at-empty2${slim ? " slim" : ""}`}>
       {art ? <div className="at-emptyart" aria-hidden="true">{art}</div> : null}
       {title ? <p className="at-eyebrow">{title}</p> : null}
       {children ? <p className="at-hint">{children}</p> : null}
@@ -1361,7 +1376,7 @@ function Written({ text }: { text?: string | null }) {
  * The card is a form rather than a `Card` or an `Item`, because both
  * sides show these: only the wording is read, and that is all a form is.
  */
-export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className }: {
+export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onClick, className, standIn }: {
   /* A card, not one of its forms: the tile shows the card's own word —
      the first of them — and says what the card is called, which is a fact
      about the card. */
@@ -1387,6 +1402,10 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
   corner?: Node;
   onClick?: () => void;
   className?: string;
+  /** What goes in the meaning's place on a card with no meaning (0.733,
+      the teacher's grids): its transliteration, or that it is a picture
+      or a recording. See standIn in cards.ts. Left out, the line is blank. */
+  standIn?: { kind: string; text: string } | null;
 }) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   /* A conversation has no front of its own: its first line stands in for
@@ -1463,6 +1482,10 @@ export function CardTile({ card, lang, showLat, meta, bar, actions, corner, onCl
         */}
       {card.name
         ? <div className="at-minien at-mininame" dir="auto">{asMeaning(card.name)}</div>
+        : !lead.en && standIn
+        ? standIn.kind === "lat"
+          ? <div className="at-minien standin"><i>{standIn.text}</i></div>
+          : <div className="at-minien standin"><Icon name={standIn.kind === "picture" ? "image" : "play"} size={14} /> {standIn.text}</div>
         : <div className="at-minien"><Written text={asMeaning(lead.en)} /></div>}
       {showLat && lead.lat ? <div className="at-minilat"><Written text={lead.lat} /></div> : null}
       {/* One line of small print, and the caller decides what it says.
@@ -1670,8 +1693,12 @@ export function dateTime(ms?: Millis) {
 /* --- Tile ---------------------------------------------------------
    The deck and course tile. Lived in spaces.tsx, which meant the one
    library the docs point at did not actually hold it. */
-export function Tile({ title, meta, onOpen, actions, footer, note }: {
+export function Tile({ title, badge, meta, onOpen, actions, footer, note }: {
   title?: Node;
+  /** A small label right after the title, such as a module's kind
+      (0.729). It sits beside the title, not inside it, so the title's
+      text stays the name alone. */
+  badge?: Node;
   meta?: Node;
   onOpen?: () => void;
   actions?: Node;
@@ -1686,7 +1713,14 @@ export function Tile({ title, meta, onOpen, actions, footer, note }: {
     <div className="at-deckcard" onClick={onOpen} data-open={onOpen ? "" : undefined}>
       <div className="at-deckrow2">
         <div className="at-deckmain">
-          <div className="at-decktitle">{title}</div>
+          {badge ? (
+            <div className="at-decktitlerow">
+              <div className="at-decktitle">{title}</div>
+              {badge}
+            </div>
+          ) : (
+            <div className="at-decktitle">{title}</div>
+          )}
           {meta ? <div className="at-deckmeta">{meta}</div> : null}
           {note}
         </div>
@@ -2085,6 +2119,10 @@ export interface CardRow {
   cells: Record<string, Node>;
   open?: () => void;
   actions?: Node;
+  /** What the phone's list says under the meaning where `decks` is empty
+      (0.733): "In no module", for a card; left out for a word set, whose
+      line then holds only its badge. */
+  noDecks?: string;
 }
 export interface CardViews<T> {
   /** Which list this is, for remembering the view it was left at. */
@@ -2194,6 +2232,117 @@ export function clipped(text: string, n = 20): string {
 }
 
 /*
+ * What makes a row of a card list a thing to press, shared by the table
+ * and the phone's list (0.733) so the two answer a tap, a key and a held
+ * finger alike: pressing opens the card, or ticks it while selecting.
+ */
+function rowPress(selecting: boolean, picked: Set<string>, toggle: (id: string) => void) {
+  const press = (id: string, row: CardRow) => (selecting ? toggle(id) : row.open && row.open());
+  const keys = (id: string, row: CardRow) => (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    press(id, row);
+  };
+  const tick = (on: boolean) =>
+    selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
+  const pressable = (id: string, row: CardRow) =>
+    selecting || row.open
+      ? {
+          tabIndex: 0,
+          onClick: () => press(id, row),
+          onKeyDown: keys(id, row),
+          ...(selecting ? { "aria-pressed": picked.has(id) } : null),
+        }
+      : {};
+  return { press, keys, tick, pressable };
+}
+
+/*
+ * Whether the screen is phone-narrow: under 640px wide (0.733). Where the
+ * browser cannot say — the smoke walk's, which has no matchMedia — it is
+ * not, so that walk keeps seeing the table it checks.
+ */
+export function useNarrow(): boolean {
+  const query = "(max-width: 639px)";
+  const [narrow, setNarrow] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    setNarrow(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
+  return narrow;
+}
+
+/*
+ * The table's view on a phone, as a list (0.733, the owner's choice): one
+ * card a row, its meaning over a line of where it is, what kind when it is
+ * not a plain word, and its badge; its word on the right. A table five
+ * columns wide scrolled sideways on a phone and showed two of them.
+ * Same props as CardTable, and the same press, tick and hold.
+ */
+function CardRows<T>({ views, page, itemKey, selecting, picked, toggle, hold, swallowed, headingAt }: {
+  views: CardViews<T>;
+  page: T[];
+  itemKey: (item: T) => string;
+  selecting: boolean;
+  picked: Set<string>;
+  toggle: (id: string) => void;
+  hold: (id: string) => Record<string, any>;
+  swallowed: (e: React.MouseEvent) => boolean;
+  headingAt: (item: T, i: number) => { label: string; n: number } | null;
+}) {
+  const rows = page.map((it) => ({ id: itemKey(it), row: views.row(it) }));
+  const { tick, pressable } = rowPress(selecting, picked, toggle);
+  return (
+    <div className="at-cardrows">
+      {rows.map(({ id, row }, i) => {
+        const head = headingAt(page[i], i);
+        const on = picked.has(id);
+        const kind = typeof row.cells.kind === "string" && row.cells.kind && row.cells.kind !== "Word or phrase" ? ` · ${row.cells.kind}` : "";
+        const where = row.cells.decks || row.noDecks || null;
+        return (
+          <React.Fragment key={id}>
+            {head && (
+              <div className="at-grouprow" role="heading" aria-level={4}>
+                {head.label} <span>{head.n}</span>
+              </div>
+            )}
+            <div className={`at-cardrow${row.open || selecting ? " opens" : ""}${on ? " picked" : ""}`} data-card={id}
+              {...hold(id)}
+              onClickCapture={(e) => { swallowed(e); }}
+              {...((selecting || row.open) ? { role: "button" } : null)}
+              {...pressable(id, row)}>
+              {tick(on)}
+              <span className="at-cardrow-main">
+                <span className="at-cardrow-meaning">{row.cells.meaning}</span>
+                <span className="at-cardrow-sub">
+                  {where}{where ? kind : kind.replace(/^ · /, "")}
+                  {row.cells.status ? <span className="at-cardrow-status">{row.cells.status}</span> : null}
+                </span>
+              </span>
+              <span className="at-cardrow-word">{row.cells.word}</span>
+              {!selecting && row.actions ? (
+                <span className="at-cardrow-acts" onClick={(e) => e.stopPropagation()}>{row.actions}</span>
+              ) : null}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/*
  * A card list drawn as a table, for ItemList.
  *
  * A row does what its tile does: pressing it opens the card, and while
@@ -2218,24 +2367,7 @@ function CardTable<T>({ views, page, itemKey, selecting, picked, toggle, hold, s
   headingAt: (item: T, i: number) => { label: string; n: number } | null;
 }) {
   const rows = page.map((it) => ({ id: itemKey(it), row: views.row(it) }));
-  const press = (id: string, row: CardRow) => (selecting ? toggle(id) : row.open && row.open());
-  const keys = (id: string, row: CardRow) => (e: React.KeyboardEvent) => {
-    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
-    e.preventDefault();
-    press(id, row);
-  };
-  const tick = (on: boolean) =>
-    selecting ? <span className={`at-ckbox pick${on ? " on" : ""}`} aria-hidden="true">{on ? "✓" : ""}</span> : null;
-  /* What makes a row a thing to press. */
-  const pressable = (id: string, row: CardRow) =>
-    selecting || row.open
-      ? {
-          tabIndex: 0,
-          onClick: () => press(id, row),
-          onKeyDown: keys(id, row),
-          ...(selecting ? { "aria-pressed": picked.has(id) } : null),
-        }
-      : {};
+  const { tick, pressable } = rowPress(selecting, picked, toggle);
 
   const acts = !selecting && rows.some((r) => r.row.actions);
   const span = views.columns.length + (selecting ? 1 : 0) + (acts ? 1 : 0);
@@ -2304,8 +2436,6 @@ export interface FilterGroup {
   options?: { value: string; label?: Node; note?: Node }[];
   /** Drawn instead of the buttons, where the choices are not a few. */
   custom?: Node;
-  /** A line of its own, for a group too wide to share one. */
-  wide?: boolean;
   /** What this group's chip says under a list's bar while it is narrowing
       — "Without recordings". Its label, where this is left out. */
   chip?: string;
@@ -2332,6 +2462,55 @@ export function narrowing(groups?: FilterGroup[]): number {
   return liveGroups(groups).filter((g) => g.quiet !== undefined && g.value !== g.quiet).length;
 }
 
+/**
+ * Chips to pick from (0.735, the owner's 2a and 3a). One of a few, or
+ * several: rounded, in ordinary letters, wrapping as they need.
+ *
+ * One at a time (`onChange`): the option that means "none" (`quiet`) is not
+ * drawn, because nothing lit already says it; pressing the lit chip goes
+ * back to it. Several (`onToggle`): each chip on or off by itself.
+ */
+export function ChipPick({ options, value, quiet, onChange, chosen, onToggle, label, disabled }: {
+  options: { value: string; label?: Node; note?: Node }[];
+  /** One at a time: the value picked, and the value that means "none". */
+  value?: string;
+  quiet?: string;
+  onChange?: (value: string) => void;
+  /** Several at once: the values picked. */
+  chosen?: string[];
+  onToggle?: (value: string, wasOn: boolean) => void;
+  /** Said to a screen reader for the group. */
+  label: string;
+  disabled?: boolean;
+}) {
+  const several = !onChange && !!onToggle;
+  const shown = several || quiet === undefined ? options : options.filter((o) => o.value !== quiet);
+  return (
+    <div className="at-chippick" role="group" aria-label={label}>
+      {shown.map((o) => {
+        const on = several ? (chosen || []).includes(o.value) : o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            className={`at-chipopt${on ? " on" : ""}`}
+            aria-pressed={on}
+            disabled={disabled}
+            onClick={() => {
+              if (several) onToggle && onToggle(o.value, on);
+              else if (!on) onChange && onChange(o.value);
+              else if (quiet !== undefined) onChange && onChange(quiet);
+            }}
+          >
+            {o.label ?? o.value}
+            {o.note !== undefined && o.note !== null ? <span className="at-chipnote">{o.note}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /*
  * A set of pickers over a list: how to order it, or what to leave out.
  *
@@ -2341,8 +2520,9 @@ export function narrowing(groups?: FilterGroup[]): number {
  * the disclosure belongs to ItemList, which draws the button and is the
  * only thing that can know which panel is open.
  *
- * Built from Segmented rather than a new control, because picking one of a
- * few is a thing this app already does one way.
+ * Built from ChipPick since 0.735: it was Segmented, with an "Any" option
+ * lit green in every group, so a list narrowing nothing looked as busy as
+ * one narrowed three ways.
  */
 export function FilterBar({ groups, note, onClear }: {
   groups?: FilterGroup[];
@@ -2367,19 +2547,18 @@ export function FilterBar({ groups, note, onClear }: {
         </div>
       ) : null}
       {live.map((g) => (
-        <div className={`at-filtergroup${g.wide ? " wide" : ""}`} key={g.key}>
+        <div className="at-filtergroup" key={g.key}>
           <span className="at-filterlabel">{g.label}</span>
-          {/* Full width: a filter group is a narrow column, and some of
-              these option sets are long — "Least first", "Recordings".
-              Compact would take the width the labels want and hang off
-              the side of the bar. */}
+          {/* Chips, every group full width (0.735, the owner's 2a and 3a):
+              no "Any" to press, since nothing lit is what narrows nothing,
+              so green says one thing — this is narrowing the list. */}
           {g.custom || (
-            <Segmented
+            <ChipPick
               options={g.options || []}
               value={g.value}
+              quiet={g.quiet}
               onChange={g.onChange || (() => {})}
-              label={g.label}
-              size={null}
+              label={g.label || ""}
             />
           )}
         </div>
@@ -2402,7 +2581,7 @@ export function FilterBar({ groups, note, onClear }: {
  * Options are { value, label, note }, and `quiet` is the value that means
  * "everything" — usually the first one.
  */
-export function FilterMenu({ icon = "tune", label, options, value, onChange, quiet = "" }: {
+export function FilterMenu({ icon = "filter", label, options, value, onChange, quiet = "" }: {
   icon?: string;
   label?: string;
   options?: { value: string, label?: Node, note?: Node }[];
@@ -2618,32 +2797,34 @@ function SortSheet({ sort, onClose }: { sort: ListSort; onClose: () => void }) {
   const opt = sort.options.find((o) => o.value === value) || sort.options[0];
   return (
     <PickSheet title="Sort" className="at-footsheet at-sortsheet" onClose={onClose}>
+      {/* Rows with a mark for what to sort by, and one two-part switch
+          under them for which way, in ordinary letters (0.735, the
+          owner's 1a). Still a draft until Apply. */}
       <div className="at-sheetbody">
-        <FilterBar
-          groups={[
-            {
-              key: "by",
-              label: "Sort by",
-              value,
-              onChange: setValue,
-              options: sort.options.map((o) => ({ value: o.value, label: o.label })),
-            },
-            {
-              key: "order",
-              label: "Order",
-              value: down ? "down" : "up",
-              onChange: (v) => setDown(v === "down"),
-              /* In the words of the one picked above, so they change as it
-                 does: "Newest first" is wrong about a count of forms. */
-              options: opt
-                ? [
-                    { value: "down", label: opt.down },
-                    { value: "up", label: opt.up },
-                  ]
-                : [],
-            },
-          ]}
+        <RadioGroup
+          name="list-sort-by"
+          label="Sort by"
+          value={value}
+          onChange={setValue}
+          options={sort.options.map((o) => ({ value: o.value, label: o.label }))}
         />
+        {opt ? (
+          <div className="at-field at-sortorder">
+            <span className="at-label">Order</span>
+            {/* In the words of the one picked above, so they change as it
+                does: "Newest first" is wrong about a count of forms. */}
+            <Segmented
+              size={null}
+              label="Order"
+              value={down ? "down" : "up"}
+              onChange={(v) => setDown(v === "down")}
+              options={[
+                { value: "down", label: opt.down },
+                { value: "up", label: opt.up },
+              ]}
+            />
+          </div>
+        ) : null}
       </div>
       <div className="at-sheetfoot">
         <Button
@@ -2884,7 +3065,11 @@ export function ItemList<T>({
   const viewAt = views ? Math.max(0, VIEWS.findIndex((v) => v.id === view)) : 0;
   const at = VIEWS[viewAt];
   const then = VIEWS[(viewAt + 1) % VIEWS.length];
-  const viewLabel = `View: ${at.name} — press for ${then.name.toLowerCase()}`;
+  /* On a phone the table is drawn as a list (0.733), and called one. */
+  const narrowScreen = useNarrow();
+  const nameOf = (v: { id: ListView; name: string }) => (narrowScreen && v.id === "table" ? "List" : v.name);
+  const viewLabel = `View: ${nameOf(at)} — press for ${nameOf(then).toLowerCase()}`;
+  const TableOrRows = narrowScreen ? CardRows : CardTable;
   const drawn: ListView = views ? at.id : "small";
 
   const startSelecting = () => {
@@ -3022,7 +3207,9 @@ export function ItemList<T>({
   /* Kept while a filter has emptied the list, so what was typed and the
      way back out are both still there: "0 of 14", Clear and the chips. */
   const any = items.length > 0 || whole > 0;
-  const box = any && !outside;
+  /* No match, no box: a search that cannot narrow anything is a bar with
+     nothing in it. Teaching's Home leaves it out under six courses (0.733). */
+  const box = any && !outside && !!match;
   const filterBtn = liveFilters.length > 0 && !bare;
   /* The dots: Select first, where there is anything to select, then the
      list's own. Select alone is its own icon rather than dots opening onto
@@ -3031,7 +3218,11 @@ export function ItemList<T>({
     .concat((more || []).filter(Boolean) as MoreItem[])
     .filter(Boolean) as MoreItem[];
   const loneSelect = dotItems.length === 1 && canSelect;
-  const dots = !bare && !selecting && dotItems.length > 0;
+  /* Kept over an empty list's panel too (0.740): the panel holds the ways
+     to make the first one, and the list's own items — Restore from a
+     backup file — stay behind the dots. Select needs items, so it is not
+     among them then. */
+  const dots = !selecting && dotItems.length > 0;
   const closeBtn = selecting && canSelect;
   const barHolds = withNew || box || filterBtn || !!narrow || dots || closeBtn;
 
@@ -3092,7 +3283,7 @@ export function ItemList<T>({
               aria-expanded={sheet === "filter"}
               onClick={() => setSheet("filter")}
             >
-              <Icon name="tune" />
+              <Icon name="filter" />
               <span className="at-btnword">Filter</span>
               {filtering ? <span className="at-filtercount">{filtering}</span> : null}
             </button>
@@ -3162,7 +3353,7 @@ export function ItemList<T>({
                     saveView(viewKey, then.id);
                   }}
                 >
-                  <Icon name={at.icon} />
+                  <Icon name={narrowScreen && at.id === "table" ? "viewList" : at.icon} />
                 </button>
               ) : null}
             </>
@@ -3207,7 +3398,7 @@ export function ItemList<T>({
           it read as a table with something missing, above the empty
           panel or the "nothing matches" line. */}
       {views && drawn === "table" ? (
-        page.length === 0 ? null : <CardTable
+        page.length === 0 ? null : <TableOrRows
           views={views}
           page={page}
           itemKey={itemKey}
@@ -3308,7 +3499,8 @@ export function ItemList<T>({
       {/* Filters take hold as they are ticked, as they did under the bar,
           and the button counts what is left; it only closes the panel. */}
       {sheet === "filter" && filter ? (
-        <PickSheet title="Filter" className="at-footsheet at-filtersheet" onClose={shut}>
+        /* One line saying what a chip does (0.738, the owner's 1a and 5a). */
+        <PickSheet title="Filter" lede="Tap to show only matching cards." className="at-footsheet at-filtersheet" onClose={shut}>
           <div className="at-sheetbody">
             <FilterBar groups={filter.groups} onClear={filter.onClear} />
           </div>
@@ -3556,6 +3748,14 @@ function ReadTable({ group, lang, reader }: {
      plain "I" — see foldJoined. A form's own table joins nothing. */
   const cells = group.of ? group.cells : foldJoined(group.cells, group.spec).forms;
   const persons = group.of ? personsOf(group.spec) : personsFor({ subs: cells }, group.spec);
+  /* Called by the name it goes by in its own row: Hebrew's past *I* is
+     plain "I", its present *I* is "I (m)" beside "I (f)" — see personAt.
+     The copies are gone from `cells`, so the table has no hole where one
+     was. */
+  const personOf = (cell: Record<string, any>) =>
+    group.of
+      ? persons.find((p) => p.id === colOf(cell))
+      : personAt({ subs: cells }, group.spec, rowOf(cell), colOf(cell)) || persons.find((p) => p.id === colOf(cell));
   let row = "";
   return (
     <section className="at-panel">
@@ -3577,7 +3777,7 @@ function ReadTable({ group, lang, reader }: {
         /* A one-row table is named by its own name — "attached pronouns" —
            and a heading repeating it says nothing twice. */
         const heads = opens && rowName !== tableTitle(group.spec);
-        const person = persons.find((p) => p.id === colOf(cell));
+        const person = personOf(cell);
         return (
           <React.Fragment key={String(cell.id || i)}>
             {heads ? <p className="at-eyebrow at-mt3">{rowName}</p> : null}
@@ -3765,13 +3965,14 @@ function ReadNames({ card, lang, cards }: {
     <section className="at-panel">
       <p className="at-eyebrow">What other cards call it</p>
       <p className="at-hint">
-        A sentence borrows a word by name. An ID names this one card and no
-        other; a tag names a set of words a sentence will take any of.
+        A sentence borrows a word by name. A name for this exact card asks
+        for it and no other; a group names a set of words a sentence will
+        take any of.
       </p>
-      <ReadRow label="The card's ID">
+      <ReadRow label="A name for this exact card">
         {own ? <span className="at-slot">{own}</span> : null}
       </ReadRow>
-      <ReadRow label="Tags">
+      <ReadRow label="Groups">
         {wrote.length || anyway.length ? (
           <span className="at-flags">
             {wrote.concat(anyway).map((name) => (
@@ -4889,8 +5090,8 @@ export function useScrollTop(key: unknown) {
  * guessing.
  */
 /* A floating button. Most screens have one; the card editor has two —
-   Save and publish beside Save — and the first of a pair is the quieter
-   (`second`), so the corner keeps the button it always had. `busyLabel` is
+   Save as draft beside Save and publish (0.740) — and the first of a pair
+   is the quieter (`second`), so the corner keeps the main button. `busyLabel` is
    what it reads while its own request is out. */
 export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean; busyLabel?: string; second?: boolean };
 
@@ -5101,6 +5302,79 @@ export function RadioGroup<T extends string>({ options, value, onChange, label, 
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * On or off, as one sliding switch (0.735, the owner's 7a). It replaced an
+ * OFF / ON pair on a course's Exercises tab, the only place that pair was
+ * used: two words for one fact read as two things to choose between.
+ */
+export function Switch({ on, onChange, label, disabled }: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={`at-switch${on ? " on" : ""}`}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+    >
+      <span />
+    </button>
+  );
+}
+
+/**
+ * One of a few, as tiles with a picture (0.738, the owner's 2b): the New
+ * module panel's look — a picture, a name, a line saying what it does —
+ * with a tick on the chosen one. For a choice that changes something at
+ * once, where each option is worth reading before it is tapped.
+ */
+export function TileChoice<T extends string>({ options, value, onChange, label, disabled }: {
+  options: { value: T; label: Node; note?: Node; icon: string }[];
+  value?: T | null;
+  onChange: (value: T) => void;
+  /** Said to a screen reader for the group. */
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="at-tilechoices" role="radiogroup" aria-label={label}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            className={`at-tilechoice${on ? " on" : ""}`}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+          >
+            <span className="at-tilechoiceico" aria-hidden="true">
+              <Icon name={o.icon} size={22} />
+            </span>
+            <span className="at-tilechoicetext">
+              <b>{o.label}</b>
+              {o.note ? <i>{o.note}</i> : null}
+            </span>
+            {on ? (
+              <span className="at-tilechoicetick" aria-hidden="true">
+                <Icon name="check" size={22} />
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -7267,7 +7541,7 @@ export function ChoiceSwitch<T extends string>({ ask, label, lede, icon, name, o
             onClick={() => setOpen(true)}
           >
             <Icon name={icon} size={16} />
-            <span className="at-choosemark">Not set</span>
+            <span className="at-choosemark">Choose</span>
             <Icon name="chevronDown" size={16} />
           </button>
         </div>
