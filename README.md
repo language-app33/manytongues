@@ -406,7 +406,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   open, *Mature* is three weeks out everywhere.
 - **One tense of a verb is ever new at a time.** Where a language lays its
   verbs out in a table — Arabic in nine persons (one *I* unless a word
-  has two: `keepsApart` in `src/verbs.ts`) and three tenses, Vietnamese in
+  has two: `keepsApart` in `src/verbs.ts`) and three tenses, Hebrew in
+  twelve and four (one *I*, *we* and *they* in the past and future unless
+  a word has two, decided row by row: `keepsApartIn`), Vietnamese in
   one person and four markers — each cell of it is a sub-form, drilled and
   scheduled in its own right by the exercises every other form gets. (Where
   the language offers the practices of a tense, as Arabic and Hebrew do, it

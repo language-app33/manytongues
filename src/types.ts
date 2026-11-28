@@ -222,9 +222,17 @@ export interface VerbPerson {
    * forms for *I*. So a card is laid out, practised and filled into
    * sentences with one *I* unless a different word is written under *I
    * (f)*, and only then are there two. See keepsApart in src/verbs.ts.
+   * Hebrew's *I (f)*, *we (f)* and *they (f)* join their masculines in the
+   * past and the future only, row by row — see `joinsIn`.
    * Absent on every column that is always its own.
    */
   joins?: string;
+  /** The rows in which `joins` applies. Absent means every row, and the
+      column is joined or kept apart as a whole (Arabic's I (f)). Present
+      means the column always stands, and is a copy of the column it joins
+      in these rows only, row by row (Hebrew's past and future). See
+      joinedInRow in src/verbs.ts. */
+  joinsIn?: string[];
   /**
    * What this column is called while the column that joins it is not kept
    * apart: *I (m)* is plain *I* on a verb with one form for it. Absent

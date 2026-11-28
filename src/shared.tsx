@@ -21,7 +21,7 @@ import type { Reader, TableGroup } from "./card-facts.ts";
 import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSaid, dimText, EXAMPLES_CEILING,
   examplesOf, fillersOn, IN_NO_MODULE, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
-import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { colOf, foldJoined, NO_PARTNER, personAt, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
 import { dismissReach, holdReach, isUnreachable, reachState, releaseReach, retryReach, showReach, watchReach } from "./reach.ts";
 import type { ReachState } from "./reach.ts";
@@ -3748,6 +3748,14 @@ function ReadTable({ group, lang, reader }: {
      plain "I" — see foldJoined. A form's own table joins nothing. */
   const cells = group.of ? group.cells : foldJoined(group.cells, group.spec).forms;
   const persons = group.of ? personsOf(group.spec) : personsFor({ subs: cells }, group.spec);
+  /* Called by the name it goes by in its own row: Hebrew's past *I* is
+     plain "I", its present *I* is "I (m)" beside "I (f)" — see personAt.
+     The copies are gone from `cells`, so the table has no hole where one
+     was. */
+  const personOf = (cell: Record<string, any>) =>
+    group.of
+      ? persons.find((p) => p.id === colOf(cell))
+      : personAt({ subs: cells }, group.spec, rowOf(cell), colOf(cell)) || persons.find((p) => p.id === colOf(cell));
   let row = "";
   return (
     <section className="at-panel">
@@ -3769,7 +3777,7 @@ function ReadTable({ group, lang, reader }: {
         /* A one-row table is named by its own name — "attached pronouns" —
            and a heading repeating it says nothing twice. */
         const heads = opens && rowName !== tableTitle(group.spec);
-        const person = persons.find((p) => p.id === colOf(cell));
+        const person = personOf(cell);
         return (
           <React.Fragment key={String(cell.id || i)}>
             {heads ? <p className="at-eyebrow at-mt3">{rowName}</p> : null}

@@ -9959,3 +9959,48 @@ learnt the old wording sees the new one once their teacher writes the box,
 with no warning beyond the teacher's own edit. The composer's version goes
 to 2; nothing compares it yet.
 
+## Hebrew verbs: one "I", "we" and "they" in the past and future
+
+**28 November 2026** · `src/verbs.ts` (`joinedInRow`, `keepsApartIn`,
+`personAt`, `foldedAt`), `src/types.ts` (`VerbPerson.joinsIn`),
+`src/languages.ts` (`HE_SUBJECT_PERSONS`), `src/card-editor.tsx`
+(`VerbTable`), `src/shared.tsx` (`ReadTable`) (0.745)
+
+Hebrew's verb table has twelve columns, every person with a gender of its
+own, because the present really differs by gender in every person: כותב
+and כותבת. In the past and future, *I*, *we* and *they* do not: כתבתי,
+כתבנו and כתבו are anybody's. The teacher typed each twice and the
+student was taught and asked each twice, under "I (m)" and "I (f)", as if
+they differed.
+
+**The mechanism Arabic's one *I* uses (0.456), decided per row.** Arabic's
+`joins` is for a whole column: if any row has a different word, the whole
+column is kept apart. That cannot serve Hebrew, whose feminine column is
+always needed in the present. So a column may declare `joinsIn`, the rows
+in which it joins; there the column is a copy unless a different word is
+written, row by row and column by column. The column itself always
+stands. Four helpers in `src/verbs.ts` are the one answer to both kinds of
+join, and every screen asks them: the table, the drills, the read-out, a
+sentence about a woman speaker, a learner's device and the editor.
+
+**Why the present keeps both boxes:** it is the one tense in which every
+person changes with gender, and joining it would teach a woman the man's
+word about herself, which is what 0.261 and 0.309 put right.
+
+**Why *you (f pl)* was left alone:** the written language has a feminine
+plural *you* in the past and future (כתבתן beside כתבתם). Spoken Hebrew
+often uses the masculine for both, but that is a teacher's choice to make
+by typing the same word, not the app's to make for everyone.
+
+**Nothing is migrated.** An old card keeps its duplicate boxes in storage
+until its teacher next saves it; the editor opens it already folded, and a
+student's device folds it when it reads the card, keeping whichever of the
+two schedules the student had got further with. That is how Arabic's
+change worked.
+
+**The cost:** two rules now sit behind one field. A join is decided per
+row for Hebrew and per column for Arabic, and anyone reading `joins` has
+to know which kind a column has. A verb whose past "I" truly has two
+forms needs the teacher to tick it and write the second word; until then
+the second box is not shown in those rows.
+

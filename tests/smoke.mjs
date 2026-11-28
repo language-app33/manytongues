@@ -15057,6 +15057,49 @@ const openPronounTables = async () => {
   check("a joined word written with a space for its maqaf is right",
     writing.joinedAsked && writing.joinedRight, JSON.stringify(writing));
   check("nothing went wrong in the Hebrew session", errors.length === before, errors.slice(before).join("\n"));
+
+  /* And a Hebrew verb in the teacher's editor (0.745): the past has one
+     "I", whatever was typed twice before, with a tick that reads "'I' has
+     two forms in the past and future" and is off. The editor is mounted
+     on its own, the way the recording screen below it is. */
+  const verbBefore = errors.length;
+  const { CardEditor } = await import(path.join(out, "card-editor.js"));
+  const { LANGUAGES } = await import(path.resolve("src/languages.ts"));
+  const vcell = (/** @type {string} */ row, /** @type {string} */ col, /** @type {string} */ ar, /** @type {string} */ en) =>
+    ({ id: `hv-${row}-${col}`, row, col, ar, en, lat: "" });
+  const verbCard = {
+    id: "hev1", lang: "he-IL", kind: "word", category: "verb", tags: [], created: 1, updated: 1,
+    ar: "כָּתַב", en: "to write", lat: "katav",
+    subs: [
+      vcell("present", "i", "כּוֹתֵב", "I write"), vcell("present", "i-f", "כּוֹתֶבֶת", "I write"),
+      vcell("past", "i", "כָּתַבְתִּי", "I wrote"), vcell("past", "i-f", "כָּתַבְתִּי", "I wrote"),
+      vcell("past", "he", "כָּתַב", "he wrote"),
+      vcell("past", "we", "כָּתַבְנוּ", "we wrote"), vcell("past", "we-f", "כָּתַבְנוּ", "we wrote"),
+    ],
+  };
+  const vhost = document.createElement("div");
+  document.body.appendChild(vhost);
+  const vr = createRoot(vhost);
+  vr.render(React.createElement(CardEditor, {
+    card: verbCard, lang: must(LANGUAGES["he-IL"], "Hebrew"), modules: [], allCards: [],
+    onSave: () => {}, onClose: () => {},
+  }));
+  await sleep(600);
+  const inputLabels = () => [...document.querySelectorAll("input")].map((i) => i.getAttribute("aria-label") || "");
+  const pastIs = inputLabels().filter((l) => /^Hebrew for past · I\b/.test(l));
+  const presentIs = inputLabels().filter((l) => /^Hebrew for present · I\b/.test(l));
+  const tick = [...document.querySelectorAll('[data-el="verb-two-forms"]')]
+    .find((t) => /‘I’ has two forms in the past and future/.test(t.textContent || ""));
+  const tickBox = /** @type {HTMLInputElement | null} */ (tick ? tick.querySelector("input") : null);
+  check("a Hebrew verb's past opens with one box for I, called I",
+    pastIs.length === 1 && pastIs[0] === "Hebrew for past · I" && presentIs.length === 2,
+    JSON.stringify({ pastIs, presentIs, all: inputLabels().filter((l) => /^Hebrew for/.test(l)).slice(0, 12) }));
+  check("with a tick reading ‘I’ has two forms in the past and future, off",
+    !!tickBox && !tickBox.checked,
+    [...document.querySelectorAll('[data-el="verb-two-forms"]')].map((t) => t.textContent).join(" | ") || "(no tick)");
+  vr.unmount();
+  vhost.remove();
+  check("nothing went wrong in a Hebrew verb's editor", errors.length === verbBefore, errors.slice(verbBefore).join("\n"));
 }
 
 report();

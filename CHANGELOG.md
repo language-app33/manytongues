@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.745 — 28 November 2026
+
+**Hebrew verbs: one box for "I", "we" and "they" in the past and future.**
+
+- In the past and future, "I", "we" and "they" are one word for everybody
+  in Hebrew, but a verb had two boxes for each, labelled "I (m)" and
+  "I (f)", and students were taught and asked the same word twice. Now
+  those rows have one box each, called plain "I", "we" and "they".
+- **The present is unchanged**: it really differs by gender, so it keeps
+  all twelve boxes. The plural "you (f)" keeps its own box everywhere.
+- For a verb that does need two, the teacher ticks **"‘I’ has two forms in
+  the past and future"** (and the same for "we" and "they") and writes the
+  second word.
+- **Verbs already written** with the same word in both boxes are joined
+  when the teacher next opens them, and on students' devices straight
+  away. A student keeps whichever of the two they had got further with.
+- Arabic and Vietnamese are unchanged.
+
+**To check by hand:** on a real phone, a Hebrew verb's past tense, as the
+teacher (one "I" box, the tick off) and as the student ("See how this verb
+changes" shows one "I", "we" and "they" in the past, twelve in the present).
+
 ## 0.744 — 28 November 2026
 
 **Nothing changes in the app: the automatic check now opens a Hebrew

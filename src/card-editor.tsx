@@ -17,7 +17,7 @@ import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
-import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf, waitsOnWord } from "./verbs.ts";
+import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, keepsApartIn, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf, waitsOnWord } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
@@ -2289,11 +2289,20 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
    * know was saved. A form's table of pronouns joins nothing.
    */
   const joining = of ? [] : personsOf(spec).filter((p) => joinsOf(spec, p));
+  /* Hebrew's *I (f)*, *we (f)* and *they (f)* join only in the past and
+     the future (`joinsIn`): the column stays, and the tick decides those
+     rows alone. Opened where one of those rows has a word written that is
+     not its mate's, which is a verb with two. */
+  const byRow = joining.filter((p) => Array.isArray(p.joinsIn));
   const [apart, setApart] = useState<Set<string>>(
     () =>
       new Set(
         joining
-          .filter((p) => cells.some((c) => c.col === p.id && mine(c) && String(c.ar || "").trim()))
+          .filter((p) =>
+            Array.isArray(p.joinsIn)
+              ? p.joinsIn.some((row) => keepsApartIn({ subs: cells }, spec, p, row))
+              : cells.some((c) => c.col === p.id && mine(c) && String(c.ar || "").trim()),
+          )
           .map((p) => p.id),
       ),
   );
@@ -2304,9 +2313,12 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
       else next.delete(person.id);
       return next;
     });
-    if (!on) onChange(cells.filter((c) => !(c.col === person.id && mine(c))));
+    /* A column joined row by row loses its boxes in those rows only: its
+       present is a word of its own whatever the tick says. */
+    const rows = person.joinsIn;
+    if (!on) onChange(cells.filter((c) => !(c.col === person.id && mine(c) && (!rows || rows.includes(c.row)))));
   };
-  const hidden = new Set(joining.filter((p) => !apart.has(p.id)).map((p) => p.id));
+  const hidden = new Set(joining.filter((p) => !byRow.includes(p) && !apart.has(p.id)).map((p) => p.id));
   const plain = new Set(joining.filter((p) => hidden.has(p.id)).map((p) => joinsOf(spec, p)));
   const persons = personsOf(spec)
     .filter((p) => !hidden.has(p.id))
@@ -2321,6 +2333,9 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
   const ticks = joining.map((person) => {
     const to = personsOf(spec).find((p) => p.id === joinsOf(spec, person));
     const name = (to && (to.alone || to.label)) || person.label;
+    /* "in the past and future", for a column joined in those rows only. */
+    const inRows = (person.joinsIn || []).map((row) => (tensesOf(spec).find((t) => t.id === row) || { label: row }).label);
+    const where = inRows.length ? ` in the ${inRows.join(" and ")}` : "";
     return (
       <label className="at-tickrow" key={person.id} data-el="verb-two-forms">
         <input
@@ -2329,7 +2344,7 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
           onChange={(e) => keepApart(person, e.target.checked)}
         />
         <span className="at-tickbody">
-          <b>{`‘${name}’ has two forms`}</b>
+          <b>{`‘${name}’ has two forms${where}`}</b>
           {person.example ? (
             <i>
               {"Like "}
@@ -2355,10 +2370,24 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
   /* A row that has fewer columns than the table — a command, said to
      *you* — offers boxes for those alone, and for any other a word was
      already written in, so nothing typed is ever out of sight. */
-  const rowPersons = (tense: VerbTense) =>
+  const declared = (tense: VerbTense) =>
     Array.isArray(tense.persons) && tense.persons.length
       ? persons.filter((p) => tense.persons!.includes(p.id) || !!String((at(tense.id, p.id) || {}).ar || "").trim())
       : persons;
+  /* And in a row where a column joined row by row is not ticked apart, its
+     box is left out and its mate is called by its plain name — one "I" in
+     the past — unless a word is already written in it. */
+  const rowPersons = (tense: VerbTense) => {
+    const folded = byRow.filter(
+      (p) => !apart.has(p.id) && p.joinsIn!.includes(tense.id) && !String((at(tense.id, p.id) || {}).ar || "").trim(),
+    );
+    if (!folded.length) return declared(tense);
+    const gone = new Set(folded.map((p) => p.id));
+    const alone = new Set(folded.map((p) => joinsOf(spec, p)));
+    return declared(tense)
+      .filter((p) => !gone.has(p.id))
+      .map((p) => (alone.has(p.id) && p.alone ? { ...p, label: p.alone } : p));
+  };
   const row = (tense: VerbTense, at_: number) => (
     <>
       {rowPersons(tense).map((person) => {

@@ -7,8 +7,10 @@
  * What is checked here is the whole of the promise: a verb with the same
  * word in both is one *I* everywhere (the table, a learner's device, a
  * sentence about a woman speaker), a verb with two keeps both, the
- * learner keeps whichever copy they had got further with, and Hebrew —
- * whose *I* really does change with gender — is left alone.
+ * learner keeps whichever copy they had got further with, and Hebrew's
+ * present — whose *I* really does change with gender — is left alone.
+ * (Hebrew's past and future are joined row by row since 0.745; that is
+ * held in tests/hebrew-one-i.test.mjs.)
  */
 
 import { test } from "node:test";
@@ -109,7 +111,7 @@ test("folding takes the copy out, keeps its recording, and says what it went int
   assert.deepEqual(into, { "c-present-i-f": "c-present-i", "c-past-i-f": "c-past-i" });
   const said = must(forms.find((f) => f.id === "c-present-i"), "the present I");
   assert.deepEqual(said.clips, ["h-said"], "the recording made under the copy");
-  /* A word with two, and Hebrew, whose table joins nothing, are left as they are. */
+  /* A word with two, and Hebrew's present, where nothing joins, are left as they are. */
   assert.equal(foldJoined(going.subs, arabic).forms, going.subs);
   const heb = [cell("present", "i", "אוכל", "I eat"), cell("present", "i-f", "אוכל", "I eat")];
   assert.equal(foldJoined(heb, hebrew).forms, heb);
