@@ -14084,12 +14084,12 @@ const openPronounTables = async () => {
   const unitRows = () => [...((courseScreen0().querySelector('[data-el="course-units"]')) || document.createElement("div")).querySelectorAll('[data-el="path-unit"]')];
   const rows = unitRows().map((x) => (x.textContent || "").replace(/\s+/g, " "));
   check("the units in order, each with its number, whether it is published and its size",
-    rows.length === 3 && /^1 · Greetings unit/.test(rows[0]) && /Unit · Published · 1 card/.test(rows[0]) &&
-      /^2 · Family unit/.test(rows[1]) && /Unit · Draft · 0 cards/.test(rows[1]) && /^3 · Travel unit/.test(rows[2]),
+    rows.length === 3 && /^1 · Greetings unit/.test(rows[0]) && /Greetings unitPublished · 1 card/.test(rows[0]) && !/\bUnit ·/.test(rows.join(" ")) &&
+      /^2 · Family unit/.test(rows[1]) && /Family unitDraft · 0 cards/.test(rows[1]) && /^3 · Travel unit/.test(rows[2]),
     rows.join(" | ") || "no unit rows");
   const deckRows = pathBlock ? [...pathBlock.querySelectorAll('[data-el="course-deck"]')].map((x) => (x.textContent || "").replace(/\s+/g, " ")) : [];
   check("the decks under them, each with its kind and size, and no chip with a cross",
-    deckRows.length === 1 && /^Lesson 1Deck · 2 cards/.test(deckRows[0]) && !courseScreen0().querySelector(".at-deckpill") &&
+    deckRows.length === 1 && /^Lesson 12 cards/.test(deckRows[0]) && !/Deck ·/.test(deckRows[0]) && !courseScreen0().querySelector(".at-deckpill") &&
       !/Greetings unit|Family unit/.test(deckRows.join(" ")),
     deckRows.join(" | ") || "no deck rows");
   const unitRow = (/** @type {RegExp} */ re) => unitRows().find((x) => re.test(x.textContent || ""));
@@ -14099,6 +14099,16 @@ const openPronounTables = async () => {
     !publishOf(/Greetings unit/) && !!publishOf(/Family unit/) && !!publishOf(/Family unit/)?.classList.contains("off") &&
       !!publishOf(/Travel unit/) && !publishOf(/Travel unit/)?.classList.contains("off"),
     rows.join(" | "));
+  /* The three dots in the row's top right, and the arrows then Publish
+     along its foot (0.741). */
+  {
+    const row = unitRow(/Family unit/) || document.createElement("div");
+    const foot = [...row.querySelectorAll(".at-unitfoot [aria-label], .at-unitfoot .at-btn")].map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim());
+    check("a unit row's three dots are in its top line, and Publish comes after the arrows",
+      !!row.querySelector(".at-deckacts .at-morebtn") && !row.querySelector(".at-unitfoot .at-morebtn") &&
+        foot.join(" | ") === "Move Family unit up | Move Family unit down | Publish",
+      foot.join(" | ") || "(no foot)");
+  }
   click(publishOf(/Family unit/) || null);
   await sleep(300);
   const said = ((document.querySelector(".at-snack") || {}).textContent || "").trim();
@@ -14109,7 +14119,7 @@ const openPronounTables = async () => {
   await sleep(600);
   check("a draft unit's Publish publishes it, with no checklist on the way",
     publishedUnits.length === 1 && publishedUnits[0].deckId === "u3" && !publishOf(/Travel unit/) &&
-      /Unit · Published/.test((unitRow(/Travel unit/) || {}).textContent || "") && !document.querySelector('[data-el="unit-checklist"]'),
+      /Travel unitPublished/.test((unitRow(/Travel unit/) || {}).textContent || "") && !document.querySelector('[data-el="unit-checklist"]'),
     `${JSON.stringify(publishedUnits)} · ${((unitRow(/Travel unit/) || {}).textContent || "").replace(/\s+/g, " ")}`);
   /* A published unit's three dots: three rows, each with its line. */
   click((unitRow(/Greetings unit/) || document.createElement("div")).querySelector(".at-morebtn"));

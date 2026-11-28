@@ -5959,19 +5959,26 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           const early = live && opened.has(u.id);
           const empty = heldIn(u) === 0 && !(u.parts || []).length;
           return (
-            <div key={u.id} data-el="path-unit">
+            /* Since 0.741 (the owner's wish): no "Unit ·" on the line, which
+               the heading above already says; the three dots in the row's
+               top right corner; the arrows, then Publish, along its foot. */
+            <div key={u.id} data-el="path-unit" className="at-unitrow">
               <Tile
                 title={`${i + 1} · ${u.title}`}
-                meta={`Unit · ${live ? "Published" : "Draft"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
+                meta={`${live ? "Published" : "Draft"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
                 onOpen={() => onOpen(u.id)}
-                actions={
-                  <span className="at-unitacts" onClick={hold}>
+                footer={
+                  <span className="at-unitfoot" onClick={hold}>
+                    <IconButton icon="chevronUp" label={`Move ${u.title} up`} disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)} />
+                    <IconButton icon="chevronDown" label={`Move ${u.title} down`} disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)} />
                     {!live && (
                       <Button size="sm" variant="primary" off={empty || undefined} disabled={busy}
                         onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Publish</Button>
                     )}
-                    <IconButton icon="chevronUp" label={`Move ${u.title} up`} disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)} />
-                    <IconButton icon="chevronDown" label={`Move ${u.title} down`} disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)} />
+                  </span>
+                }
+                actions={
+                  <span className="at-unitacts" onClick={hold}>
                     <MoreMenu
                       bare
                       label={`More for ${u.title}`}
@@ -6002,10 +6009,12 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
       <p className="at-eyebrow at-modgroup">Decks, studied in any order</p>
       <div className="at-decklist2" data-el="course-decks">
         {decks.map((d) => (
-          <div key={d.id} data-el="course-deck">
+          <div key={d.id} data-el="course-deck" className="at-unitrow">
             <Tile
               title={d.title}
-              meta={`${d.set ? "Personal set" : "Deck"} · ${plural(heldIn(d), "card")}`}
+              /* "Deck" is the heading's word; only a personal set, the one
+                 thing here that is not a deck, says what it is (0.741). */
+              meta={`${d.set ? "Personal set · " : ""}${plural(heldIn(d), "card")}`}
               onOpen={() => onOpen(d.id)}
               actions={
                 <span className="at-unitacts" onClick={hold}>

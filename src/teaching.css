@@ -8,8 +8,6 @@
 .at-codebox { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   border:2px solid var(--tag-line); background: var(--tag-bg); border-radius: var(--r-sm);
   padding:9px 11px; }
-.at-codebox span { font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
-  color: var(--muted); }
 .at-codebox b { flex:1; min-width:120px; font-family: ui-monospace, Menlo, monospace;
   font-size:15px; color: var(--brass); user-select:all; }
 .ob-logo { display:block; width:72px; height:72px; margin:0 auto 14px; }

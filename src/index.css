@@ -1265,13 +1265,15 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
    three dots puts its controls on a line of their own under the name. */
 .at-eyebrow.at-modgroup { margin:22px 0 10px; }
 .at-formhead + .at-eyebrow.at-modgroup, .at-mb3 + .at-eyebrow.at-modgroup { margin-top:4px; }
-.at-unitacts { display:flex; align-items:center; gap:2px; }
-.at-unitacts > .at-icon { min-width:40px; width:40px; height:40px; padding:0; border:none; background:none; }
-.at-unitacts > .at-btn { margin-right:6px; }
-@media (max-width: 480px) {
-  .at-deckrow2:has(> .at-deckacts > .at-unitacts > :nth-child(4)) { flex-wrap:wrap; }
-  .at-deckrow2:has(> .at-deckacts > .at-unitacts > :nth-child(4)) > .at-deckmain { flex-basis:100%; }
-}
+.at-unitacts { display:flex; align-items:center; }
+/* The three dots in the row's top right corner, and the arrows then
+   Publish along the row's foot, at its right (0.741). */
+.at-unitrow .at-deckrow2 { align-items:flex-start; }
+.at-unitrow .at-deckacts { margin-top:-8px; margin-right:-8px; }
+.at-unitfoot { display:flex; align-items:center; justify-content:flex-end; gap:2px; margin-top:6px; }
+.at-unitfoot:empty { display:none; }
+.at-unitfoot > .at-icon { flex:0 0 auto; min-width:40px; width:40px; height:40px; padding:0; border:none; background:none; }
+.at-unitfoot > .at-btn { margin-left:6px; }
 .at-addwide { display:flex; width:100%; justify-content:center; margin-top:10px; }
 /* A unit's courses (0.740): one plain row per course, its place under the
    name, and the words "Open course" with an arrow at the right. */

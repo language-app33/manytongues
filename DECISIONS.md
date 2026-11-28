@@ -9924,3 +9924,10 @@ module's line in the Modules list; the length of a card's Advanced tab;
 the recording screen; student flags, student progress and adding many
 cards at once.
 
+**0.741: the rows, tidier.** The owner asked that a row not repeat what its
+heading says, so "Unit ·" and "Deck ·" left the line under the name; the
+three dots moved to the row's top right corner, where they sit on every
+other tile; and Publish moved after the arrows, so the arrows stay in the
+same place whether a unit is a draft or published. What the button says is
+an open question to the owner.
+

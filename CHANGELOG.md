@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.741 — 28 November 2026
+
+**A course's unit and deck rows, tidier**, as asked.
+
+- The line under a unit's name no longer starts with "Unit", nor a deck's
+  with "Deck": the headings above them already say so. A personal set still
+  says "Personal set", as the one thing among the decks that is not one.
+- A row's three dots sit in its top right corner.
+- On a unit's row, the up and down arrows come first and Publish after
+  them, at the right of the row's foot.
+- The Copy button beside the student code is in ordinary letters like the
+  other buttons (0.740 missed it).
+
+**To check by hand:** on a real phone, that the arrows and Publish are easy
+to hit at the row's foot.
+
 ## 0.740 — 28 November 2026
 
 **The audit round: a course, a unit, a card's status, and plainer words**,
