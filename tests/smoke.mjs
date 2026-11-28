@@ -14161,13 +14161,31 @@ const openPronounTables = async () => {
   click([...courseScreen0().querySelectorAll("button.at-addwide")].find((b) => /Add a deck/.test(b.textContent || "")) || null);
   await sleep(200);
   const deckSheet = document.querySelector(".at-sheet");
+  /* Since 0.748 (the owner's 5a) its first row makes a deck, not "a
+     module" with a kind to choose. */
   check("+ Add a deck opens the deck panel, with a way to make one first",
     ((deckSheet && deckSheet.querySelector(".at-modaltitle")) || {}).textContent === "Add a deck" &&
-      /Create a new module/.test((deckSheet && deckSheet.textContent) || "") && /Lesson 1/.test((deckSheet && deckSheet.textContent) || "") &&
-      !/Greetings unit/.test((deckSheet && deckSheet.textContent) || ""),
+      /Create a new deck/.test((deckSheet && deckSheet.textContent) || "") && !/Create a new module/.test((deckSheet && deckSheet.textContent) || "") &&
+      /Lesson 1/.test((deckSheet && deckSheet.textContent) || "") && !/Greetings unit/.test((deckSheet && deckSheet.textContent) || ""),
     ((deckSheet && deckSheet.textContent) || "(no panel)").slice(0, 200));
+  /* And it asks the deck's title in the same box a new unit's is asked in,
+     with no "What kind of module?" first. */
+  click([...document.querySelectorAll(".at-sheet button")].find((b) => /Create a new deck/.test(b.textContent || "")) || null);
+  await sleep(250);
+  {
+    const box = [...document.querySelectorAll(".at-modal, [role=dialog]")].pop();
+    const said = ((box && box.textContent) || "").replace(/\s+/g, " ");
+    check("Create a new deck asks its title in the box New unit uses, not which kind",
+      /New deck/.test(said) && /Deck title/i.test(said) && !/What kind of module/.test(document.body.textContent || ""), said.slice(0, 160) || "(no box)");
+    click([...document.querySelectorAll(".at-modal button, [role=dialog] button")].find((b) => /^Cancel$/.test((b.textContent || "").trim())) || null);
+    await sleep(200);
+  }
   click(document.querySelector('.at-sheet [aria-label="Close"]'));
   await sleep(150);
+  /* Each group's line saying what it is for shows only while the course
+     holds nothing (0.748, 1a). */
+  check("a course with modules has no line under its group labels", !courseScreen0().querySelector(".at-modhint"),
+    ((courseScreen0().querySelector(".at-modhint") || {}).textContent) || "");
   /* The Modules block itself: a unit is never among the decks. */
   const modulesPart = (((courseScreen0().querySelector('[data-el="course-decks"]')) || {}).textContent) || "";
   check("a unit is not among the course's ordinary decks", /Lesson 1/.test(modulesPart) && !/Greetings unit|Family unit/.test(modulesPart),

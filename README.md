@@ -1259,6 +1259,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   while it is a draft, arrows to move it and three dots (Open it early,
   Remove from the course, Delete this unit), and "+ Add a unit"; then
   "Decks, studied in any order", each with three dots, and "+ Add a deck".
+  Since 0.748 an empty course has a line under each label instead of a
+  box above them, and with nothing to choose from either add button goes
+  straight to one shared name box (New unit or New deck).
   A unit's own screen is titled "Unit" and lists its courses with its
   place in each; a row opens that course. `countingCards` still feeds the
   unit's quality score. What follows is the screen as it was from 0.616.

@@ -10032,3 +10032,28 @@ The "Deleted … Undo" bar (3a: make it the ordinary bar) turned out to be
 unreachable: nothing had set what it shows since the word list's delete
 was reworked, so it was removed rather than restyled. If the word list
 gets an Undo after delete again, it goes through the snackbar's `undo`.
+
+
+## An empty course's Modules section, and its add buttons (0.748)
+
+The tan `Nudge` with Create a module above an empty course's two groups
+read as a warning and was a third button for one job. The owner chose
+(1a) to drop it and give each group a line saying what it is for while
+the course holds nothing (`CourseModules`' `fresh`, `.at-modhint`), and
+(2a) to keep the dotted add buttons, so the screen has one shape empty or
+filled. `TeachSpace` lost `moduleSwitch` and `createHere`; the course
+screen no longer opens the kind sheet.
+
+Reproduced on an emulated phone with a new teacher: Add a unit opened a
+`PickSheet` holding New unit alone, and Add a deck took three taps to
+reach a name (a panel with nothing to tick, "Create a new module", then
+"What kind of module?", where picking Unit made a unit from Add a deck).
+The owner chose (3a, 4a) to go straight to naming when there is nothing
+to choose, (5a) "Create a new deck" in the panel otherwise, and asked
+that the naming be the same for both. So `CourseModules`' `naming` holds
+the kind, and one `ConfirmModal` asks "Unit title" or "Deck title";
+`onCreateDeck(title)` makes the deck in the course's language, attaches
+it, and stays on the course, as `onCreateUnit` always did. The cost: a
+deck made here no longer opens on `NewModule`'s screen and then itself;
+its description is left empty, as a unit's is.
+

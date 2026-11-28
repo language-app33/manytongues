@@ -5939,9 +5939,12 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
   onRemove: (id: string) => void;
   onDelete: (unitId: string) => void;
   onToggleDeck: (id: string, on: boolean) => void;
-  onCreateDeck: () => void;
+  /** A deck named here: made in the course's language and put in it. */
+  onCreateDeck: (title: string) => void;
 }) {
-  const [naming, setNaming] = useState<string | null>(null);
+  /* A new unit or deck being named: one box for both (0.748, the owner's
+     3a, 4a, 5a), so making either looks and goes the same way. */
+  const [naming, setNaming] = useState<{ kind: "unit" | "deck"; title: string } | null>(null);
   const [addingUnit, setAddingUnit] = useState(false);
   const [addingDeck, setAddingDeck] = useState(false);
   const [deleting, setDeleting] = useState<Module | null>(null);
@@ -6008,7 +6011,10 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           );
         })}
       </div>
-      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingUnit(true)}>
+      {/* With no unit to choose from, the panel would hold New unit alone:
+          go straight to naming one (0.748, 3a). Likewise a deck (4a). */}
+      <button type="button" className="at-deckadd at-addwide" disabled={busy}
+        onClick={() => (spareUnits.length ? setAddingUnit(true) : setNaming({ kind: "unit", title: "" }))}>
         <Icon name="add" size={17} />
         Add a unit
       </button>
@@ -6040,7 +6046,8 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           </div>
         ))}
       </div>
-      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingDeck(true)}>
+      <button type="button" className="at-deckadd at-addwide" disabled={busy}
+        onClick={() => (deckChoices.length ? setAddingDeck(true) : setNaming({ kind: "deck", title: "" }))}>
         <Icon name="add" size={17} />
         Add a deck
       </button>
@@ -6048,7 +6055,7 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
       {addingUnit && (
         <PickSheet title="Add a unit" onClose={() => setAddingUnit(false)}>
           <div className="at-sheetacts">
-            <SheetAction icon="add" label="New unit" onClick={() => { setAddingUnit(false); setNaming(""); }} />
+            <SheetAction icon="add" label="New unit" onClick={() => { setAddingUnit(false); setNaming({ kind: "unit", title: "" }); }} />
           </div>
           {spareUnits.length > 0 && (
             <>
@@ -6068,7 +6075,9 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           title="Add a deck"
           lede={`Choose the decks ${course.title} teaches. Students see them at their next check.`}
           find="Search modules"
-          create={{ label: "Create a new module", onCreate: onCreateDeck }}
+          /* A deck, not "a module" with a kind to choose: this is Add a
+             deck (0.748, 5a). Units are made from Add a unit. */
+          create={{ label: "Create a new deck", onCreate: () => { setAddingDeck(false); setNaming({ kind: "deck", title: "" }); } }}
           rows={deckChoices.map((d) => ({ id: d.id, title: d.title, meta: moduleSize(d), on: inCourse.has(d.id), saving: saving[d.id] }))}
           none="You have no decks yet."
           onToggle={onToggleDeck}
@@ -6077,21 +6086,21 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
       )}
       {naming !== null && (
         <ConfirmModal
-          title="New unit"
+          title={naming.kind === "unit" ? "New unit" : "New deck"}
           danger={false}
-          confirmLabel="New unit"
+          confirmLabel={naming.kind === "unit" ? "New unit" : "New deck"}
           busy={busy}
           body={
-            <Field label="Unit title">
-              <input className="at-input" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} />
+            <Field label={naming.kind === "unit" ? "Unit title" : "Deck title"}>
+              <input className="at-input" autoFocus value={naming.title} onChange={(e) => setNaming({ ...naming, title: e.target.value })} />
             </Field>
           }
           onCancel={() => setNaming(null)}
           onConfirm={() => {
-            const title = (naming || "").trim();
+            const title = naming.title.trim();
             if (!title) return;
             setNaming(null);
-            onCreateUnit(title);
+            (naming.kind === "unit" ? onCreateUnit : onCreateDeck)(title);
           }}
         />
       )}
@@ -10767,13 +10776,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }),
       );
     };
-    /* A new module made from this course: the kind asked, as New module
-       asks it, then the module is put in this course and opened. */
-    const createHere = () => {
-      setNewKind("deck");
-      setNamingFor(c);
-      setChoosingKind(true);
-    };
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -10878,7 +10880,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   await refresh(true);
                 })}
                 onToggleDeck={toggleModule}
-                onCreateDeck={createHere}
+                onCreateDeck={(title) => run(async () => {
+                  const r = await API.createModule(title, "", c.language as LangId);
+                  if (!(r && r.deck && r.deck.id)) return;
+                  const a = await API.attachModule(r.deck.id, c.id);
+                  tookModule(a);
+                  tookCourse(a);
+                }, `${title} added to ${c.title}`)}
               />
               {kindSheet}
             </div>

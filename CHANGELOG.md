@@ -8,6 +8,36 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.748 — 28 November 2026
+
+**A course with no modules yet: a calmer Modules section, and quicker ways to fill it.**
+
+- The tan "Nothing here yet" box and its Create a module button are gone
+  from an empty course. It looked like a warning, and its button did what
+  Add a unit and Add a deck under it already do.
+- Instead, while the course holds nothing, each group says in a line what
+  it is for: "Students work through units one after another" and
+  "Students practise decks whenever they like". The lines go once the
+  course has its first unit or deck. The add buttons stay dotted, as they
+  are on a filled course.
+- **Add a unit**, when you have no unit to choose from, now opens the
+  "New unit" box at once, rather than a panel holding New unit alone.
+- **Add a deck**, when you have no deck to choose from, now opens a
+  "New deck" box at once. It used to take you through a panel with
+  nothing to choose, a "Create a new module" button, and a question
+  asking whether you wanted a deck or a unit.
+- When you do have decks, the panel's first row now reads **Create a new
+  deck** and opens that same box, with no deck-or-unit question.
+- A new deck and a new unit are now named in the same box, and both stay
+  on the course screen once made, with a message saying they were added.
+
+**Trade-off:** a deck made from a course no longer opens by itself
+afterwards; tap it in the list to add its first cards, as with a new unit.
+
+**To check by hand:** on a phone, a new teacher's empty course; Add a unit
+and Add a deck each go straight to the name box, and the two lines under
+the group labels go once something is added.
+
 ## 0.747 — 28 November 2026
 
 **Every message at the foot of the screen is now one size and one look.**
