@@ -60,14 +60,6 @@ from (`sayAlong`), but nothing marks against it — so a range has no
 ordinary card gets. A counted noun has no box for one either, so a counting
 question shows none.
 
-## Hebrew's ten thousand
-
-`scale` gives the bound form to three through nine and counts ten the
-masculine way with the singular after it, which is what the app has said
-since 0.152 and what the port kept deliberately. The written language would
-have the bound form there too. A correction for whoever reads the Hebrew
-table, because changing it changes what an existing learner sees.
-
 ## A preview each language chooses
 
 The list of numbers under *What a student will be asked* is one list for

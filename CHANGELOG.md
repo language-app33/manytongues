@@ -8,6 +8,26 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.742 — 28 November 2026
+
+**Hebrew: ten thousand is said the correct way**, once the teacher gives
+the word for it.
+
+- Ten thousand was said with the masculine ten and the singular thousand.
+  Written Hebrew says it with the bound ten and the plural, the same way
+  three to nine thousand already were.
+- Ten now has one more box on the number screen, **"before thousands"**,
+  like three to nine. Once a teacher writes it, ten thousand (and 10,001,
+  10,500 and so on) is said the correct way.
+- **Until that box is written, nothing changes**: ten thousand keeps its
+  old wording, and the screen shows the box as missing. Eleven thousand and
+  above, and ten million, are unchanged.
+- A student who learnt the old wording will see the new one once their
+  teacher fills the box.
+
+**To check by hand:** on a Hebrew number screen, that ten shows the new
+box, and that a number question on ten thousand uses it once it is written.
+
 ## 0.741 — 28 November 2026
 
 **A course's unit and deck rows, tidier**, as asked.

@@ -14,7 +14,15 @@
     "Which means this table is not a review waiting to happen, the way the",
     "Palestinian Arabic one is. It is a fence. If a row here ever changes,",
     "somebody has changed what an existing learner sees, and that wants",
-    "saying out loud rather than merging."
+    "saying out loud rather than merging.",
+    "",
+    "Except one row, changed on purpose in 0.742: ten thousand. It said",
+    "עשרה אלף (the masculine ten and the singular thousand); the written",
+    "language says עשרת אלפים, the bound ten and the plural, the way three",
+    "to nine thousand already were. The new form is the box for ten \"before",
+    "thousands\", added to this table's system; a system without it still",
+    "says the old words, so nobody's numbers change until their teacher",
+    "writes it. Ten million is unchanged, and is here to show it."
   ],
   "system": {
     "id": "golden-he",
@@ -120,7 +128,8 @@
         "forms": {
           "standalone": "עשר",
           "m": "עשרה",
-          "f": "עשר"
+          "f": "עשר",
+          "construct.m": "עשרת"
         }
       },
       "teen.11": {
@@ -974,7 +983,15 @@
     },
     {
       "n": 10000,
-      "text": "עשרה אלף"
+      "text": "עשרת אלפים"
+    },
+    {
+      "n": 10001,
+      "text": "עשרת אלפים ואחת"
+    },
+    {
+      "n": 10500,
+      "text": "עשרת אלפים וחמש מאות"
     },
     {
       "n": 11000,
@@ -1539,6 +1556,10 @@
     {
       "n": 9999999,
       "text": "תשעה מיליון תשע מאות תשעים ותשעה אלף תשע מאות תשעים ותשע"
+    },
+    {
+      "n": 10000000,
+      "text": "עשרה מיליון"
     }
   ]
 }

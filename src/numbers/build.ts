@@ -72,6 +72,14 @@ export class Build {
     return !!lex && Object.values(lex.forms || {}).some((t) => String(t || "").trim());
   }
 
+  /** Whether one face of a slot is written, without crediting it or
+      warning: for a rule that has a better way to say a number only when
+      the teacher has given the word for it. */
+  written(slot: string, key: FormKey): boolean {
+    const lex = this.sys.lexemes ? this.sys.lexemes[slot] : undefined;
+    return !!textOf(lex, key);
+  }
+
   /** A number the teacher wrote out by hand, in this face if they gave one. */
   override(n: number, key: FormKey): string {
     const table = this.sys.overrides || {};
