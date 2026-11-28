@@ -14711,7 +14711,7 @@ const openPronounTables = async () => {
     await sleep(300);
     const panel = scr.querySelector('[role=tabpanel][aria-label="people"]');
     const code = panel ? panel.querySelector(".at-codeblock") : null;
-    const teachers = panel ? [...panel.querySelectorAll("*")].find((el) => el.children.length === 0 && (el.textContent || "").trim() === "Teachers") : null;
+    const teachers = panel ? [...panel.querySelectorAll("*")].find((el) => el.children.length === 0 && /^Teachers\b/.test((el.textContent || "").trim())) : null;
     const said = ((panel && panel.textContent) || "").replace(/\s+/g, " ");
     check("People opens on the student code, above Teachers",
       !!code && /Student code/.test(code.textContent || "") && !!teachers && !!(code.compareDocumentPosition(teachers) & 4) &&
