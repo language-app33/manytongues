@@ -3778,10 +3778,15 @@ const HE_PREFIXES = ["וה", "וב", "ול", "ומ", "וכ", "וש", "שה", "כ
  * shapes. Read off spellings the teacher already typed; nothing is looked
  * up.
  *
- * Near enough, not right. Four rules, each applied only while three
+ * Near enough, not right. Five rules, each applied only while three
  * letters remain, so that a root which truly holds one of these letters
  * keeps it:
  *   - drop a plural ending or a feminine ה from the end;
+ *   - drop a leading ל, when what is left has three letters besides its
+ *     vowel letters: a verb written as "to …" (לכתוב) joins its family
+ *     (0.743). The cost is that a few nouns that begin with a ל of their
+ *     own may be filed with a family they do not belong to. When this
+ *     rule is taken the next one is not;
  *   - drop a leading מ, the commonest noun prefix — and only that. The
  *     article and the one-letter prepositions are peeled when matching a
  *     word inside a phrase, not here: half the roots in the language start
@@ -3804,6 +3809,17 @@ export function heRootKey(text: string) {
     if (x.endsWith(suf) && x.length - suf.length >= 3) {
       x = x.slice(0, -suf.length);
       break;
+    }
+  }
+  /* A verb written as "to …" is the root behind a ל. Taken only when the
+     rest holds three letters besides its vowel letters, so the ל of a
+     noun such as לימוד stays where it is; and when it is taken, the מ
+     rule is not, or למכור would lose two letters and have no key. */
+  if (x.startsWith("ל") && x.length >= 4) {
+    let candidate = x.slice(1);
+    if (candidate.replace(/[וי]/g, "").length >= 3) {
+      while (candidate.length > 3 && /[וי]/.test(candidate)) candidate = candidate.replace(/[וי]/, "");
+      return candidate;
     }
   }
   if (x.startsWith("מ") && x.length >= 4) x = x.slice(1);

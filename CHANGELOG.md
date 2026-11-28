@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.743 — 28 November 2026
+
+**Hebrew: "Built on the same root" gathers a verb written as "to …"**.
+
+- A verb card written in its "to …" form, such as "to write", is now listed
+  with the other words of its family (write, writer, letter, writing),
+  where before it was left out on its own.
+- **The cost:** a few nouns that happen to begin with the same letter as
+  "to" may now be listed with a family they do not belong to. The grouping
+  was always a near guess and still is.
+
+**To check by hand:** a Hebrew deck with a "to …" verb and a noun from the
+same family, that "Built on the same root" lists them together.
+
 ## 0.742 — 28 November 2026
 
 **Hebrew: ten thousand is said the correct way**, once the teacher gives

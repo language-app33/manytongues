@@ -852,6 +852,26 @@ test("the Hebrew root key gathers a family across its spellings and shapes", () 
   assert.equal(heRootKey("מלך").length, 3);
 });
 
+test("a Hebrew verb written as \"to …\" joins its family (0.743)", () => {
+  assert.equal(heRootKey("לכתוב"), "כתב");
+  assert.equal(heRootKey("ללמוד"), "למד");
+  assert.equal(heRootKey("לאכול"), "אכל");
+  assert.equal(heRootKey("לדבר"), "דבר");
+  /* The ל is taken and the מ is then left alone, or "to sell" has no key. */
+  assert.equal(heRootKey("למכור"), "מכר");
+  /* What was gathered before is gathered the same. */
+  for (const w of ["כתב", "כותב", "מכתב", "כתיבה", "מכתבים"]) assert.equal(heRootKey(w), "כתב", w);
+  /* Three letters is a root already, and a ל with two letters behind it
+     besides the vowel letters is the word's own. */
+  assert.equal(heRootKey("למד"), "למד");
+  assert.equal(heRootKey("לימוד"), "למד");
+  /* (Keys are written with the finals folded, so white keeps its own
+     three letters with an ordinary נ.) */
+  assert.equal(heRootKey("לבן"), "לבנ");
+  assert.equal(heRootKey("מלכה"), heRootKey("מלך"));
+  assert.notEqual(heRootKey("שמש"), "כתב");
+});
+
 test("a Hebrew key too short to mean anything is no key", () => {
   assert.equal(heRootKey("אב"), "");
   assert.equal(heRootKey(""), "");
