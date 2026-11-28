@@ -217,7 +217,7 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
       name: ".at-btn",
       size: "15px",
       what: "Every button but the main one, in ordinary letters (0.740, the owner's choice).",
-      example: "Cards you already have",
+      example: "Add existing cards",
       cls: "at-btn",
       tag: "span",
     },

@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.750 — 28 November 2026
+## 0.751 — 28 November 2026
 
 **Calmer cards in the teacher's lists.**
 
@@ -33,6 +33,46 @@ past than the outlined label was.
 **To check by hand:** on a phone, open Teaching › Material › Cards with
 some drafts in it, then a module's own list of cards. Look at both in
 the dark theme too.
+
+## 0.750 — 28 November 2026
+
+**Moving units on a screen of their own, a quieter empty Cards section,
+the student code in People, and a first tab called Modules.**
+
+- **Move units.** The up and down arrows are gone from each unit on a
+  course's screen. To change the order, open a unit's three dots and tap
+  **Move unit** (it is first, and only there when the course has more than
+  one unit). A screen opens with every unit on one slim line, the one you
+  started from highlighted, and arrows at the right of each. Nothing
+  changes for students while you move them: **Apply** saves the new order
+  in one go, **Cancel** leaves it as it was. If you close the screen with
+  the cross after moving something, it asks whether to apply the new
+  order, discard it, or carry on.
+- A unit that is open to students now has a shorter tile: no arrows and
+  no empty strip at its foot. A unit that is not open yet still shows
+  **Open to students** there.
+- **An empty unit or deck** no longer shows an amber box with a green
+  button. Under **Cards** there is one line, "No cards yet. Students need
+  some to practise.", and two dotted rows, **New card** and **Add existing
+  cards**, the same kind of button as Add a unit and Add a deck. The three
+  dots with **Restore from a backup file** sit on the same line as
+  "Cards", at its right.
+- "Cards you already have" is now called **Add existing cards**
+  everywhere, including in the panel the green + opens.
+- **The student code moved to the People tab**, at the top, above
+  Teachers and Students. The empty Students list now just says "Nobody
+  has joined yet.", since the code and its Copy button are right above it.
+- **The course's first tab is now called Modules** (it said Course), and
+  the "Modules" heading inside it is gone: the course's name is followed
+  directly by "Units, studied in order".
+
+**Trade-off:** moving a unit one place now takes a few more taps (three
+dots, Move unit, an arrow, Apply), in return for calmer tiles and an order
+students only see once it is finished.
+
+**To check by hand:** Move units on a real phone with a long course
+(scrolling, and the buttons at the foot staying in reach), and Copy on the
+student code in People.
 
 ## 0.749 — 28 November 2026
 

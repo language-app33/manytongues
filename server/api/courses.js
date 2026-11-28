@@ -5302,6 +5302,25 @@ async function handle(req) {
       return json({ ok: true, course: next || (await readCourse(store, course.id)) });
     }
 
+    /* The whole order at once (0.750): Move units sends it on Apply, so a
+       failed save cannot leave the path half moved. */
+    if (action === "order-units") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const order = Array.isArray(body.order) ? body.order.map(String) : [];
+      /* The same units, each once: a unit added or taken out by someone else
+         since the list was opened makes the order stale, and it is refused. */
+      const same = (/** @type {string[]} */ path) =>
+        path.length === order.length && new Set(order).size === order.length && path.every((x) => order.includes(x));
+      if (!same(course.path || [])) return json({ error: "not-on-path" }, 404);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
+        if (!fresh || !same(fresh.path || [])) return null;
+        return order.join() === (fresh.path || []).join() ? null : { ...fresh, path: order };
+      });
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
     if (action === "publish-unit") {
       const { course, refused } = await pathCourse();
       if (refused) return refused;

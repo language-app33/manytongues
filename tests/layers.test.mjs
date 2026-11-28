@@ -929,7 +929,7 @@ for (const sel of [".at-cmenu"]) {
   });
 }
 
-test("a teacher's card tile leads with the meaning and says its status quietly (0.750)", () => {
+test("a teacher's card tile leads with the meaning and says its status quietly (0.751)", () => {
   const lead = ".at-minicard.teach:has(> .at-minien:not(:empty))";
   assert.match(rule(`${lead} > .at-minien`), /order:\s*-1/, "the meaning is not moved above the script");
   assert.match(rule(`${lead} > .at-minien`), /font-weight:\s*700/, "the meaning is not the tile's bold line");

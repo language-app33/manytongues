@@ -10077,8 +10077,32 @@ had when it opened, so a row does not jump as it is toggled. The cost: a
 unit students are working through can be taken off the path from the
 panel with one tap, as it already could from the unit's own Courses.
 
+## Move units, the empty Cards section, the student code, Modules (0.750)
 
-## The teacher's card tiles, calmer (0.750)
+The owner's choices: (1a) a unit's order is changed on a screen of its
+own, Move units, opened from Move unit in a unit's three dots, and the
+arrows leave the tile; (2a) arrows only on that screen, no dragging;
+(3b) nothing changes until Apply, with Cancel beside it, and the button
+says "Apply", not "Done"; (7a) leaving by the close cross with moves not
+applied asks Apply, Discard or Cancel. (4a) An empty module shows one
+line and two dotted rows, the course screen's add buttons, instead of
+the amber box; (5a) its three dots sit on the Cards heading's line,
+since the list draws no toolbar while empty; (6b) "Cards you already
+have" is renamed "Add existing cards". (8a) The student code moved to the
+top of the People tab. (9a) The course's first tab is named Modules and
+its inner Modules heading is dropped; the list is nested in the course's
+name block so no rule falls between them.
+
+Apply sends the whole order with a new action, `order-units`, rather than
+one `move-unit` per step: a save that fails partway cannot leave the path
+half moved, and an order that no longer names exactly the course's units
+(someone added or took one out meanwhile) is refused with `not-on-path`,
+the code `move-unit` already used. `move-unit` stays on the server. The
+phone's own back button is not handled by the app, so it leaves Move units
+without asking; only the screen's cross asks.
+
+
+## The teacher's card tiles, calmer (0.751)
 
 The owner found Material › Cards too busy and was shown five things to
 quieten (the "Calmer Cards screen" proposal), then three follow-ups.
