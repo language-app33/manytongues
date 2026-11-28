@@ -5947,12 +5947,17 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
   const [deleting, setDeleting] = useState<Module | null>(null);
   const opened = new Set(course.opened || []);
   const inCourse = new Set(decks.map((d) => d.id));
+  /* While the course holds nothing at all, each group says in a line what
+     it is for (0.748, the owner's 1a). The dotted add buttons stay as
+     they are once it is filled (2a): the screen keeps one shape throughout. */
+  const fresh = !units.length && !decks.length;
   /* The controls at a row's right: a press on them is theirs alone, not
      the row's, which opens the module. */
   const hold = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
     <>
       <p className="at-eyebrow at-modgroup">Units, studied in order</p>
+      {fresh && <p className="at-hint at-modhint" data-el="course-units-hint">Students work through units one after another.</p>}
       <div className="at-decklist2" data-el="course-units">
         {units.map((u, i) => {
           const live = isLiveIn(course, u.id);
@@ -6009,6 +6014,7 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
       </button>
 
       <p className="at-eyebrow at-modgroup">Decks, studied in any order</p>
+      {fresh && <p className="at-hint at-modhint" data-el="course-decks-hint">Students practise decks whenever they like.</p>}
       <div className="at-decklist2" data-el="course-decks">
         {decks.map((d) => (
           <div key={d.id} data-el="course-deck" className="at-unitrow">
@@ -10768,29 +10774,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       setNamingFor(c);
       setChoosingKind(true);
     };
-    const moduleSwitch = (empty: boolean) => (
-      <ModuleSwitch
-        modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
-        chosen={mine.map((d) => d.id)}
-        onOpen={(id) => setOpenModule(id)}
-        onToggle={toggleModule}
-        onCreate={createHere}
-        solid={empty}
-        saving={moduleSaving}
-        find={{
-          placeholder: "Search modules",
-          match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
-        }}
-        words={{
-          first: empty ? "Add a module" : "Add a module to this course",
-          another: "Another module",
-          drop: (t) => `Take ${t} out of this course`,
-          lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
-          note: "",
-          none: "You have no modules yet. Make one under Modules, then add it to this course.",
-        }}
-      />
-    );
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -10850,23 +10833,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 </div>
               )}
-              {/* Empty, one way to fill it (0.727, the owner's 1a–4a): Add a
-                  module where there are modules to add, whose list can make
-                  a new one too, and Create a module where there are none.
-                  Above both groups while the course has nothing at all. */}
-              {!mine.length && !units.length ? (
-                <div className="at-mb3">
-                  <Nudge
-                    icon="folder"
-                    tone="attention"
-                    action={plainModules.length ? moduleSwitch(true) : (
-                      <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
-                    )}
-                  >
-                    Nothing here yet. Add a module to give your students something to practise.
-                  </Nudge>
-                </div>
-              ) : null}
+              {/* An empty course has no box of its own (0.748): the tan box
+                  read as a warning, and its Create a module repeated what
+                  Add a unit and Add a deck below it already do. Each group
+                  says what it is for instead. See CourseModules. */}
               <CourseModules
                 course={c}
                 units={units}
