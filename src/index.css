@@ -515,7 +515,7 @@ button {
   .at.auto .at-mark-loops { display:none !important; }
 }
 
-.at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; box-shadow: var(--nav-shadow); justify-content:center; }
+.at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:13px; font-weight:800; box-shadow: var(--nav-shadow); justify-content:center; }
 .at-modecaret { color: var(--brass); display:inline-flex; transition: transform 150ms; }
 .at-modecaret.up { transform: rotate(180deg); }
 .at-modemenu { position:absolute; top:46px; left:0; min-width:170px; background: var(--surface);
@@ -970,8 +970,13 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 
 /* Icons sit inside buttons at the text baseline. */
 .at-ic { flex:0 0 auto; vertical-align:-4px; }
-.at-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family: var(--ui); font-size:16px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; background: var(--raised); color: var(--text); border:2px solid var(--line); border-radius: var(--r); padding:14px 22px; cursor:pointer; transition: transform 60ms, background 120ms; min-height:52px; }
+/* Buttons are in ordinary letters (0.738, the owner's choice): only the
+   one main green button of a screen — the primary variant — keeps its
+   capitals, so it is the one that stands out. Labels, small capital
+   headings and badges keep theirs; they are not buttons. */
+.at-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family: var(--ui); font-size:15px; font-weight:800; letter-spacing:0; background: var(--raised); color: var(--text); border:2px solid var(--line); border-radius: var(--r); padding:14px 22px; cursor:pointer; transition: transform 60ms, background 120ms; min-height:52px; }
 .at-btn.sm { gap:6px; }
+.at-btn.primary { text-transform:uppercase; letter-spacing:.03em; font-size:16px; }
 .at-icon { display:inline-flex; align-items:center; justify-content:center; flex:1; border:2px solid var(--line); border-radius: var(--r-sm); background: var(--raised); color: var(--ink); font-size:14px; line-height:1; padding:7px 0; cursor:pointer; }
 /* The outline without the fill, matching .at-btn.ghost — for an icon button
    standing in a row beside ghost buttons. */
@@ -1656,8 +1661,8 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
    than one you should — and a brass pill would pull the eye every time the
    menu opened. */
 .at-cact { border:2px solid var(--line); background:none; color: var(--muted); cursor:pointer;
-  border-radius:999px; padding:5px 11px; font-family: var(--ui); font-size:11px; font-weight:800;
-  letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; flex:none; }
+  border-radius:999px; padding:5px 11px; font-family: var(--ui); font-size:13px; font-weight:800;
+  white-space:nowrap; flex:none; }
 .at-cact:hover { background: var(--raised); color: var(--text); }
 /* A row that names a choice rather than being one: no hover, no pointer,
    because the thing you tap is the picker underneath it. */
@@ -2172,7 +2177,7 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-btn.danger { background: var(--rose); border-color: var(--rose); color:#fff; }
 .at-btn.ghost { background:transparent; border-color: var(--line); }
 .at-btn.wide { width:100%; }
-.at-btn.sm { padding:9px 14px; font-size:13px; min-height:0; border-radius: var(--r-sm);
+.at-btn.sm { padding:9px 14px; font-size:14px; min-height:0; border-radius: var(--r-sm);
   letter-spacing:.02em; }
 /* Fading a filled button took its label down with it, leaving jade-on-jade
    that was barely readable. Disabled now drops to the plain surface and
@@ -3090,7 +3095,7 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
   padding:3px; gap:3px; container-type: inline-size; }
 .at-seg { flex:1 1 0; min-width: min-content; display:inline-flex; align-items:center;
   justify-content:center; gap:6px;
-  font-family: var(--ui); font-weight:800; letter-spacing:.03em; text-transform:uppercase;
+  font-family: var(--ui); font-weight:800;
   white-space:nowrap;
   background: var(--raised); border:2px solid transparent; border-radius:9px;
   color: var(--text-soft); cursor:pointer; padding:9px 6px; min-height:38px;
@@ -3847,7 +3852,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   background: color-mix(in srgb, var(--jade) 14%, transparent); }
 .at-trainchoice:disabled .at-trainchoiceico, .at-trainchoice.off .at-trainchoiceico { color: var(--faint);
   background: var(--well); }
-.at-trainchoicename { font-size:16px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; line-height:1.2; }
+.at-trainchoicename { font-size:16px; font-weight:800; line-height:1.2; }
 .at-trainchoicenote { font-size:13.5px; font-weight:500; line-height:1.35; color: var(--muted); text-wrap: pretty; }
 .at-trainchoicestatus { font-size:13.5px; font-weight:700; line-height:1.35; color: var(--jade); }
 .at-trainchoice:active:not(:disabled):not(.off) { transform: translateY(1px); }

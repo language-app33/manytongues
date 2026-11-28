@@ -3945,13 +3945,14 @@ function ReadNames({ card, lang, cards }: {
     <section className="at-panel">
       <p className="at-eyebrow">What other cards call it</p>
       <p className="at-hint">
-        A sentence borrows a word by name. An ID names this one card and no
-        other; a tag names a set of words a sentence will take any of.
+        A sentence borrows a word by name. A name for this exact card asks
+        for it and no other; a group names a set of words a sentence will
+        take any of.
       </p>
-      <ReadRow label="The card's ID">
+      <ReadRow label="A name for this exact card">
         {own ? <span className="at-slot">{own}</span> : null}
       </ReadRow>
-      <ReadRow label="Tags">
+      <ReadRow label="Groups">
         {wrote.length || anyway.length ? (
           <span className="at-flags">
             {wrote.concat(anyway).map((name) => (

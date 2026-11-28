@@ -863,7 +863,7 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "ref",
     on: "card",
-    label: "The card's ID",
+    label: "A name for this exact card",
     what: "The name the teacher gave this card, so another card's sentence can borrow this word by name rather than any word of a kind.",
     reader: "teacher",
     shown: (value) => {
@@ -874,7 +874,7 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "fills",
     on: "card",
-    label: "Tags",
+    label: "Groups",
     what: "The blanks this card says it fills, which is nowhere in its words: the teacher's answer to what kind of hole this word stands in.",
     reader: "teacher",
     shown: (value) => fillNames({ fills: value }),

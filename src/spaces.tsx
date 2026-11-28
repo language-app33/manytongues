@@ -4837,7 +4837,7 @@ function ImportScreen({ cards, modules, langName, busy, failed, onImport, onClos
 
   return (
     <Screen
-      title="Import"
+      title="Restore from a backup file"
       onBack={onClose}
       rise
       action={
@@ -4849,7 +4849,7 @@ function ImportScreen({ cards, modules, langName, busy, failed, onImport, onClos
             disabled={busy || nothing}
             onClick={() => onImport({ file: read.file, cards: read.cards, decks: read.decks, ticked })}
           >
-            {busy ? "Importing…" : "Import"}
+            {busy ? "Restoring…" : "Restore"}
           </Button>
         ) : null
       }
@@ -8619,7 +8619,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               took(frame, true);
               setReviewing(frame);
             }
-            snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
+            snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} put in the group`, "good");
           } finally {
             setBusy(false);
           }
@@ -9545,7 +9545,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const typedTrouble = !held
       ? ""
       : held.kind === "card"
-        ? "A card's ID is that name already, so it cannot be a tag as well."
+        ? "A card's name is that already, so it cannot be a group as well."
         : held.kind === "category"
           ? "That name is spoken for by a kind of word, which every card of that kind fills already."
           : "";
@@ -9561,22 +9561,22 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     };
     return (
       <Screen
-        title={adding ? "Add tags to the selected cards" : "Take tags off the selected cards"}
+        title={adding ? "Add the selected cards to groups" : "Remove the selected cards from groups"}
         onBack={close}
       >
         <Help>
           {adding
-            ? "Tick the tags every selected card should have. Wherever another card has a blank for one of these tags, these cards can fill it."
-            : "Tick the tags to take off every selected card that has them. Sentences that have a blank for a tag keep the blank."}
+            ? "Tick the groups every selected card should be in. Wherever a sentence has a blank for one of these groups, these cards can fill it."
+            : "Tick the groups to take the selected cards out of. Sentences that have a blank for a group keep the blank."}
         </Help>
         {adding && (
           <div className="at-formblock at-mb3">
-            <Field label="New tag" hint={typedTrouble}>
+            <Field label="New group" hint={typedTrouble}>
               <div className="at-blanknew">
                 <input
                   className="at-input"
-                  placeholder="Name a new tag"
-                  aria-label="Name a new tag"
+                  placeholder="Name a new group"
+                  aria-label="Name a new group"
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); makeTag(); } }}
@@ -9601,7 +9601,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           }))}
           chosen={pickedTags}
           onToggle={(id, on) => setPickedTags((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))}
-          empty={adding ? "No tags yet. Create one above." : "None of the selected cards has a tag."}
+          empty={adding ? "No groups yet. Make one above." : "None of the selected cards is in a group."}
         />
         <div className="at-row at-mt5">
           <Button variant="ghost" onClick={close} icon="close">
@@ -9638,10 +9638,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 ({ changed, sentences, full }) =>
                   [
                     changed
-                      ? `${pickedTags.length === 1 ? "Tag" : "Tags"} ${adding ? "added to" : "taken off"} ${plural(changed, "card")}`
+                      ? `${plural(changed, "card")} ${adding ? "added to" : "taken out of"} ${pickedTags.length === 1 ? "a group" : "groups"}`
                       : "Nothing to change — they were already like that",
-                    sentences ? `${plural(sentences, "sentence")} left out: a sentence takes no tags` : "",
-                    full ? `${plural(full, "card")} already had ${MAX_FILLS} tags, the most a card may have` : "",
+                    sentences ? `${plural(sentences, "sentence")} left out: a sentence is in no group` : "",
+                    full ? `${plural(full, "card")} already in ${MAX_FILLS} groups, the most a card may be in` : "",
                   ]
                     .filter(Boolean)
                     .join(". "),
@@ -10513,8 +10513,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           bulkActions={[
             { label: `Remove from this ${kindW}`, icon: "folderRemove", onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
             { label: "Add to another module", icon: "folderAdd", onClick: () => setCardAction("add") },
-            { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
-            { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
+            { label: "Add to groups", icon: "tagAdd", onClick: () => setTagAction("add") },
+            { label: "Remove from groups", icon: "tagRemove", onClick: () => setTagAction("remove") },
             { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
             { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
             {
@@ -10658,7 +10658,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       const next = r && r.course;
       if (!next || next.id !== c.id) return;
       setCourses((prev) => prev.map((x) => (x.id === c.id
-        ? { ...x, decks: next.decks || [], path: next.path, pathLive: next.pathLive, opened: next.opened }
+        ? { ...x, decks: next.decks || x.decks || [], path: next.path, pathLive: next.pathLive, opened: next.opened }
         : x)));
     };
     const tookModule = (r: any) => {
@@ -11203,7 +11203,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 noun="card"
                 items={listedCards}
                 total={onListed}
-                more={cards.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
+                more={cards.length && !mineSide ? [{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }] : []}
                 sort={cardSort}
                 filter={cardFilterProp}
                 size="small"
@@ -11233,7 +11233,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         }}>
                           New card
                         </Button>
-                        <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
+                        <IconButton icon="upload" label="Restore from a backup file" onClick={() => setImporting(true)} />
                       </div>
                     }
                   >
@@ -11253,8 +11253,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 bulkActions={[
                   { label: "Add to a module", icon: "folderAdd", onClick: () => setCardAction("add") },
                   { label: "Remove from a module", icon: "folderRemove", onClick: () => setCardAction("remove") },
-                  { label: "Add tags", icon: "tagAdd", onClick: () => setTagAction("add") },
-                  { label: "Remove tags", icon: "tagRemove", onClick: () => setTagAction("remove") },
+                  { label: "Add to groups", icon: "tagAdd", onClick: () => setTagAction("add") },
+                  { label: "Remove from groups", icon: "tagRemove", onClick: () => setTagAction("remove") },
                   { label: "Change status", icon: "verify", onClick: () => setStatusAction({ to: null }) },
                   { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
@@ -11484,7 +11484,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 /* A personal set is on New module's sheet again (0.722), not
                    here. */
-                more={modules.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
+                more={modules.length && !mineSide ? [{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }] : []}
                 onNew={mineSide ? undefined : newModule}
                 selected={selModules}
                 onSelectedChange={setSelModules}

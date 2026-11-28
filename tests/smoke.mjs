@@ -5021,7 +5021,14 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const statusLines = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
     .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
   check("and it opens the app's panel of what can be done from there, the status now ticked",
-    statusLines.join(" | ") === "Published ✓ | Unpublish", statusLines.join(" | ") || "(no panel)");
+    statusLines.join(" | ") === "Published ✓ | Draft | Ready for review", statusLines.join(" | ") || "(no panel)");
+  /* Each row with its line (0.738, the owner's choice): no Unpublish step. */
+  const statusNotes = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
+    .map((b) => ((b.querySelector("i") || {}).textContent || "").trim());
+  check("each status row says what it does, and none is red",
+    statusNotes.join(" | ") === "Students see it. | Takes it back from students. | Takes it back from students. Marked to be checked." &&
+      !document.querySelector(".at-statussheet .at-sheetact.danger"),
+    statusNotes.join(" | ") || "(no lines)");
   click(document.querySelector('.at-statussheet [aria-label="Close"]'));
   await sleep(100);
   /* On the title's own line since 0.484, as icons, each named out loud,
@@ -14501,6 +14508,9 @@ const openPronounTables = async () => {
   await sleep(500);
   click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);
   await sleep(500);
+  /* Since 0.738 New unit is the first row of the panel + Add a unit opens. */
+  click(buttonNamed(/^Add a unit$/));
+  await sleep(200);
   click(buttonNamed(/^New unit$/));
   await sleep(300);
   {

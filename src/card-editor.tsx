@@ -2007,7 +2007,7 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange, line = false }
   if (!suggestions.length && !keptCards.length) {
     return (
       <div className="at-formblock at-mt5">
-        <p className="at-eyebrow">Words this teaches</p>
+        <p className="at-eyebrow">Words in this sentence</p>
         <Help>
           None of your single-word cards appear in this one. Add the word on its own card and it
           will be offered here.
@@ -2040,12 +2040,12 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange, line = false }
 
   return (
     <div className="at-formblock at-mt5">
-      <p className="at-eyebrow">Words this teaches</p>
-      <Help>
-        Tick the words this phrase is a good example of. Each one gets practiced inside this phrase
-        as well as on its own — which is how a word is met in more than one place without anything
-        being invented.
-      </Help>
+      <p className="at-eyebrow">Words in this sentence</p>
+      {/* Said as the owner put it (0.738), and true: a word's own meaning
+          is learnt in exercise group 1, and the in-a-phrase exercises are
+          in groups 2 and 4 (levelOf), so they come after. A test holds
+          the scheduler to it. */}
+      <Help>Ticked words are learnt on their own first, then practised inside this sentence.</Help>
       <CheckList
         options={options}
         chosen={chosen || []}

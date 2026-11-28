@@ -1571,3 +1571,18 @@ test("a week is the last seven days, today first, with no day dropped or repeate
   assert.equal(new Set(spring).size, 7, "no day twice across a clock change");
   assert.equal(spring[0], "2026-03-31");
 });
+
+/* 0.738: the card editor tells a teacher that ticked words "are learnt on
+   their own first, then practised inside this sentence". True only while a
+   word's in-a-sentence exercises stand above the level its meaning is
+   learnt at, and the ladder keeps them shut until that level is solid. */
+test("a new word is asked what it means before it is asked inside a sentence", () => {
+  const inPhrase = ["ctx2pick", "ctx2ar", "rec2ctx"].filter((t) => EX[t]);
+  assert.ok(inPhrase.length >= 2, "the in-a-sentence exercises exist");
+  for (const t of inPhrase) assert.ok(levelOf(t) > 1, `${t} is above group 1`);
+  const ladder = ["ar2en", ...inPhrase];
+  const table = (/** @type {Record<string, ExerciseState>} */ s) => (/** @type {string} */ t) => s[t];
+  assert.deepEqual(openTypes(ladder, table({})), ["ar2en"], "fresh, only its meaning is asked");
+  assert.ok(openTypes(ladder, table({ ar2en: sure() })).some((t) => inPhrase.includes(t)),
+    "once its meaning is solid, it is practised inside a sentence");
+});

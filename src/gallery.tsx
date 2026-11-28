@@ -1160,7 +1160,7 @@ export function ComponentGallery() {
               row: (d) => ({ cells: { title: d.title } }),
             }}
             onNew={() => {}}
-            more={[{ label: "Import", icon: "upload", onClick: () => {} }]}
+            more={[{ label: "Restore from a backup file", icon: "upload", onClick: () => {} }]}
             sort={{
               value: order,
               down: orderDown,
