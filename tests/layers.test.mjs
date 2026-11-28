@@ -928,3 +928,21 @@ for (const sel of [".at-cmenu"]) {
     assert.equal(rule["overflow-y"], "auto", "and it has to scroll inside itself rather than spill");
   });
 }
+
+test("a teacher's card tile leads with the meaning and says its status quietly (0.750)", () => {
+  const lead = ".at-minicard.teach:has(> .at-minien:not(:empty))";
+  assert.match(rule(`${lead} > .at-minien`), /order:\s*-1/, "the meaning is not moved above the script");
+  assert.match(rule(`${lead} > .at-minien`), /font-weight:\s*700/, "the meaning is not the tile's bold line");
+  assert.match(rule(`${lead} .at-slot`), /background:\s*none/, "a blank on a teacher's tile is still a filled pill");
+  const quiet = rule(".at-minicard.teach .at-statusbadge.quiet");
+  assert.match(quiet, /text-transform:\s*none/, "the status is still in capitals");
+  assert.match(quiet, /border:\s*0/, "the status still has an outline");
+  assert.match(rule(".at-minicard.teach .at-statusbadge.quiet.lost"), /color:\s*var\(--rose\)/,
+    "a missing recording is not said in red");
+  /* And both lists of tiles use it: the Cards tab's and a module's own. */
+  const spaces = readFileSync(new URL("../src/spaces.tsx", import.meta.url), "utf8");
+  assert.equal((spaces.match(/\{statusNote\(c\)\}|meta=\{statusNote\(it\)\}/g) || []).length, 2,
+    "a list of tiles does not use statusNote");
+  assert.doesNotMatch(spaces, /className="at-statusbadge">\{statusWords\(/,
+    "a tile still draws its status as the outlined label");
+});

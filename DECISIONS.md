@@ -10077,3 +10077,37 @@ had when it opened, so a row does not jump as it is toggled. The cost: a
 unit students are working through can be taken off the path from the
 panel with one tap, as it already could from the unit's own Courses.
 
+
+## The teacher's card tiles, calmer (0.750)
+
+The owner found Material › Cards too busy and was shown five things to
+quieten (the "Calmer Cards screen" proposal), then three follow-ups.
+Chosen: (1a) a card's status as quiet words after a dot, (2a) the meaning
+first and bold with the script under it, (6a) the status said whatever
+filter is on, (7a) in both grids of teacher's tiles, the Cards tab's and
+a module's own, and (8a) "Recording missing" quiet too, in red. Kept as
+they were: (3c) the three dots on a tile, (5c) the count line and the
+chips. Chosen and held back as a change of its own: (4a) slim text tabs,
+which is in `BACKLOG.md`.
+
+On 6a: the first proposal was to leave the status off while a filter
+already said it. No filter does. The chip "Waiting for review" is the
+Review filter, the sentence cards a teacher has still to read, and a card
+under it can be a draft or published; it only looked like the status
+because an imported card starts as Ready for review. So the words are
+always said.
+
+The order is CSS alone: `order` on `.at-minien` under
+`.at-minicard.teach:has(> .at-minien:not(:empty))`. `CardTile`'s markup
+and the learner's tiles are untouched, and a tile with no meaning line
+(a number range) or an empty one keeps its script as the headline.
+`statusNote` in `src/spaces.tsx` draws the status as
+`.at-statusbadge.quiet`; a table row keeps `statusPill`. The "Word set"
+badge is not a status and is left as it was.
+
+This goes back, for the teacher's tiles, on the note beside
+`.at-mininame` that a bold line on top made named tiles the loudest in
+the list: every tile has one now, so none is louder than the rest. The
+cost: the script is smaller here (15px times the script's scale, from
+18), and the order on screen is no longer the order in the markup, so a
+screen reader still hears the script before the meaning.

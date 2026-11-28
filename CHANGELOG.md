@@ -8,6 +8,32 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.750 — 28 November 2026
+
+**Calmer cards in the teacher's lists.**
+
+- On Teaching › Material › Cards, and in a module's own list of cards,
+  each card now leads with its **meaning, in bold**. The words in the
+  language being taught sit under it, a little smaller, and a blank in
+  them is a plain underlined word where it was a tan pill.
+- A card's status (Draft, Ready for review, Changes in draft, Changes
+  ready for review) is now **small grey text after a dot**, where it was
+  an outlined label in capitals. The dot is brass when the card is ready
+  to be looked at and grey while it is a draft. A published card with
+  nothing waiting still says nothing.
+- **Recording missing** is said the same way, in red.
+- Nothing else on the screen moved: the three dots, the tabs and the
+  lines under the search box are as they were, and so are the table view
+  and the cards a student sees.
+
+**Trade-off:** the words in the language being taught are a little
+smaller in these lists than they were, and a status is easier to scroll
+past than the outlined label was.
+
+**To check by hand:** on a phone, open Teaching › Material › Cards with
+some drafts in it, then a module's own list of cards. Look at both in
+the dark theme too.
+
 ## 0.749 — 28 November 2026
 
 **Add a unit and Add a deck now open the same panel.**

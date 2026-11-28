@@ -1467,6 +1467,32 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px; }
 .at-minicard.teach .at-minimeta:empty { display:none; }
 .at-minicard.teach .at-statusbadge { margin:0; max-width:100%; white-space:normal; }
+/* The teacher's tiles, calmer (0.750, the owner's 1a, 2a, 6a, 7a, 8a).
+   The meaning is the tile's first line and its bold one; the taught
+   script sits under it, a little smaller, and a blank in it is a plain
+   underlined word rather than a pill. Done with `order`, so the markup
+   and the learner's tiles are untouched. Only where the tile has a
+   meaning line with something in it: a number range has none, and a card
+   with nothing to say there keeps its script as the headline. */
+.at-minicard.teach:has(> .at-minien:not(:empty)) > .at-minikind { order:-2; }
+.at-minicard.teach:has(> .at-minien:not(:empty)) > .at-minien { order:-1; font-size:14px; font-weight:700; color: var(--text); }
+.at-minicard.teach:has(> .at-minien:not(:empty)) > .at-minien.standin { font-weight:600; color: var(--muted); }
+.at-minicard.teach:has(> .at-minien:not(:empty)) > .ar { font-size:calc(15px * var(--sscale, 1)); color: var(--text-soft); }
+.at-minicard.teach:has(> .at-minien:not(:empty)) .at-slot { background:none; border:0; border-bottom:1px dotted var(--faint); border-radius:0; padding:0; }
+/* The three dots are in the top corner, so it is now the meaning that
+   keeps clear of them, and the script has the whole width. */
+.at-minicard.teach.cornered:has(> .at-minien:not(:empty)) > .at-minien { padding-right:26px; }
+.at-minicard.teach.cornered:has(> .at-minien:not(:empty)) > .ar { padding-right:0; }
+/* A card's status on a teacher's tile: quiet words after a dot, each on a
+   line of its own, where it was an outlined label in capitals. Brass for
+   ready to look at, grey for a draft, and the red of something to fix
+   for a recording that is missing. "Word set" is not a status and keeps
+   the outlined badge. */
+.at-minicard.teach .at-statusbadge.quiet { display:flex; align-items:baseline; gap:5px; width:100%; margin:0; padding:0; border:0; border-radius:0; font-size:12px; font-weight:600; letter-spacing:0; text-transform:none; line-height:1.4; color: var(--muted); }
+.at-minicard.teach .at-statusbadge.quiet::before { content:""; flex:none; width:7px; height:7px; border-radius:50%; background: var(--brass); transform: translateY(-1px); }
+.at-minicard.teach .at-statusbadge.quiet.draft::before { background: var(--faint); }
+.at-minicard.teach .at-statusbadge.quiet.lost { color: var(--rose); font-weight:700; }
+.at-minicard.teach .at-statusbadge.quiet.lost::before { background: var(--rose); }
 /* What stands for a missing meaning: a transliteration in italics, or a
    small picture or play mark before "Picture" or "Recording". */
 .at-minien.standin svg, .at-standin svg { vertical-align:-2px; }

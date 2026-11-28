@@ -6455,6 +6455,16 @@ const statusWords = (c: Card): string =>
 const statusPill = (c: Card): React.ReactNode =>
   statusWords(c) ? <span className="at-statuspill">{statusWords(c)}</span> : null;
 
+/* The same words on a teacher's card tile (0.750, the owner's 1a and 6a):
+   quiet text after a dot, where it was an outlined label in capitals, and
+   said whatever filter is on. The dot is brass for a card ready to be
+   looked at and grey for a draft. Tiles only: a table row keeps
+   statusPill. */
+const statusNote = (c: Card): React.ReactNode => {
+  const words = statusWords(c);
+  return words ? <span className={`at-statusbadge quiet${/draft/i.test(words) ? " draft" : ""}`}>{words}</span> : null;
+};
+
 /* A card naming a recording the server does not hold — see clipsMissing on
    the server. Beside the status pill, in the colour of something to fix:
    students get the card without being able to hear it. */
@@ -7762,8 +7772,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          by it. What is left is only what needs looking at. */
       meta={
         <>
-          {cardLostRecordings(c) ? <span className="at-statusbadge lost">Recording missing</span> : null}
-          {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
+          {cardLostRecordings(c) ? <span className="at-statusbadge quiet lost">Recording missing</span> : null}
+          {statusNote(c)}
         </>
       }
       onClick={() => openCard(c)}
@@ -10169,7 +10179,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             lang={langOfCard(it)}
             className="teach"
             standIn={standIn(it)}
-            meta={statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}
+            meta={statusNote(it)}
             onClick={() => openCard(it)}
             corner={manageMenu(it)}
           />

@@ -14821,6 +14821,10 @@ const openPronounTables = async () => {
   check("and a draft's tile still says Draft, at its foot",
     !!draftTile && /^Draft$/.test(((draftTile.querySelector(".at-minimeta .at-statusbadge") || {}).textContent || "").trim()),
     draftTile ? (draftTile.textContent || "").trim() : "(no tile)");
+  /* In quiet words after a grey dot, not an outlined label (0.750). */
+  check("and says it quietly",
+    !!draftTile && !!draftTile.querySelector(".at-minimeta .at-statusbadge.quiet.draft"),
+    draftTile ? draftTile.innerHTML.slice(0, 240) : "(no tile)");
   click(viewBtn());
   await sleep(300);
   check("on a phone the second view is a list, not a table",
