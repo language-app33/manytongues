@@ -9270,7 +9270,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
             {/* One way out, since 0.187: what kind of card this is was
                 answered before the screen opened, so there is nothing here
                 to call a sentence. */}
-            <Help>Take the braces out of its words.</Help>
+            <Help>Take the braces out of its words, or start a new card and pick Sentence.</Help>
           </>
         )}
 

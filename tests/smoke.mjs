@@ -6444,7 +6444,7 @@ const openPronounTables = async () => {
     el.dispatchEvent(new w.Event("input", { bubbles: true }));
     return true;
   };
-  const saveBtn = () => /** @type {any} */ (buttonNamed(/^Save$|^Saving…$/) || null);
+  const saveBtn = () => /** @type {any} */ (buttonNamed(/^Save as draft$|^Saving…$/) || null);
 
   /* ---- the card's ID ----
 
@@ -6472,7 +6472,7 @@ const openPronounTables = async () => {
     check("a new card is offered a name for this exact card, folded as optional",
       !!fold() && !idBox() && /A name for this exact card/.test((fold() || {}).textContent || "") &&
         /Optional/.test((fold() || {}).textContent || ""),
-      fold() ? (fold().textContent || "") : "no such row");
+      ((fold() || {}).textContent) || "no such row");
     click([...((fold() || document.createElement("div")).querySelectorAll("button"))].find((b) => /Add/.test(b.textContent || "")) || null);
     await sleep(200);
     check("and Add opens the box, saying what it is for", !!idBox() &&
@@ -7267,13 +7267,12 @@ const openPronounTables = async () => {
       const idFold = () => (blanks() || document).querySelector('[data-el="id-fold"]');
       check("the section is named parts, not one block doing several jobs",
         groups().includes("Blanks in this card") &&
-          (groups().includes("A name for this exact card") || !!idFold()) &&
-          groups().includes("Groups"),
+          (groups().includes("A name for this exact card") || !!idFold()),
         groups().join(" | ") || "(no headings)");
       /* And the ID is one of them rather than a field at the top of the
          screen: what it is for is filling somebody else's blank, so it is
          read beside the groups that do the same job. */
-      const idHalf = () => idFold() ? (idFold().textContent || "") : inHalf(CARDID, ".at-hint, .at-idrow, .at-shutrow")
+      const idHalf = () => idFold() ? ((idFold() || {}).textContent || "") : inHalf(CARDID, ".at-hint, .at-idrow, .at-shutrow")
         .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim()).join(" · ");
       check("the card's own name is one of them, folded as optional or saying what it is for",
         (!!idFold() && /Optional/.test(idHalf())) || /Lets a sentence ask for this card and no other/.test(idHalf()),
@@ -7294,9 +7293,11 @@ const openPronounTables = async () => {
         await sleep(200);
       };
       const newBox = () => /** @type {any} */ (inSheet(".at-blanknew")[0] || null);
-      check("and a card that leaves a blank is told why it fills none",
-        /fills none/.test(((blanks() || {}).textContent) || "") && !newBox(),
-        newBox() ? "offered anyway" : "said, and not offered");
+      /* Since 0.738 a box that does not apply is not drawn: no Groups part
+         and no paragraph saying why on a sentence that fills none. */
+      check("and a sentence that leaves a blank shows no Groups part at all",
+        !groups().includes("Groups") && !/fills none/.test(((blanks() || {}).textContent) || "") && !newBox(),
+        groups().join(" | "));
 
       /* The card that fills somebody else's blank has to be a word to be
          offered the question at all: a sentence dropped into a hole is a
@@ -7339,7 +7340,7 @@ const openPronounTables = async () => {
       /* On a word that fills nothing yet, the heading says what the section
          is for on this kind of card. */
       check("a word's section says it is about filling sentence cards' blanks",
-        /How this card can be used to fill blanks in sentence cards/.test(
+        /A sentence can leave a gap for any word in a group, like colours or foods\./.test(
           (((blanks() || document).querySelector(".at-formrole") || {}).textContent) || ""),
         (((blanks() || document).querySelector(".at-formrole") || {}).textContent) || "(no line)");
       check("the groups it can join are a list on the screen, not a menu to open",
@@ -7446,7 +7447,7 @@ const openPronounTables = async () => {
         const none = inSheet(".at-tagsheetlist .at-hint")
           .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim()).join(" ");
         check("and says so when none matches, with Add still there to make it",
-          !fillList().length && /No tag has .zzqq. in its name/.test(none) &&
+          !fillList().length && /No group has .zzqq. in its name/.test(none) &&
             !!addNew() && !addNew().disabled,
           none || "(nothing said)");
         typeInto(findBox(), "");
@@ -7532,7 +7533,7 @@ const openPronounTables = async () => {
       {
         const role = (((blanks() || document).querySelector(".at-formrole") || {}).textContent || "").trim();
         check("the section's line stays the same once a tag is ticked",
-          role === "How this card can be used to fill blanks in sentence cards", role || "(no line)");
+          role === "A sentence can leave a gap for any word in a group, like colours or foods.", role || "(no line)");
         check("a tag says how many cards use it",
           /used in \d+ card/.test((fillRow(/^friend$/) || {}).textContent || ""),
           ((fillRow(/^friend$/) || {}).textContent || "").trim());
@@ -7584,7 +7585,7 @@ const openPronounTables = async () => {
          question is whether to do it at all, and what it costs. */
       const bin = (/** @type {RegExp} */ re) => /** @type {any} */ (
         (fillRow(re) ? fillRow(re).parentElement : document)
-          .querySelector('button[aria-label^="Take the tag"]') || null);
+          .querySelector('button[aria-label^="Take every card out of the group"]') || null);
       check("a group cards actually fill offers to come off all of them",
         !!bin(/^friend$/), bin(/^friend$/) ? "there" : "(no bin)");
       /* And one nothing fills does not: there is nothing to take off
@@ -7595,7 +7596,7 @@ const openPronounTables = async () => {
       click(bin(/^friend$/));
       await sleep(300);
       check("the bin asks before it reaches past this card",
-        !!modal() && /^Take friend off every card\?$/.test(
+        !!modal() && /^Take every card out of friend\?$/.test(
           ((modal().querySelector(".at-modaltitle") || {}).textContent || "").trim()),
         modal() ? ((modal().querySelector(".at-modaltitle") || {}).textContent || "").trim() : "(nothing asked)");
       /* Not "are you sure" — what it costs, in both directions: the cards
@@ -7604,7 +7605,7 @@ const openPronounTables = async () => {
          nobody would think of and the one that re-ticking cannot undo. */
       const asked = () => ((modal() || {}).textContent || "").replace(/\s+/g, " ");
       check("and says what goes with it, and what does not",
-        /The tag comes off/.test(asked()) && /progress/.test(asked()),
+        /leave the group/.test(asked()) && /progress/.test(asked()),
         asked().slice(0, 160) || "(nothing said)");
       check("including the sentences that go on asking for the name",
         /goes on being asked/.test(asked()),
@@ -7619,7 +7620,7 @@ const openPronounTables = async () => {
 
       click(bin(/^friend$/));
       await sleep(300);
-      click(modalBtn(/^Take it off every card$/));
+      click(modalBtn(/^Take them all out$/));
       await sleep(300);
       check("and answering yes takes it off this card with the rest",
         !modal() && JSON.stringify(ticked()) === JSON.stringify(["greeting"]),
@@ -7663,7 +7664,7 @@ const openPronounTables = async () => {
       await sleep(250);
       const pencil = (/** @type {RegExp} */ re) => /** @type {any} */ (
         (fillRow(re) ? fillRow(re).parentElement : document)
-          .querySelector('button[aria-label^="Rename the tag"]') || null);
+          .querySelector('button[aria-label^="Rename the group"]') || null);
       click(pencil(/^friend$/));
       await sleep(250);
       const renameBox = () => /** @type {any} */ (inSheet(".at-tagrow input.at-input")[0] || null);
@@ -7673,7 +7674,7 @@ const openPronounTables = async () => {
       typeInto(renameBox(), "friends");
       await sleep(150);
       click([...document.querySelectorAll("button")]
-        .find((b) => b.getAttribute("aria-label") === "Rename the tag friend"));
+        .find((b) => b.getAttribute("aria-label") === "Rename the group friend"));
       await sleep(300);
 
       check("renaming a tag asks whether the name follows it everywhere",
