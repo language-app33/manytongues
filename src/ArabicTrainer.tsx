@@ -12054,8 +12054,6 @@ export default function ArabicTrainer() {
   const retryAt: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
   const retryFor = useRef(500);
   const inputRef: React.MutableRefObject<HTMLInputElement | null> = useRef(null);
-  const undoTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
-  const [lastDeleted, setLastDeleted] = useState<Item[] | null>(null);
   /* Every short-lived message the app says, here and in the teaching and
      admin screens below, which reach it through SnackbarProvider. */
   const snack = useSnackbarState();
@@ -15998,20 +15996,6 @@ export default function ArabicTrainer() {
       });
   }
 
-  function undoDelete() {
-    if (!lastDeleted || !lastDeleted.length) return;
-    // A later `updated` than the tombstone, so the restore also wins on
-    // any device that already received the deletion.
-    const restored = lastDeleted.map((it) => ({ ...it, updated: now() }));
-    const tombstones = { ...(data.tombstones || {}) };
-    for (const it of restored) delete tombstones[it.id];
-    persist({ ...data, items: items.concat(restored), tombstones });
-    sfx("pop");
-    setLastDeleted(null);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-  }
-
-
   /* The one prep, set, changed or cleared from its screen — see Prep.
      Called a goal wherever the learner reads it (0.681, the owner's 1b);
      still a prep in the code, where renaming it would touch the stored
@@ -18272,20 +18256,6 @@ export default function ArabicTrainer() {
           </p>
         )}
       </div>
-
-      {lastDeleted && lastDeleted.length > 0 && (
-        <div className="at-undo">
-          <span className="what">
-            {lastDeleted.length === 1
-              ? `Deleted “${leadOf(lastDeleted[0]).en || leadOf(lastDeleted[0]).ar || leadOf(lastDeleted[0]).lat}”`
-              : `Deleted ${lastDeleted.length} items`}
-          </span>
-          <Button size="sm" onClick={undoDelete}>
-            Undo
-          </Button>
-        </div>
-      )}
-
 
       {updateWaiting && !updateLater && !inExercise && (
         /* In the band across the top, where it is seen, rather than as a

@@ -1916,64 +1916,48 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-status { font-family: var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
   color: var(--jade); border-top:1px solid var(--line); padding:10px 0 4px; margin-top:4px; }
 .at-status.warn { color: var(--rose); }
-.at-undo { position: fixed; left:50%; transform: translateX(-50%);
-  bottom: calc(84px + env(safe-area-inset-bottom)); z-index:60;
-  background: var(--surface); border:1px solid var(--line); border-radius:8px;
-  padding:10px 14px; display:flex; align-items:center; gap:14px;
-  box-shadow: var(--nav-shadow); max-width: calc(100% - 24px); font-size:13px; }
-.at-undo .what { color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* The snackbar: the undo bar's shape, because that is already this app's
-   way of saying "something floating, and temporary". It sits above
-   everything (--z-toast) — a confirmation hidden behind the screen that
-   triggered it is worth nothing — and it is the only thing at that layer,
-   so nothing has to be ordered against it.
+/* Every message at the foot of the screen — the snackbar, "No connection"
+   with Retry, and "Working…" — is one size and one shape (0.747, the
+   owner's 1b, 2, 3a, 4a): the larger size the connection bar always had,
+   full width up to 560px, a coloured edge on the left saying what kind of
+   message it is. They had grown apart into five sizes, from a 103px pill
+   to a 73px-tall bar, and a message with a button stood taller than one
+   without. The min-height is the bar with its Retry button, so a line of
+   text alone, an Undo or a Retry all come out the same height.
 
-   pointer-events is left alone: the dismiss button is the one thing in it
-   worth tapping, and the pill is small and low enough not to sit on
-   anything. */
-.at-snack { position: fixed; left:50%; transform: translateX(-50%);
+   It sits above everything (--z-toast) — a confirmation hidden behind the
+   screen that triggered it is worth nothing. pointer-events is left
+   alone: its buttons are the things in it worth tapping. */
+.at-snack, .at-reachbar, .at-working { position: fixed; left:50%; transform: translateX(-50%);
   bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
-  background: var(--surface); border:1px solid var(--line); border-left-width:3px;
-  border-radius:8px; padding:11px 8px 11px 14px;
-  display:flex; align-items:center; gap:10px;
-  box-shadow: var(--nav-shadow);
-  /* Sized like the bulk bar rather than shrunk to its text: a pill that
-     hugs three words is easy to miss, and a message the width of the page
-     is read without hunting for it. Capped short of the 700px content
-     column, which one sentence cannot fill without looking empty. */
-  width: calc(100% - 24px); max-width: 560px;
-  font-family: var(--ui); font-size:14px; font-weight:600; color: var(--text);
-  animation: at-snack-in 160ms ease-out; }
-/* Takes the slack, so the dismiss button sits hard right rather than
-   trailing the text across a half-empty pill. */
-.at-snack .msg { flex:1; min-width:0; overflow-wrap:anywhere; }
-.at-snackundo { border:0; background:none; cursor:pointer; padding:4px 8px; border-radius:8px;
-  font: inherit; font-weight:800; color: var(--brass); }
-.at-snackundo:hover { background: var(--raised); }
-.at-snack.good { border-left-color: var(--jade); }
-.at-snack.warn { border-left-color: var(--rose); }
-.at-snack.info { border-left-color: var(--brass); }
-.at-snackx { border:0; background:none; padding:4px; margin:-4px 0; cursor:pointer;
-  color: var(--muted); display:inline-flex; flex:none; border-radius:6px; }
-.at-snackx:hover { color: var(--text); }
-@keyframes at-snack-in { from { opacity:0; transform: translate(-50%, 10px); }
-  to { opacity:1; transform: translate(-50%, 0); } }
-@media (prefers-reduced-motion: reduce) { .at-snack { animation: none; } }
-/* Can't reach the server (0.636): the snackbar's place and look, larger,
-   and staying — it holds Retry, so it cannot go on a timer. Above the
-   ordinary snackbar's spot, which moves up over it while it is shown so
-   the two never sit on each other. */
-.at-reachbar { position: fixed; left:50%; transform: translateX(-50%);
-  bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
-  background: var(--surface); border:1px solid var(--line); border-left:4px solid var(--rose);
-  border-radius:10px; padding:16px 10px 16px 16px;
+  background: var(--surface); border:1px solid var(--line); border-left:4px solid var(--brass);
+  border-radius:10px; padding:10px 10px 10px 16px; min-height:73px;
   display:flex; align-items:center; gap:14px;
   box-shadow: var(--nav-shadow);
   width: calc(100% - 24px); max-width: 560px;
   font-family: var(--ui); font-size:16px; color: var(--text);
   animation: at-snack-in 160ms ease-out; }
+@keyframes at-snack-in { from { opacity:0; transform: translate(-50%, 10px); }
+  to { opacity:1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .at-snack, .at-reachbar, .at-working { animation: none; } }
+/* The message takes the slack, so the buttons sit hard right. */
+.at-snack .msg, .at-reachbar .msg { flex:1; min-width:0; overflow-wrap:anywhere; }
+.at-snack .msg { font-weight:600; }
+.at-snack.good { border-left-color: var(--jade); }
+.at-snack.warn { border-left-color: var(--rose); }
+.at-snack.info { border-left-color: var(--brass); }
+.at-snackundo { flex:none; border:0; background:none; cursor:pointer; padding:10px 12px; border-radius:8px;
+  font: inherit; font-size:15px; font-weight:800; color: var(--brass); }
+.at-snackundo:hover { background: var(--raised); }
+.at-snackx { border:0; background:none; padding:4px; margin:-4px 0; cursor:pointer;
+  color: var(--muted); display:inline-flex; flex:none; border-radius:6px; }
+.at-snackx:hover { color: var(--text); }
+/* Can't reach the server (0.636): staying, because it holds Retry, and
+   above the ordinary snackbar's spot, which moves up over it while it is
+   shown so the two never sit on each other. */
+.at-reachbar { border-left-color: var(--rose); }
 .at-reachbar > .at-ic { color: var(--rose); flex:none; }
-.at-reachbar .msg { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; overflow-wrap:anywhere; }
+.at-reachbar .msg { display:flex; flex-direction:column; gap:3px; }
 .at-reachbar .msg strong { font-weight:700; }
 .at-reachbar .detail { font-size:13px; color: var(--muted); }
 .at-reachretry { flex:none; border:0; cursor:pointer; padding:10px 18px; border-radius:8px;
@@ -1988,21 +1972,11 @@ html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); 
 html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
   max-height: calc(100vh - 224px - env(safe-area-inset-bottom));
   max-height: calc(100dvh - 224px - env(safe-area-inset-bottom)); }
-@media (prefers-reduced-motion: reduce) { .at-reachbar { animation: none; } }
-/* "Working…" while a space is fetching or a save is in flight. The
-   snackbar's place and the snackbar's manners — it sits over the content
-   rather than in it, so nothing on the page moves for it, and the
-   confirmation that follows a slow save arrives in the same spot. Quieter
-   than a snack, because it is not news: no coloured edge, and the dashed
-   border the busy notice has always used. */
-.at-working { position: fixed; left:50%; transform: translateX(-50%);
-  bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
-  margin:0; padding:10px 16px; border-radius:999px;
-  background: var(--surface); border:2px dashed var(--line);
-  box-shadow: var(--nav-shadow);
-  font-family: var(--ui); font-size:13px; font-weight:700; color: var(--muted);
-  animation: at-snack-in 160ms ease-out; }
-@media (prefers-reduced-motion: reduce) { .at-working { animation: none; } }
+/* "Working…" while a space is fetching or a save is in flight, in the
+   snackbar's place so the confirmation that follows a slow save arrives
+   in the same spot. Quieter than a snack, because it is not news: a grey
+   edge and grey words. */
+.at-working { margin:0; border-left-color: var(--muted); font-weight:700; color: var(--muted); }
 
 /* The word being asked for, under the phrase it is missing from. */
 .at-ctxmeaning { font-family: var(--ui); font-size:17px; font-weight:700; color: var(--text-soft);
@@ -3880,7 +3854,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end; gap:12px;
   pointer-events:none; z-index:4; transition: bottom 160ms ease-out; }
 /* A message at the foot of the window lifts the button over it. */
-.at:has(.at-snack) .at-fabrow { bottom: calc(148px + env(safe-area-inset-bottom)); }
+.at:has(.at-snack) .at-fabrow { bottom: calc(176px + env(safe-area-inset-bottom)); }
 .at-fab { pointer-events:auto; display:inline-flex; align-items:center; gap:8px;
   height:56px; min-width:56px; padding:0 16px; border-radius:18px;
   background: var(--jade); color: var(--onjade); border:0;

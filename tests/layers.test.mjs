@@ -250,8 +250,10 @@ test("the waiting line is over the page, not in it", () => {
   /* It used to be a notice in the flow above the tabs, so every arrival in
      a space pushed the tabs and everything under them down and pulled them
      back a moment later. Pinned like the snackbar, it can appear and go
-     without moving anything. */
-  const body = rule(".at-working");
+     without moving anything. Since 0.747 it shares one rule with the
+     snackbar and the connection bar, so look in any rule that names it. */
+  const body = [...css.matchAll(/\n([^{}\n]*\.at-working\b[^{}\n]*) \{([^}]*)\}/g)]
+    .map((m) => m[2]).join("\n");
   assert.ok(body, "there is no rule for the waiting line");
   assert.match(body, /position:\s*fixed/, "the waiting line sits in the flow again");
   assert.equal(layer[".at-working"], tokens["--z-toast"],

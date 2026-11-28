@@ -10010,3 +10010,25 @@ to know which kind a column has. A verb whose past "I" truly has two
 forms needs the teacher to tick it and write the second word; until then
 the second box is not shown in those rows.
 
+
+## Every message at the foot of the screen is one bar (0.747)
+
+Measured on a phone, the floating messages had drifted into five sizes:
+the snackbar (41 tall, 49 with Undo), a "Working…" pill hugging its word
+(103 wide, 40 tall), the connection bar with Retry (73 tall, bigger type),
+and a "Deleted … Undo" bar that shrank to its text.
+
+The owner chose the connection bar's size for all of them (1b), with the
+connection bar simply matching it (2), and "Working…" as the same bar,
+quieter (4a). So `.at-snack`, `.at-reachbar` and `.at-working` share one
+rule; the left edge's colour says the kind, and `min-height` is the bar
+with its Retry, so a line alone, an Undo or a Retry come out the same
+height. A longer message still grows rather than being cut. The cost: a
+plain "Saved" is twice as tall as it was and covers more of the screen
+for its four seconds, and the floating Edit/Save button lifts higher to
+stay clear (148 to 176).
+
+The "Deleted … Undo" bar (3a: make it the ordinary bar) turned out to be
+unreachable: nothing had set what it shows since the word list's delete
+was reworked, so it was removed rather than restyled. If the word list
+gets an Undo after delete again, it goes through the snackbar's `undo`.

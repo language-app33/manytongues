@@ -8,6 +8,32 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.747 — 28 November 2026
+
+**Every message at the foot of the screen is now one size and one look.**
+
+- They had drifted into five sizes: "Saved" and most messages, the same
+  ones a little taller when they had an Undo, a small grey "Working…"
+  pill, and a larger "No connection" bar with Retry.
+- All of them now take the larger size "No connection" always had: full
+  width (up to the width of the page on a computer), the same height
+  whether or not there is a button in it, and a coloured edge on the left
+  that says what kind of message it is: green for done, red for a
+  problem, yellow for information, grey for "Working…".
+- "Working…" is now that same bar, with grey words, rather than a small
+  dashed pill.
+- The Edit and Save button on a card or deck moves up a little further
+  while a message is showing, so the taller message does not cover it.
+- A "Deleted … Undo" bar from an older version of the word list, which
+  nothing could bring up any more, has been removed.
+
+**Trade-off:** a plain "Saved" is now bigger and covers a little more of
+the screen for its four seconds.
+
+**To check by hand:** on a phone, that a save message, "Working…" during a
+slow save, and "No connection" (with the phone in flight mode) are the
+same size, and that the Edit or Save button on a card stays clear of them.
+
 ## 0.746 — 28 November 2026
 
 **Hebrew verbs: one box for "I", "we" and "they" in the past and future.**
