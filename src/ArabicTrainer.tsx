@@ -21741,7 +21741,7 @@ function AccountPanel({ me, onRename, children }: { me: User & { key: string }; 
           )}
         </FormField>
       ) : null}
-      {/* Sign out, as the last thing in this section (0.738). */}
+      {/* Sign out, as the last thing in this section (0.740). */}
       {children}
     </div>
   );
@@ -22538,7 +22538,7 @@ function SettingsScreen({ kind, onClose, sets = [], onOpenSet, ...rest }: {
         <Guide />
       ) : (
         <>
-          {/* One screen, in the owner's order (0.738): your account first,
+          {/* One screen, in the owner's order (0.740): your account first,
               with Sign out at its end; then what you practise with; then
               how it looks; then the version and the danger zone. */}
           <AccountSettings {...rest} part="account" />
@@ -22680,7 +22680,7 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
     [clips ? plural(clips, "recording") : "", images ? plural(images, "picture") : ""].filter(Boolean).join(" and ");
 
   return (
-    /* A field of When you practise since 0.738, no longer a section of
+    /* A field of When you practise since 0.740, no longer a section of
        its own. */
     <div className="at-field at-mt3">
       <label className="at-label">Recordings and pictures on this device</label>
@@ -22765,7 +22765,7 @@ function AccountSettings({
   onDownloaded,
   part = "rest",
 }: {
-  /** Which half to draw (0.738): your account, with Sign out at its end,
+  /** Which half to draw (0.740): your account, with Sign out at its end,
       heads the screen; the version and the danger zone close it. */
   part?: "account" | "rest";
   account: User & { key: string };
@@ -22996,7 +22996,7 @@ function AppPreferences({ settings, setSetting, media }: {
       {/* Headed and explained the way the card editor and Account settings
           are: each section's name at heading size, and each field's
           explanation straight under its name, before the control. */}
-      {/* The practising settings together, under one heading (0.738,
+      {/* The practising settings together, under one heading (0.740,
           the owner's choice). */}
       <div className="at-formblock">
         <div className="at-formhead">

@@ -1572,7 +1572,7 @@ test("a week is the last seven days, today first, with no day dropped or repeate
   assert.equal(spring[0], "2026-03-31");
 });
 
-/* 0.738: the card editor tells a teacher that ticked words "are learnt on
+/* 0.740: the card editor tells a teacher that ticked words "are learnt on
    their own first, then practised inside this sentence". True only while a
    word's in-a-sentence exercises stand above the level its meaning is
    learnt at, and the ladder keeps them shut until that level is solid. */

@@ -134,6 +134,7 @@ import {
   ConfirmModal,
   RadioGroup,
   Switch,
+  TileChoice,
   Field,
   formHasAudio,
   FilterMenu,
@@ -2007,6 +2008,13 @@ const MODE_LABEL: Record<PracticeMode, string> = {
 };
 /* What each preset does (0.708); since 0.735 always under its own row, so
    a teacher reads all four before a tap that changes what students get. */
+/* Each choice's picture (0.738, the owner's 2b). */
+const MODE_ICON: Record<PracticeMode, string> = {
+  with: "english",
+  little: "englishLittle",
+  none: "image",
+  custom: "tune",
+};
 const MODE_SAYS: Record<PracticeMode, string> = {
   with: "Students see English in questions and answers.",
   little: "Students see English only where a card needs it.",
@@ -2220,19 +2228,19 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
           What students in this course are asked. Phones on an older version of the app ask everything until they update.
         </span>
       </div>
-      {/* Four rows, each saying what it does, with a mark on the chosen
-          one (0.735, the owner's 6a): every tap changes what students get,
-          so each choice explains itself before it is made. */}
-      <RadioGroup
-        name={`practice-mode-${course.id}`}
+      {/* Four choices, each saying what it does (0.735, the owner's 6a):
+          every tap changes what students get, so each explains itself
+          before it is made. Since 0.738 (the owner's 2b) as tiles with a
+          picture, the New module panel's look. */}
+      <TileChoice
         label="How much English"
-        quiet
         value={now.mode}
+        disabled={busy}
         onChange={(mode) => {
           if (busy) return;
           if (mode !== now.mode) ask({ mode, off: now.off });
         }}
-        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m], note: MODE_SAYS[m] }))}
+        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m], note: MODE_SAYS[m], icon: MODE_ICON[m] }))}
       />
       {/* Switches set under an earlier Custom choice still apply. */}
       {now.mode !== "custom" && now.off.length > 0 && (
@@ -2259,6 +2267,16 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
       {now.mode !== "custom" && (
         <div className="at-field at-practice-asks">
           <label className="at-label">What this asks</label>
+          {/* What "If needed" in the rows means, said once above them and
+              drawn as it is drawn there, so the eye links the two (0.738,
+              the owner's 3a and 6b). Only Little translation uses it. */}
+          {now.mode === "little" && (
+            <p className="at-practice-key">
+              <span className="at-practice-keyhead">In the list below</span>
+              <span className="at-practice-state where">If needed</span>
+              {" = asked only for a card with no other way in, such as a word with no picture or recording."}
+            </p>
+          )}
           {byLevel.map(([level, types]) => {
             const on = types.filter((t) => switchOf(now, t) !== "off").length;
             const open = opened.has(level);
@@ -2301,7 +2319,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
                             –
                           </span>
                         ) : (
-                          <span className="at-practice-state where">Where needed</span>
+                          <span className="at-practice-state where">If needed</span>
                         )}
                       </div>
                     );
@@ -5813,7 +5831,7 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
 
 
 /* ------------------------------------------------------------------
-   A course's Modules (0.738, the owner's choice)
+   A course's Modules (0.740, the owner's choice)
 
    One list of everything a course teaches, as rows of one kind: its units
    first, "studied in order", each with Publish while it is a draft, small
@@ -5826,7 +5844,7 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
    ------------------------------------------------------------------ */
 
 /* Material's line of explanation over each list shows while the list is
-   shorter than this (0.738, the owner's choice). */
+   shorter than this (0.740, the owner's choice). */
 const EXPLAIN_UNDER = 5;
 
 /* How many cards a module holds, as its tile says it. */
@@ -5836,7 +5854,7 @@ const heldIn = (m: Module): number => (typeof m.cardCount === "number" ? m.cardC
  * A panel of things to add, each a row that says what tapping it does:
  * "Add", or "Added" for one already in (tapping takes it out again).
  * Stays open while several are picked; a row being saved says so and
- * waits. The course's "+ Add a deck" and a unit's course picker (0.738).
+ * waits. The course's "+ Add a deck" and a unit's course picker (0.740).
  */
 function AddSheet({ title, lede, rows, none, find, create, onToggle, onClose }: {
   title: string;
@@ -6422,7 +6440,7 @@ type StatusTo = "draft" | "review" | "published" | "discard" | "unpublish" | "un
 
 /**
  * The status menu's choices, by what the card is now, each with a line
- * saying what it does (0.738, the owner's choice). A published card goes
+ * saying what it does (0.740, the owner's choice). A published card goes
  * straight to Draft or Ready for review: there is no Unpublish step of
  * its own. "Draft" there is what Unpublish was; "Ready for review" is
  * that and then marked to be checked, one action with one confirmation.
@@ -6912,11 +6930,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   useEffect(() => setCourseTab("course"), [courseView]);
   /* The course a unit's page was opened from (0.616): the course its
      quality is read in. Publishing and the checklist left the unit's
-     page in 0.738; its place in each course is said there and arranged
+     page in 0.740; its place in each course is said there and arranged
      on the course's screen. */
   const [unitCourse, setUnitCourse] = useState<string | null>(null);
   /* The course picker on a unit's page: its amber box's button, or Add
-     to another course in its three dots (0.738). */
+     to another course in its three dots (0.740). */
   const [pickingCourse, setPickingCourse] = useState(false);
   /* The decks a course is still saving, and which way: shown on the
      deck's row as "Adding…" or "Removing…" until the server answers, and
@@ -9277,7 +9295,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <>
         {/* One line per tab, matching Modules and Cards (0.725). That any
             teacher here can edit a set is said inside the set instead. */}
-        {/* Only while the list is short (0.738, the owner's choice): once
+        {/* Only while the list is short (0.740, the owner's choice): once
             there are five, the teacher knows what a word set is. */}
         {wordSetLangsOn.reduce((n, id) => n + wordSetsOf(id, account.handle).length, 0) < EXPLAIN_UNDER ? (
           <Help className="at-mb3">
@@ -9834,7 +9852,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           setModules((prev) => prev.map((x) => (x.id === d.id ? { ...x, courses: saved.courses } : x)));
         else await refresh(true);
         /* A unit's place in the course's path comes back too, which its
-           page's Courses rows read (0.738). */
+           page's Courses rows read (0.740). */
         if (r && r.course && Array.isArray(r.course.decks))
           setCourses((prev) => prev.map((x) => (x.id === courseId
             ? { ...x, decks: r.course.decks, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
@@ -10161,7 +10179,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
     /* A new card made from the deck's screen goes straight into it. */
     const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
-    /* A path unit's page (0.738, the owner's choice): it says where the
+    /* A path unit's page (0.740, the owner's choice): it says where the
        unit stands in each course whose path holds it, and each of those
        rows opens the course, where the unit is published, put in order
        and opened early. The checklist, and the per-course blocks that
@@ -10291,7 +10309,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 {/* A My space deck is in no course; in their place, whether its
                     owner practises it (0.545, 59b, 61a). */}
                 {d.personal ? null : isPathUnit(d) ? (
-                /* A unit's courses, each with its place there (0.738): a
+                /* A unit's courses, each with its place there (0.740): a
                    row opens that course, where the unit is arranged. */
                 <Field label="Courses">
                   {unitCourses.length ? (
@@ -10479,7 +10497,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           noun="card"
           items={listed}
           total={listedWhole}
-          /* In the three dots whether or not the module is empty (0.738):
+          /* In the three dots whether or not the module is empty (0.740):
              the empty box holds the two ways to fill it and nothing else. */
           more={[{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }]}
           sort={cardSort}
@@ -10492,7 +10510,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               icon="cards"
               tone="attention"
               action={
-                /* Exactly two buttons (0.738, the owner's choice): restoring
+                /* Exactly two buttons (0.740, the owner's choice): restoring
                    from a backup file is in the list's three dots. */
                 <div className="at-row">
                   <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
@@ -10782,7 +10800,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             <div role="tabpanel" aria-label="course">
 
             {/* The course's name is the heading, with its language and how
-                many students it has under it (0.738, the owner's choice). */}
+                many students it has under it (0.740, the owner's choice). */}
             <div className="at-formblock" data-el="course-head">
               <div className="at-formhead">
                 <span className="at-formnum">{c.title}</span>
@@ -10792,7 +10810,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               </div>
             </div>
 
-            {/* What the course teaches, in one list (0.738, the owner's
+            {/* What the course teaches, in one list (0.740, the owner's
                 choice): its units, studied in order, then its decks,
                 studied in any order. See CourseModules. */}
             <div className="at-formblock" data-el="course-modules">
@@ -11194,7 +11212,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   is, taken off in 0.714, is back in 0.725 as one of three
                   matching lines, one per tab (the owner's wording). */}
               {/* Counted over the whole list, not what a search or filter
-                  leaves (0.738). */}
+                  leaves (0.740). */}
               {onListed < EXPLAIN_UNDER ? (
                 <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
               ) : null}

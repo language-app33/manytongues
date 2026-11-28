@@ -291,7 +291,7 @@ let withPath = false;
 let pathOrder = ["u1", "u2", "u3"];
 /** @type {any[]} */
 const movedUnits = [];
-/** The units published in the course, and those asked to publish (0.738). */
+/** The units published in the course, and those asked to publish (0.740). */
 let pathLive = /** @type {Record<string, number>} */ ({ u1: 1 });
 /** @type {any[]} */
 const publishedUnits = [];
@@ -555,7 +555,7 @@ const fakeFetch = async (input, opts = {}) => {
       pathOrder = rest;
       return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { ...pathLive }, opened: [] } });
     }
-    /* Publishing a unit (0.738): no checklist, so the stub publishes. */
+    /* Publishing a unit (0.740): no checklist, so the stub publishes. */
     if (action === "publish-unit" && withPath) {
       const body = JSON.parse(opts.body || "{}");
       publishedUnits.push(body);
@@ -3369,7 +3369,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     "CheckList", "LanguageRadio", "ModeSelector", "Section", "Tabs", "Screen",
     "SpaceFrame", "Empty", "Stat", "Tile", "TileNote", "CardTile", "CardReadout",
     "ItemList", "ConfirmModal", "PlayButton", "ClipList", "Icon", "LanguageTag",
-    "Snackbar", "KeysButton", "FilterBar", "ChipPick", "Switch",
+    "Snackbar", "KeysButton", "FilterBar", "ChipPick", "Switch", "TileChoice",
   ].filter((n) => !shown.includes(n));
   check("every component in the library has a row", missing.length === 0, `missing: ${missing.join(", ")}`);
 
@@ -5022,7 +5022,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
   check("and it opens the app's panel of what can be done from there, the status now ticked",
     statusLines.join(" | ") === "Published ✓ | Draft | Ready for review", statusLines.join(" | ") || "(no panel)");
-  /* Each row with its line (0.738, the owner's choice): no Unpublish step. */
+  /* Each row with its line (0.740, the owner's choice): no Unpublish step. */
   const statusNotes = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
     .map((b) => ((b.querySelector("i") || {}).textContent || "").trim());
   check("each status row says what it does, and none is red",
@@ -5923,8 +5923,11 @@ const openPronounTables = async () => {
       `${editor().querySelectorAll(".at-answerheadrow button").length} buttons in the headings · ${links().join(" | ")}`);
     setBox(scriptBoxes()[0], "كتاب");
     await sleep(200);
-    check("typing the word brings + Another way to write it under it, named for a screen reader as before",
-      links().join(" | ") === "+ Another way to write it" &&
+    /* Since 0.738 (the owner's 4b): a + picture and the words, green and
+       bold, no underline — not the app's link style. */
+    check("typing the word brings Another way to write it under it, with a + picture, named for a screen reader as before",
+      links().join(" | ") === "Another way to write it" &&
+        !!editor().querySelector("button.at-addanswer svg.at-ic") && !editor().querySelector("button.at-addanswer.at-linkbtn") &&
         editor().querySelector("button.at-addanswer")?.getAttribute("aria-label") === "Add another accepted answer",
       links().join(" | ") || "(no link)");
     click(editor().querySelector("button.at-addanswer"));
@@ -5938,8 +5941,8 @@ const openPronounTables = async () => {
     await sleep(150);
     setBox(englishBoxes()[0], "book");
     await sleep(200);
-    check("and typing the English brings + Another accepted answer under it",
-      scriptBoxes().length === 1 && links().join(" | ") === "+ Another accepted answer",
+    check("and typing the English brings Another accepted answer under it",
+      scriptBoxes().length === 1 && links().join(" | ") === "Another accepted answer",
       `${scriptBoxes().length} script boxes · ${links().join(" | ") || "(no link)"}`);
     setBox(englishBoxes()[0], "");
     await sleep(150);
@@ -6466,7 +6469,7 @@ const openPronounTables = async () => {
       [...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === label) || null);
     const idName = () => (((document.querySelector(".at-idname") || {}).textContent) || "").trim();
 
-    /* Folded away as optional since 0.738 (the owner's choice): one row,
+    /* Folded away as optional since 0.740 (the owner's choice): one row,
        its title, "Optional" and Add. */
     const fold = () => document.querySelector('[data-el="id-fold"]');
     check("a new card is offered a name for this exact card, folded as optional",
@@ -6694,7 +6697,7 @@ const openPronounTables = async () => {
     const CARDID = /^A name for this exact card$/;
     const FILLS = /^Groups$/;
 
-    check("the section is called for what it does (0.738), not Variables or Filling blanks", !!blanks(),
+    check("the section is called for what it does (0.740), not Variables or Filling blanks", !!blanks(),
       [...document.querySelectorAll(".at-formnum")].map((n) => n.textContent).join(" | "));
     /* The sentences a student will be asked, filled from the cards that
        exist — the explanation that replaced the paragraphs. Each is three
@@ -7263,7 +7266,7 @@ const openPronounTables = async () => {
          is in. The last two are both about being borrowed, which is why
          they are neighbours under one heading rather than a field at the
          top of the screen and a list at the bottom. */
-      /* The card's own name folded to one row while it has none (0.738). */
+      /* The card's own name folded to one row while it has none (0.740). */
       const idFold = () => (blanks() || document).querySelector('[data-el="id-fold"]');
       check("the section is named parts, not one block doing several jobs",
         groups().includes("Blanks in this card") &&
@@ -7293,7 +7296,7 @@ const openPronounTables = async () => {
         await sleep(200);
       };
       const newBox = () => /** @type {any} */ (inSheet(".at-blanknew")[0] || null);
-      /* Since 0.738 a box that does not apply is not drawn: no Groups part
+      /* Since 0.740 a box that does not apply is not drawn: no Groups part
          and no paragraph saying why on a sentence that fills none. */
       check("and a sentence that leaves a blank shows no Groups part at all",
         !groups().includes("Groups") && !/fills none/.test(((blanks() || {}).textContent) || "") && !newBox(),
@@ -9725,6 +9728,11 @@ const openPronounTables = async () => {
     document.querySelectorAll(".at-sheet").length === 1 && !document.querySelector(".at-sortsheet") &&
       sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Modules | Blanks | Review",
     `${document.querySelectorAll(".at-sheet").length} panels · ${sortLabels().join(" | ")}`);
+  /* One line saying what a chip does (0.738, the owner's 1a and 5a). */
+  check("the Filter panel says, under its title, what tapping a chip does",
+    ((document.querySelector(".at-filtersheet .at-hint") || {}).textContent || "").trim() === "Tap to show only matching cards." &&
+      !!((document.querySelector(".at-filtersheet .at-hint") || { compareDocumentPosition: () => 0 }).compareDocumentPosition(document.querySelector(".at-filtersheet .at-filterbar") || document.body) & 4),
+    ((document.querySelector(".at-filtersheet .at-hint") || {}).textContent || "(no line)").trim());
   check("with a button that says how many cards it is showing",
     (sheetFoot(".at-filtersheet") || {}).textContent === `Show ${listed()} card${listed() === 1 ? "" : "s"}`,
     (sheetFoot(".at-filtersheet") || {}).textContent || "(no button)");
@@ -13402,7 +13410,7 @@ const openPronounTables = async () => {
     /* The menu's lines carry an icon's name before their words. */
     click([...host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
     await sleep(400);
-    /* Settings in the owner's order (0.738): your account first, Sign out
+    /* Settings in the owner's order (0.740): your account first, Sign out
        at its end; the practising settings under When you practise. */
     if (!settingsChecked) {
       settingsChecked = true;
@@ -14058,7 +14066,7 @@ const openPronounTables = async () => {
   check("the teacher's course is listed", !!courseTile, "no Arabic 101 tile");
   click(courseTile || null);
   await sleep(500);
-  /* A course's screen (0.738, the owner's choice): its name is the
+  /* A course's screen (0.740, the owner's choice): its name is the
      heading, with its language and students under it; one Modules section
      holds its units, studied in order, then its decks, studied in any
      order, as rows of one kind. No Path section, and no deck as a chip
@@ -14169,14 +14177,17 @@ const openPronounTables = async () => {
        itself; under a preset a fixed "What this asks" over four folded
        groups with their counts, read-only; under Custom sliding switches. */
     const tabPanel = () => /** @type {any} */ (courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || document.createElement("div"));
-    const modeRows = () => [...tabPanel().querySelectorAll('[role="radiogroup"][aria-label="How much English"] .at-tickrow')];
+    /* Since 0.738 (the owner's 2b) the four are tiles with a picture. */
+    const modeRows = () => [...tabPanel().querySelectorAll('[role="radiogroup"][aria-label="How much English"] button.at-tilechoice[role="radio"]')];
     const modeRow = (/** @type {string} */ name) => /** @type {any} */ (modeRows().find((r) => ((r.querySelector("b") || {}).textContent || "").trim() === name) || null);
-    check("the translation choice is four radio rows, each with its explanation showing",
+    check("the translation choice is four tiles, each with a picture and its explanation showing, the chosen one ticked",
       modeRows().length === 4 &&
         modeRows().map((r) => ((r.querySelector("b") || {}).textContent || "").trim()).join(" | ") === "With translation | Little translation | No translation | Custom" &&
         modeRows().every((r) => !!((r.querySelector("i") || {}).textContent || "").trim()) &&
         ((modeRow("No translation") || { querySelector: () => null }).querySelector("i") || {}).textContent === "No English: only pictures, sound and the language itself." &&
-        !!(modeRow("With translation") || { querySelector: () => null }).querySelector("input:checked"),
+        modeRows().every((r) => !!r.querySelector(".at-tilechoiceico svg")) &&
+        modeRow("With translation")?.getAttribute("aria-checked") === "true" && !!modeRow("With translation")?.querySelector(".at-tilechoicetick") &&
+        modeRows().filter((r) => r.getAttribute("aria-checked") === "true").length === 1,
       modeRows().map((r) => (r.textContent || "").trim()).join(" | ") || "(no rows)");
     const folds = () => [...tabPanel().querySelectorAll("button.at-practice-fold")];
     const foldNamed = (/** @type {string} */ n) => /** @type {any} */ (folds().find((b) => ((b.querySelector("b") || {}).textContent || "").trim() === n) || null);
@@ -14196,8 +14207,28 @@ const openPronounTables = async () => {
     click(foldNamed("What it means"));
     await sleep(150);
     check("and pressing it again folds it", openRows().length === 0, `${openRows().length} rows still open`);
+    check("With translation has no If needed key, since nothing in it is asked only if needed",
+      !tabPanel().querySelector(".at-practice-key"), "(a key is showing)");
+    /* "If needed" (0.738, the owner's 3a and 6b): under Little translation
+       a key over the list says what it means, the term drawn as in the rows. */
+    click(modeRow("Little translation"));
+    await sleep(500);
+    const key = () => /** @type {any} */ (tabPanel().querySelector(".at-practice-asks > .at-practice-key"));
+    check("Little translation is ticked, and a key above the groups says what If needed means in the list below",
+      modeRow("Little translation")?.getAttribute("aria-checked") === "true" && !!key() &&
+        ((key().querySelector(".at-practice-keyhead") || {}).textContent || "") === "In the list below" &&
+        ((key().querySelector(".at-practice-state.where") || {}).textContent || "") === "If needed" &&
+        /= asked only for a card with no other way in, such as a word with no picture or recording\.$/.test((key().textContent || "").trim()) &&
+        !!(key().compareDocumentPosition(folds()[0]) & 4),
+      key() ? (key().textContent || "").trim() : "(no key)");
+    click(foldNamed("What it means"));
+    await sleep(200);
+    const stateWords = () => openRows().map((r) => ((r.querySelector(".at-practice-state.where") || {}).textContent || "").trim()).filter(Boolean);
+    check("and the English exercises in the list say If needed, not Where needed",
+      stateWords().length > 0 && stateWords().every((w) => w === "If needed") && !/Where needed/.test(panel()),
+      stateWords().join(" | ") || "(none)");
     const savesBefore = practiceSaves.length;
-    click((modeRow("Custom") || { querySelector: () => null }).querySelector("input"));
+    click(modeRow("Custom"));
     await sleep(500);
     check("and Custom shows them", /Match the pairs/.test(panel()), panel().slice(0, 200));
     const switches = () => [...tabPanel().querySelectorAll('button[role="switch"]')];
@@ -14218,7 +14249,7 @@ const openPronounTables = async () => {
     click(tabNamed("Course") || null);
     await sleep(300);
   }
-  /* Found again: the Course tab was drawn afresh. A unit's page (0.738):
+  /* Found again: the Course tab was drawn afresh. A unit's page (0.740):
      titled Unit, a Courses label with a row per course saying its place,
      and no publishing, ordering or checklist on it. */
   click((unitRows().find((x) => /Greetings unit/.test(x.textContent || "")) || document.createElement("div")).querySelector(".at-deckcard"));
@@ -14302,11 +14333,11 @@ const openPronounTables = async () => {
     click(document.querySelector('.at-moresheet [aria-label="Close"]'));
     await sleep(150);
   }
-  /* Material's line over the list shows only under five items (0.738):
+  /* Material's line over the list shows only under five items (0.740):
      here there are five modules, so it is gone. */
   check("with five modules, Material's line of explanation is gone",
     !/A module is a group of cards/.test(frame().textContent || ""), "still said");
-  /* A unit in no course (0.738): titled Unit, the amber box under Courses
+  /* A unit in no course (0.740): titled Unit, the amber box under Courses
      with "Add it to a course"; and, empty, two buttons and Restore from a
      backup file behind the list's three dots. */
   {
@@ -14558,7 +14589,7 @@ const openPronounTables = async () => {
   await sleep(500);
   click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);
   await sleep(500);
-  /* Since 0.738 New unit is the first row of the panel + Add a unit opens. */
+  /* Since 0.740 New unit is the first row of the panel + Add a unit opens. */
   click(buttonNamed(/^Add a unit$/));
   await sleep(200);
   click(buttonNamed(/^New unit$/));

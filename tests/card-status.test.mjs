@@ -346,7 +346,7 @@ test("unpublishing takes a card from students and keeps the teacher's work as a 
   assert.equal(edited.json.card.changes, undefined, "a draft has no second version");
 });
 
-/* 0.738: the status panel has no Unpublish step. "Ready for review" on a
+/* 0.740: the status panel has no Unpublish step. "Ready for review" on a
    published card takes it back from students and marks it to be checked,
    as two calls in order: unpublish, then review. */
 test("Ready for review on a published card takes it from students and marks it for review", async () => {

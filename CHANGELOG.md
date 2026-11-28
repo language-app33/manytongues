@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.738 — 28 November 2026
+## 0.740 — 28 November 2026
 
 **The audit round: a course, a unit, a card's status, and plainer words**,
 as chosen on the page of mock-ups.
@@ -97,6 +97,49 @@ an edited card's status panel is five rows; teachers used to "tags" meet
 **To check by hand.** On a real phone: that the small arrows and three dots
 on a unit's row are easy to hit, and that buttons in ordinary letters still
 fit on the narrowest phones.
+## 0.739 — 28 November 2026
+
+**A Hebrew word written with a joining line is right when typed with a
+space.** Found in an audit of Hebrew teaching and learning.
+
+A card written with the Hebrew joining line or a hyphen, such as בית־ספר,
+marked a student who typed the two words with a space between them as a
+near miss, and accepted the two words run together with no space. Now the
+joining line, a hyphen and a space all count as the same thing, whichever
+the teacher wrote and whichever the student types. The two words run
+together are a near miss.
+
+- Nothing else about Hebrew marking changes: vowel points, final letters
+  and punctuation are marked as before.
+- Arabic and Vietnamese are unchanged.
+- To check by hand: on a Hebrew card whose word has a joining line, answer
+  "Write in Hebrew" with a space instead and see it marked correct.
+
+## 0.738 — 27 November 2026
+
+**Four follow-ups to 0.735**, as chosen on the page of options (1a, 2b,
+3a, 4b, 5a, 6b).
+
+- **The Filter panel says what a chip does:** one line under its title,
+  "Tap to show only matching cards."
+- **Course › Exercises: the four translation choices are tiles with a
+  picture**, the look of the New module panel: English in a box for With
+  translation, the same with only the box's corners for Little
+  translation, a picture for No translation, and the sliders for Custom.
+  The chosen one is green with a tick. Choosing still saves at once.
+- **"Where needed" is now "If needed", and explained.** Under Little
+  translation, a line above the groups headed "In the list below" says:
+  "If needed = asked only for a card with no other way in, such as a word
+  with no picture or recording." The words "If needed" are drawn there
+  exactly as they appear in the rows.
+- **A card's "Another way to write it" and "Another accepted answer"** are
+  green and bold with a + in front, no longer underlined, like Clear on a
+  list's line.
+
+**Trade-offs:** the four tiles are a little taller than the rows were.
+
+**To check by hand:** on a real phone, that the tiles are easy to tell
+apart and to tap.
 
 ## 0.737 — 27 November 2026
 

@@ -216,7 +216,7 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
     {
       name: ".at-btn",
       size: "15px",
-      what: "Every button but the main one, in ordinary letters (0.738, the owner's choice).",
+      what: "Every button but the main one, in ordinary letters (0.740, the owner's choice).",
       example: "Cards you already have",
       cls: "at-btn",
       tag: "span",

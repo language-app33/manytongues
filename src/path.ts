@@ -26,7 +26,7 @@
  * This file decides which never-met cards may come into a session
  * (`cardHeld`) and what counts as taught by a unit's place on the path
  * (`countingCards`, which the quality score reads). Whether a unit may be
- * published needs no rule here since 0.738: one with a card publishes.
+ * published needs no rule here since 0.740: one with a card publishes.
  * It does not touch the levels, the scheduler, the session
  * mix, the review rules, or how blanks are filled.
  *
@@ -229,13 +229,13 @@ export function neverAskedAlone(card: Held | null | undefined): boolean {
 }
 
 /* ------------------------------------------------------------------
-   Publishing (0.738)
+   Publishing (0.740)
 
    A unit publishes in a course once it holds a card or a word-set part:
    the server's publish-unit refuses an empty one with "unit-empty" and
    nothing else. The checklist that stood here (R7, R9, R10: five
    sentences with a blank, enough approved cards for each blank, every
-   word used, one closing scene) was withdrawn by the owner in 0.738
+   word used, one closing scene) was withdrawn by the owner in 0.740
    because it added complexity and confusion. See DECISIONS.md.
    ------------------------------------------------------------------ */
 

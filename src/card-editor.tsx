@@ -262,11 +262,12 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
       {headed && !locked && String(list[list.length - 1] || "").trim() !== "" && (
         <button
           type="button"
-          className="at-linkbtn at-addanswer"
+          className="at-addanswer"
           aria-label={of ? `${addLabel} for ${of}` : addLabel}
           onClick={() => commit(list.concat([""]))}
         >
-          + Another accepted answer
+          <Icon name="add" size={18} />
+          Another accepted answer
         </button>
       )}
     </div>
@@ -656,11 +657,12 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
       {headed && !locked && String((rows[rows.length - 1] || { text: "" }).text || "").trim() !== "" && (
         <button
           type="button"
-          className="at-linkbtn at-addanswer"
+          className="at-addanswer"
           aria-label="Add another accepted answer"
           onClick={() => commit(rows.concat([{ text: "", lat: "" }]))}
         >
-          + Another way to write it
+          <Icon name="add" size={18} />
+          Another way to write it
         </button>
       )}
     </div>
@@ -2041,7 +2043,7 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange, line = false }
   return (
     <div className="at-formblock at-mt5">
       <p className="at-eyebrow">Words in this sentence</p>
-      {/* Said as the owner put it (0.738), and true: a word's own meaning
+      {/* Said as the owner put it (0.740), and true: a word's own meaning
           is learnt in exercise group 1, and the in-a-phrase exercises are
           in groups 2 and 4 (levelOf), so they come after. A test holds
           the scheduler to it. */}
@@ -3614,7 +3616,7 @@ export const shapeLabel = (shape: CardShape): string =>
 
 /* What each of the three is, in one sentence — said to somebody choosing
    between them and to somebody reading what their card already is, which
-   is the same sentence and so is written once. One line each since 0.738
+   is the same sentence and so is written once. One line each since 0.740
    (the owner's wording), with an example a teacher recognises. */
 export const shapeHelp = (shape: CardShape): string =>
   shape === "scene"
@@ -6828,7 +6830,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
           <RadioGroup
             label="What type of card"
             name="card-type"
-            /* Each kind with its picture before its name (0.738). */
+            /* Each kind with its picture before its name (0.740). */
             options={shapeChoices().map((c) => ({
               ...c,
               label: <span className="at-shapename"><Icon name={c.icon} size={18} />{c.label}</span>,
@@ -6922,7 +6924,7 @@ function CardHero({ lang, word, talk, scene, onExport, onToSpace }: {
       )}
       {!scene && lead.lat ? <p className="at-cardherolat">{lead.lat}</p> : null}
       {!scene && lead.en ? <p className="at-cardheroen">{lead.en}</p> : null}
-      {/* The card's name, only where it is not just its English (0.738,
+      {/* The card's name, only where it is not just its English (0.740,
           the owner's choice): a name that repeats the meaning says
           nothing the line above has not. */}
       {!scene && String(name || "").trim() && String(name).trim().toLowerCase() !== String(lead.en || "").trim().toLowerCase() ? (
@@ -7001,7 +7003,7 @@ function BasicBlock({ lang, scene, sentence = false, word, talk, advanced, canUn
     )}
     {/* Read, "This card", its Export and the advanced box wait for Edit;
         the card itself is drawn above them — see CardHero (0.732, the
-        owner's 4a). Its name is not drawn either since 0.738 (the
+        owner's 4a). Its name is not drawn either since 0.740 (the
         owner's choice): the card at the top says "Listed as" where the
         name differs from its English, so the block would be an empty
         band under the card, and it goes. */}
@@ -8692,7 +8694,7 @@ function BlankChip({ slot, values, lang }: {
  * what has it.
  */
 /*
- * Folded away as optional since 0.738 (the owner's choice): one row with
+ * Folded away as optional since 0.740 (the owner's choice): one row with
  * its title, "Optional" and Add, until Add is pressed. A card that has an
  * ID shows it open.
  */
@@ -9222,7 +9224,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
         says these are the blanks in this card. Neither was true. */}
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
-          {/* Named for what it does on each kind of card (0.738, the
+          {/* Named for what it does on each kind of card (0.740, the
               owner's choice): a word is used in sentences; a sentence has
               blanks. */}
           <span className="at-formnum">{sentence ? "Blanks in this sentence" : "Use in sentences"}</span>
@@ -9661,7 +9663,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
             question rather than the absence of it — on a card that leaves
             a blank of its own, what they find is the reason there is
             nothing to answer. */}
-        {/* Not drawn at all on a card that cannot fill a blank (0.738, the
+        {/* Not drawn at all on a card that cannot fill a blank (0.740, the
             owner's choice): a box that does not apply is not shown. */}
         {canFill && (
         <div className="at-part">
@@ -11378,7 +11380,7 @@ export function CardEditor({ card, lang, modules, inModules, onCreateModule, all
           locked
             ? onUnlock ? { icon: "edit", label: "Edit", onClick: onUnlock } : null
             : [
-                /* Save and publish is the main button since 0.738 (the
+                /* Save and publish is the main button since 0.740 (the
                    owner's choice), on the right; the quieter one beside it
                    saves without sending anything to students. Both are off
                    whenever there is nothing to save — changes already

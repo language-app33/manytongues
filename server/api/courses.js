@@ -5308,7 +5308,7 @@ async function handle(req) {
       const moduleId = String(body.deckId || "");
       if (!(course.path || []).includes(moduleId)) return json({ error: "not-on-path" }, 404);
       if (isLiveIn(course, moduleId)) return json({ ok: true, course });
-      /* 0.738: the owner withdrew the publishing checklist (five sentences
+      /* 0.740: the owner withdrew the publishing checklist (five sentences
          with a blank, enough cards for each blank, every word used, one
          closing scene): it added complexity and confusion. A unit publishes
          once it holds something to study, a card or a word-set part. */

@@ -477,7 +477,7 @@ export const createUnit = (courseId: string, title: string) =>
   call("create-unit", { body: { courseId, title } });
 export const moveUnit = (courseId: string, moduleId: string, to: number) =>
   call("move-unit", { body: { courseId, deckId: moduleId, to } });
-/** Refused with "unit-empty" for a unit with nothing in it (0.738: the only rule left). */
+/** Refused with "unit-empty" for a unit with nothing in it (0.740: the only rule left). */
 export const publishUnit = (courseId: string, moduleId: string) =>
   call("publish-unit", { body: { courseId, deckId: moduleId } });
 export const openUnit = (courseId: string, moduleId: string, open: boolean) =>

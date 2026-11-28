@@ -99,7 +99,7 @@ const vi = LANGUAGES["vi"];
 /**
  * A unit with something in it: five words that fill `{{food}}` and five
  * sentences, each approved for all five words. Once the checklist this
- * cleared (withdrawn in 0.738); the tests that use it are about publishing,
+ * cleared (withdrawn in 0.740); the tests that use it are about publishing,
  * moving and opening, which still want a unit of some size.
  * @param {string} key @param {string} moduleId @param {string} tag
  */
@@ -144,7 +144,7 @@ test("a new unit is on the course's decks and path, and a draft reaches no stude
   assert.ok(!m.decks.some((/** @type {any} */ d) => d.id === u.id), "a draft unit was sent");
 });
 
-/* 0.738: the checklist is withdrawn (the owner's choice). The one rule
+/* 0.740: the checklist is withdrawn (the owner's choice). The one rule
    left is that a unit holds something: a card or a word-set part. */
 test("publishing an empty unit is refused as empty, and it stays a draft", async () => {
   const teacher = await anAdmin("Hoa");

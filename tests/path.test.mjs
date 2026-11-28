@@ -178,7 +178,7 @@ test("neverAskedAlone: practice switched off, or a name kind", () => {
 });
 
 /* ---- what counts as taught by a unit's place on the path ----
-   The checklist these once fed (R7, R9, R10) was withdrawn in 0.738; what
+   The checklist these once fed (R7, R9, R10) was withdrawn in 0.740; what
    counts toward a unit still feeds its quality score. */
 
 import { countingCards, heldFillers } from "../src/path.ts";
@@ -199,7 +199,7 @@ const frame = (id, verb) => ({
 
 const five = ["pho", "com", "banh", "bun", "che"].map((id) => food(id, id));
 
-test("the withdrawn checklist's rules are gone (0.738)", () => {
+test("the withdrawn checklist's rules are gone (0.740)", () => {
   for (const name of ["unitProblems", "MIN_SENTENCES", "MIN_FILLERS", "problemLine", "draftsLine", "sameFormBlanks", "blankFills"]) {
     assert.equal(/** @type {any} */ (pathModule)[name], undefined, name);
   }
