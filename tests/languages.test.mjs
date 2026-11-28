@@ -206,6 +206,13 @@ test("Punctuation is never what an answer is marked on, curly or straight", () =
   assert.equal(checkAr("“مرحبا”", "مرحبا", {}).ok, true);
   assert.equal(checkAr("مرحبا كيفك", "مرحبا، كيفك؟", {}).ok, true);
   assert.equal(checkHe("„שלום“", "שלום", {}).ok, true);
+  /* A maqaf or a hyphen joining two words is the space a learner types
+     (0.739): either way round, and never the two words run together. */
+  assert.equal(checkHe("בית ספר", "בֵּית־סֵפֶר", { niqqud: "either" }).ok, true);
+  assert.equal(checkHe("בית ספר", "בית-ספר", {}).ok, true);
+  assert.equal(checkHe("בית-ספר", "בית ספר", {}).ok, true);
+  assert.equal(checkHe("בית־ספר", "בית ספר", {}).ok, true);
+  assert.equal(checkHe("ביתספר", "בית־ספר", {}).ok, false);
   assert.equal(checkViet("xin chào — bạn", "xin chào, bạn!", { tones: "either" }).ok, true);
   assert.equal(checkViet("“xin chào”", "xin chào", { tones: "either" }).ok, true);
 });

@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.739 — 28 November 2026
+
+**A Hebrew word written with a joining line is right when typed with a
+space.** Found in an audit of Hebrew teaching and learning.
+
+A card written with the Hebrew joining line or a hyphen, such as בית־ספר,
+marked a student who typed the two words with a space between them as a
+near miss, and accepted the two words run together with no space. Now the
+joining line, a hyphen and a space all count as the same thing, whichever
+the teacher wrote and whichever the student types. The two words run
+together are a near miss.
+
+- Nothing else about Hebrew marking changes: vowel points, final letters
+  and punctuation are marked as before.
+- Arabic and Vietnamese are unchanged.
+- To check by hand: on a Hebrew card whose word has a joining line, answer
+  "Write in Hebrew" with a space instead and see it marked correct.
+
 ## 0.738 — 27 November 2026
 
 **Four follow-ups to 0.735**, as chosen on the page of options (1a, 2b,

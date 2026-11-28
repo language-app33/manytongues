@@ -3694,6 +3694,7 @@ export const NIQQUD = new RegExp(`[${NIQQUD_CLASS}]`, "g");
 export const HAS_NIQQUD = new RegExp(`[${NIQQUD_CLASS}]`);
 const HE_MARK_RUN = new RegExp(`([\\u05D0-\\u05EA])([${NIQQUD_CLASS}]+)`, "g");
 
+const HE_JOINER = /[\u05BE-]/g;
 export const HE_PUNCT = /[.,!?;:"'()[\]־׀׃׳״«»]/g;
 
 /* Five letters take another shape at the end of a word. A beginner who
@@ -3710,6 +3711,12 @@ export function normHe(s: string, { stripNiqqud, foldFinals }: { stripNiqqud?: b
     ? x.replace(NIQQUD, "")
     : x.replace(HE_MARK_RUN, (_, base, marks) => base + marks.split("").sort().join(""));
   if (foldFinals) x = x.replace(HE_FINALS, (c) => HE_FINAL_OF[c]);
+  /* The maqaf joins two words into one — בית־ספר — and so does the hyphen
+     most keyboards type in its place. Both are read as the space a learner
+     types there: taken out with the rest of the punctuation, as they were
+     until 0.739, בית ספר was one letter-and-a-space away from ביתספר and
+     marked a near miss, while the two words run together were right. */
+  x = x.replace(HE_JOINER, " ");
   return x.replace(HE_PUNCT, "").replace(TYPED_PUNCT, "").replace(TYPED_DASH, " ").replace(/\s+/g, " ").trim();
 }
 
