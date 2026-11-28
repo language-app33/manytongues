@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.744 — 28 November 2026
+
+**Nothing changes in the app: the automatic check now opens a Hebrew
+session.**
+
+- Until now the check that walks the app's screens did so in Arabic and
+  Vietnamese only. It now also starts a Hebrew session and checks that the
+  words are drawn right to left, that a new word shows its niqqud, that a
+  known word is shown without them and a tap puts them back, that "Write
+  in Hebrew" takes a word typed without niqqud as right and then shows it
+  with them, and that a joined word such as "school" can be typed with a
+  space.
+
 ## 0.743 — 28 November 2026
 
 **Hebrew: "Built on the same root" gathers a verb written as "to …"**.

@@ -14900,6 +14900,165 @@ const openPronounTables = async () => {
   check("and nothing threw recording with a name", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
+/* ---- a Hebrew session (0.744) ----
+   The walks above are in Arabic and Vietnamese; this is the one that opens
+   a Hebrew session on screen. Six words written with their niqqud, one of
+   them joined with a maqaf. New, a word is asked with its niqqud; once its
+   meaning is known it is shown bare, says so, and a tap puts them back.
+   And with the writing due, "Write in Hebrew" takes the word typed without
+   niqqud as right, shows the spelling with them, and takes the joined word
+   written with a space (0.739). Last in the file, on its own document, for
+   the reason the harakat walk gives: what is added earlier moves every
+   draw after it. */
+{
+  const before = errors.length;
+  const NIQQUD = /[֑-ׇ]/;
+  const HEBREW = /[א-ת]/;
+  const words = [
+    ["סֵפֶר", "book", "sefer"], ["בַּיִת", "house", "bayit"], ["כֶּלֶב", "dog", "kelev"],
+    ["מַיִם", "water", "mayim"], ["שָׁלוֹם", "hello", "shalom"], ["בֵּית־סֵפֶר", "school", "beit sefer"],
+  ];
+  /* The maqaf (U+05BE) sits inside the range of the marks, so it is made
+     a space before the marks go. */
+  const bareOf = (/** @type {string} */ t) => t.replace(/־/g, " ").replace(/[֑-ׇ]/g, "");
+  const card = (/** @type {number} */ i, /** @type {any} */ s = {}) => ({
+    id: `hecard${i}`, kind: "word", lang: "he-IL", tags: ["Lesson 1"], created: 1, updated: Date.now(),
+    forms: [{ id: `hecard${i}`, ar: words[i][0], en: words[i][1], lat: words[i][2], s }],
+  });
+  const solid = { phase: "review", reps: 4, interval: 9, ease: 2.5, due: Date.now() + 5 * 86400000,
+    right: 4, wrong: 0, hist: [1, 1, 1, 1], updated: Date.now() };
+  const meaningKnown = { ar2pick: { ...solid }, ar2en: { ...solid } };
+  /* Everything below the writing done, and the transliteration too, so
+     what is due is the spelling from its transliteration: "Write in
+     Hebrew". */
+  const writingDue = { ...meaningKnown, en2pick: { ...solid }, match: { ...solid }, ar2tr: { ...solid } };
+  const text = (/** @type {Element | null} */ el) => ((el && el.textContent) || "").trim();
+  const typeAnswer = (/** @type {any} */ box, /** @type {string} */ value) => {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, value);
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+  };
+  /** @param {any[]} items */
+  const walk = async (items) => {
+    remoteDocs.clear();
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "he-IL" }, account, items,
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
+    for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
+    click(startBtn());
+    for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
+    const met = {
+      started: !!host.querySelector(".at-instruction"),
+      promptsInScript: 0, promptsMarked: 0, promptsBare: 0, promptDir: "", promptLang: "",
+      tipNiqqud: false, tapped: false, tappedShows: false,
+      writes: 0, inputDir: "", inputLang: "", typedRight: false, answerMarked: false, bareNote: "",
+      joinedAsked: false, joinedRight: false, asked: /** @type {string[]} */ ([]),
+    };
+    for (let n = 0; n < 40 && host.querySelector(".at-instruction"); n++) {
+      const asked = text(host.querySelector(".at-instruction"));
+      met.asked.push(asked);
+      const promptEl = host.querySelector('[data-el="question-prompt-text"]');
+      if (promptEl && HEBREW.test(text(promptEl))) {
+        met.promptsInScript += 1;
+        if (!met.promptDir) {
+          met.promptDir = promptEl.getAttribute("dir") || "";
+          met.promptLang = promptEl.getAttribute("lang") || "";
+        }
+        if (NIQQUD.test(text(promptEl))) met.promptsMarked += 1;
+        const bare = host.querySelector('[data-el="word-bare"]');
+        if (bare) {
+          met.promptsBare += 1;
+          met.tipNiqqud = met.tipNiqqud || /niqqud/.test(text(host.querySelector('[data-el="question-marks-tip"]')));
+          if (!met.tapped) {
+            click(bare);
+            await sleep(60);
+            met.tapped = true;
+            met.tappedShows = !!host.querySelector('[data-el="word-marks-lent"]') && NIQQUD.test(text(host.querySelector('[data-el="question-prompt-text"]')));
+          }
+        }
+      }
+      const box = /** @type {any} */ (host.querySelector('[data-el="answer-input"]'));
+      const choices = host.querySelector('[data-el="answer-choices"]');
+      if (/Write in Hebrew/.test(asked) && box) {
+        met.writes += 1;
+        met.inputDir = met.inputDir || box.getAttribute("dir") || "";
+        met.inputLang = met.inputLang || box.getAttribute("lang") || "";
+        /* The word asked, from its transliteration or its meaning. */
+        const cue = text(promptEl).toLowerCase();
+        const word = words.find((wd) => cue === wd[2] || cue === wd[1]) ||
+          words.find((wd) => new RegExp(`\\b${wd[2]}\\b`).test(cue));
+        if (word) {
+          typeAnswer(box, bareOf(word[0]));
+          await sleep(60);
+          click(host.querySelector('[data-el="check-button"]'));
+          await sleep(250);
+          const ok = !!host.querySelector('[data-el="verdict"].ok');
+          if (word[1] === "school") {
+            met.joinedAsked = true;
+            met.joinedRight = ok;
+          } else if (ok && !met.typedRight) {
+            met.typedRight = true;
+            met.answerMarked = host.textContent?.includes(word[0]) || false;
+            met.bareNote = text(host.querySelector('[data-el="bare-note"]'));
+          }
+        }
+      } else if (choices) {
+        click(choices.querySelector("button"));
+      } else if (host.querySelector('[data-el="answer-match"]')) {
+        await playGrid();
+      } else {
+        const dunno = [...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim()));
+        click(dunno || null);
+      }
+      await sleep(120);
+      if (!host.querySelector('[data-el="verdict"]')) {
+        click(host.querySelector('[data-el="check-button"]'));
+        await sleep(200);
+      }
+      click([...host.querySelectorAll("button")].find((b) => /^Continue$/.test((b.textContent || "").trim())));
+      await sleep(200);
+    }
+    r.unmount();
+    host.remove();
+    const KEY = "arabic-trainer:arabic-trainer-v3";
+    let was = localStorage.getItem(KEY);
+    for (let t = 0, still = 0; t < 40 && still < 4; t++) {
+      await sleep(100);
+      const now = localStorage.getItem(KEY);
+      still = now === was ? still + 1 : 0;
+      was = now;
+    }
+    return met;
+  };
+
+  materialQuiet = true;
+  localStorage.removeItem("arabic-trainer-marks-tip");
+  const all = [0, 1, 2, 3, 4, 5];
+  const fresh = await walk(all.map((i) => card(i)));
+  const known = await walk(all.map((i) => card(i, meaningKnown)));
+  const writing = await walk(all.map((i) => card(i, writingDue)));
+  materialQuiet = false;
+  check("a Hebrew session starts", fresh.started && known.started && writing.started, JSON.stringify(fresh.asked));
+  check("its prompt is drawn right to left, in Hebrew",
+    fresh.promptsInScript > 0 && fresh.promptDir === "rtl" && fresh.promptLang === "he-IL", JSON.stringify(fresh));
+  check("a new Hebrew word is shown with its niqqud",
+    fresh.promptsInScript > 0 && fresh.promptsMarked === fresh.promptsInScript && fresh.promptsBare === 0, JSON.stringify(fresh));
+  check("once its meaning is known it is shown without them, and says the niqqud can be had",
+    known.promptsBare > 0 && known.tipNiqqud, JSON.stringify(known));
+  check("and tapping the bare word puts its niqqud back", known.tappedShows, JSON.stringify(known));
+  check("\"Write in Hebrew\" is asked, in a box written right to left in Hebrew",
+    writing.writes > 0 && writing.inputDir === "rtl" && writing.inputLang === "he-IL", JSON.stringify(writing));
+  check("a word typed there without its niqqud is right, and the answer shows them and says they are above",
+    writing.typedRight && writing.answerMarked && /The niqqud are above/.test(writing.bareNote), JSON.stringify(writing));
+  check("a joined word written with a space for its maqaf is right",
+    writing.joinedAsked && writing.joinedRight, JSON.stringify(writing));
+  check("nothing went wrong in the Hebrew session", errors.length === before, errors.slice(before).join("\n"));
+}
+
 report();
 console.log("\nrequests:", calls.join("\n          "));
 exitWhenWritten(results.some((r) => r.startsWith("FAIL")) ? 1 : 0);
