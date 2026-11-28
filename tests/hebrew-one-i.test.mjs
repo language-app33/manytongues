@@ -1,6 +1,6 @@
 /*
  * A Hebrew verb has one "I", one "we" and one "they" in the past and the
- * future, unless the teacher says one has two (0.745).
+ * future, unless the teacher says one has two (0.746).
  *
  * The present really differs by gender in every person — כותב and כותבת —
  * so its twelve boxes stay. In the past and future כתבתי, כתבנו and כתבו
@@ -39,7 +39,7 @@ const PRESENT = [
   ["you-pl", "כּוֹתְבִים", "you write"], ["you-pl-f", "כּוֹתְבוֹת", "you write"],
   ["they", "כּוֹתְבִים", "they write"], ["they-f", "כּוֹתְבוֹת", "they write"],
 ];
-/* The past as written before 0.745: "I", "we" and "they" typed twice, and
+/* The past as written before 0.746: "I", "we" and "they" typed twice, and
    one "I" with a dagesh the other lacks, which is one word all the same. */
 const PAST = [
   ["i", "כָּתַבְתִּי", "I wrote"], ["i-f", "כָּתַבְתִי", "I wrote", { clips: ["h-said"] }],

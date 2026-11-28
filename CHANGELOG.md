@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.745 — 28 November 2026
+## 0.746 — 28 November 2026
 
 **Hebrew verbs: one box for "I", "we" and "they" in the past and future.**
 
@@ -30,7 +30,7 @@ and moves once per batch of work you would notice, not once per commit.
 teacher (one "I" box, the tick off) and as the student ("See how this verb
 changes" shows one "I", "we" and "they" in the past, twelve in the present).
 
-## 0.744 — 28 November 2026
+## 0.745 — 28 November 2026
 
 **Nothing changes in the app: the automatic check now opens a Hebrew
 session.**
@@ -43,7 +43,7 @@ session.**
   with them, and that a joined word such as "school" can be typed with a
   space.
 
-## 0.743 — 28 November 2026
+## 0.744 — 28 November 2026
 
 **Hebrew: "Built on the same root" gathers a verb written as "to …"**.
 
@@ -56,6 +56,24 @@ session.**
 
 **To check by hand:** a Hebrew deck with a "to …" verb and a noun from the
 same family, that "Built on the same root" lists them together.
+## 0.743 — 28 November 2026
+
+**A unit is "Open to students", not "Published"**, as chosen on the page of
+mock-ups (1a), so it is not confused with publishing a card.
+
+- On a course's unit row the button reads **Open to students**, and the
+  line under the unit's name says "Open to students" or "Not open yet".
+- A unit's screen says the same in each course's row ("Unit 1 of 3 · Not
+  open yet"), and opening one says "Family is open to students in
+  Beginners A1".
+- A card's Publish is unchanged. "Open it early" stays as it was.
+
+**Trade-off:** the word "open" now appears three times around a unit (Open
+to students, Open it early, Open course).
+
+**To check by hand:** on a real phone, that the longer button is easy to
+read beside the arrows (on the narrowest phones its letters are a little
+smaller to keep it on one line).
 
 ## 0.742 — 28 November 2026
 

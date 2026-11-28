@@ -852,7 +852,7 @@ test("the Hebrew root key gathers a family across its spellings and shapes", () 
   assert.equal(heRootKey("מלך").length, 3);
 });
 
-test("a Hebrew verb written as \"to …\" joins its family (0.743)", () => {
+test("a Hebrew verb written as \"to …\" joins its family (0.744)", () => {
   assert.equal(heRootKey("לכתוב"), "כתב");
   assert.equal(heRootKey("ללמוד"), "למד");
   assert.equal(heRootKey("לאכול"), "אכל");

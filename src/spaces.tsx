@@ -5965,7 +5965,9 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
             <div key={u.id} data-el="path-unit" className="at-unitrow">
               <Tile
                 title={`${i + 1} · ${u.title}`}
-                meta={`${live ? "Published" : "Draft"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
+                /* "Open to students" rather than "Publish" (0.743, the owner's 1a):
+                   a card's Publish is another thing. */
+                meta={`${live ? "Open to students" : "Not open yet"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
                 onOpen={() => onOpen(u.id)}
                 footer={
                   <span className="at-unitfoot" onClick={hold}>
@@ -5973,7 +5975,7 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
                     <IconButton icon="chevronDown" label={`Move ${u.title} down`} disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)} />
                     {!live && (
                       <Button size="sm" variant="primary" off={empty || undefined} disabled={busy}
-                        onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Publish</Button>
+                        onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Open to students</Button>
                     )}
                   </span>
                 }
@@ -10333,7 +10335,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                             aria-label={`Open ${course.title}`} onClick={() => openCourse(course.id)}>
                             <span className="at-unitcoursetext">
                               <b>{course.title}</b>
-                              <i data-el="unit-place">{`Unit ${at + 1} of ${path.length} · ${live ? "Published" : "Draft"}${opened ? " · Opened early" : ""}`}</i>
+                              <i data-el="unit-place">{`Unit ${at + 1} of ${path.length} · ${live ? "Open to students" : "Not open yet"}${opened ? " · Opened early" : ""}`}</i>
                             </span>
                             <span className="at-unitcoursego" aria-hidden="true">
                               Open course
@@ -10887,7 +10889,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 })}
                 onPublish={(id) => {
                   const title = (units.find((u) => u.id === id) || { title: "The unit" }).title;
-                  run(async () => tookCourse(await API.publishUnit(c.id, id)), `${title} published in ${c.title}`);
+                  run(async () => tookCourse(await API.publishUnit(c.id, id)), `${title} is open to students in ${c.title}`);
                 }}
                 onEmptyPublish={() => snack("Add a card first", "warn")}
                 onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}

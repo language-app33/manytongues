@@ -9959,12 +9959,17 @@ learnt the old wording sees the new one once their teacher writes the box,
 with no warning beyond the teacher's own edit. The composer's version goes
 to 2; nothing compares it yet.
 
+**0.743: "Open to students".** A unit's button and status say "Open to
+students" / "Not open yet" instead of Publish / Published / Draft, the
+owner's 1a, because a card's Publish is a different act. Chosen knowing it
+sits beside "Open it early" and "Open course"; the stored field is still
+`pathLive` and the server action still `publish-unit`.
 ## Hebrew verbs: one "I", "we" and "they" in the past and future
 
 **28 November 2026** · `src/verbs.ts` (`joinedInRow`, `keepsApartIn`,
 `personAt`, `foldedAt`), `src/types.ts` (`VerbPerson.joinsIn`),
 `src/languages.ts` (`HE_SUBJECT_PERSONS`), `src/card-editor.tsx`
-(`VerbTable`), `src/shared.tsx` (`ReadTable`) (0.745)
+(`VerbTable`), `src/shared.tsx` (`ReadTable`) (0.746)
 
 Hebrew's verb table has twelve columns, every person with a gender of its
 own, because the present really differs by gender in every person: כותב

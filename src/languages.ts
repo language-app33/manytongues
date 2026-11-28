@@ -2838,7 +2838,7 @@ const AR_SUBJECT_PERSONS: VerbPerson[] = [
  * about herself, which is what 0.261 put right for Arabic.
  *
  * The past and the future do not split for *I*, *we* and *they* —
- * אכלתי, אכלנו and אכלו are anybody's — so since 0.745 those three
+ * אכלתי, אכלנו and אכלו are anybody's — so since 0.746 those three
  * feminine columns `joinsIn` the past and the future: there, a verb has
  * one box each, called plain "I", "we" and "they", unless the teacher
  * ticks that one has two forms and writes a different word. In the
@@ -3788,7 +3788,7 @@ const HE_PREFIXES = ["וה", "וב", "ול", "ומ", "וכ", "וש", "שה", "כ
  *   - drop a plural ending or a feminine ה from the end;
  *   - drop a leading ל, when what is left has three letters besides its
  *     vowel letters: a verb written as "to …" (לכתוב) joins its family
- *     (0.743). The cost is that a few nouns that begin with a ל of their
+ *     (0.744). The cost is that a few nouns that begin with a ל of their
  *     own may be filed with a family they do not belong to. When this
  *     rule is taken the next one is not;
  *   - drop a leading מ, the commonest noun prefix — and only that. The

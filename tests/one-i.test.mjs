@@ -9,7 +9,7 @@
  * sentence about a woman speaker), a verb with two keeps both, the
  * learner keeps whichever copy they had got further with, and Hebrew's
  * present — whose *I* really does change with gender — is left alone.
- * (Hebrew's past and future are joined row by row since 0.745; that is
+ * (Hebrew's past and future are joined row by row since 0.746; that is
  * held in tests/hebrew-one-i.test.mjs.)
  */
 

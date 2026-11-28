@@ -303,7 +303,7 @@ export function keepsApart(
 }
 
 /*
- * A column joined row by row (0.745). Hebrew's *I (f)* is a word of its own
+ * A column joined row by row (0.746). Hebrew's *I (f)* is a word of its own
  * in the present — אוכל and אוכלת — and a copy of *I (m)* in the past and
  * the future, where כתבתי is anybody's. So the column always stands, and
  * in the rows its `joinsIn` names each cell is decided on its own: a copy
