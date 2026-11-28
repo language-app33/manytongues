@@ -1273,7 +1273,12 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
 .at-unitfoot { display:flex; align-items:center; justify-content:flex-end; gap:2px; margin-top:6px; }
 .at-unitfoot:empty { display:none; }
 .at-unitfoot > .at-icon { flex:0 0 auto; min-width:40px; width:40px; height:40px; padding:0; border:none; background:none; }
-.at-unitfoot > .at-btn { margin-left:6px; }
+.at-unitfoot > .at-btn { margin-left:4px; white-space:nowrap; padding:9px 12px; }
+/* "Open to students" on one line on the narrowest phones (0.742). */
+@media (max-width: 360px) {
+  .at-unitfoot > .at-icon { min-width:34px; width:34px; }
+  .at-unitfoot > .at-btn { padding:9px 10px; letter-spacing:0; font-size:13px; }
+}
 .at-addwide { display:flex; width:100%; justify-content:center; margin-top:10px; }
 /* A unit's courses (0.740): one plain row per course, its place under the
    name, and the words "Open course" with an arrow at the right. */

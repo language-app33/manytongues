@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.742 — 28 November 2026
+
+**A unit is "Open to students", not "Published"**, as chosen on the page of
+mock-ups (1a), so it is not confused with publishing a card.
+
+- On a course's unit row the button reads **Open to students**, and the
+  line under the unit's name says "Open to students" or "Not open yet".
+- A unit's screen says the same in each course's row ("Unit 1 of 3 · Not
+  open yet"), and opening one says "Family is open to students in
+  Beginners A1".
+- A card's Publish is unchanged. "Open it early" stays as it was.
+
+**Trade-off:** the word "open" now appears three times around a unit (Open
+to students, Open it early, Open course).
+
+**To check by hand:** on a real phone, that the longer button is easy to
+read beside the arrows (on the narrowest phones its letters are a little
+smaller to keep it on one line).
+
 ## 0.741 — 28 November 2026
 
 **A course's unit and deck rows, tidier**, as asked.

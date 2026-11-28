@@ -9931,3 +9931,9 @@ other tile; and Publish moved after the arrows, so the arrows stay in the
 same place whether a unit is a draft or published. What the button says is
 an open question to the owner.
 
+**0.742: "Open to students".** A unit's button and status say "Open to
+students" / "Not open yet" instead of Publish / Published / Draft, the
+owner's 1a, because a card's Publish is a different act. Chosen knowing it
+sits beside "Open it early" and "Open course"; the stored field is still
+`pathLive` and the server action still `publish-unit`.
+
