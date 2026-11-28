@@ -8,6 +8,128 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.751 — 28 November 2026
+
+**Calmer cards in the teacher's lists.**
+
+- On Teaching › Material › Cards, and in a module's own list of cards,
+  each card now leads with its **meaning, in bold**. The words in the
+  language being taught sit under it, a little smaller, and a blank in
+  them is a plain underlined word where it was a tan pill.
+- A card's status (Draft, Ready for review, Changes in draft, Changes
+  ready for review) is now **small grey text after a dot**, where it was
+  an outlined label in capitals. The dot is brass when the card is ready
+  to be looked at and grey while it is a draft. A published card with
+  nothing waiting still says nothing.
+- **Recording missing** is said the same way, in red.
+- Nothing else on the screen moved: the three dots, the tabs and the
+  lines under the search box are as they were, and so are the table view
+  and the cards a student sees.
+
+**Trade-off:** the words in the language being taught are a little
+smaller in these lists than they were, and a status is easier to scroll
+past than the outlined label was.
+
+**To check by hand:** on a phone, open Teaching › Material › Cards with
+some drafts in it, then a module's own list of cards. Look at both in
+the dark theme too.
+
+## 0.750 — 28 November 2026
+
+**Moving units on a screen of their own, a quieter empty Cards section,
+the student code in People, and a first tab called Modules.**
+
+- **Move units.** The up and down arrows are gone from each unit on a
+  course's screen. To change the order, open a unit's three dots and tap
+  **Move unit** (it is first, and only there when the course has more than
+  one unit). A screen opens with every unit on one slim line, the one you
+  started from highlighted, and arrows at the right of each. Nothing
+  changes for students while you move them: **Apply** saves the new order
+  in one go, **Cancel** leaves it as it was. If you close the screen with
+  the cross after moving something, it asks whether to apply the new
+  order, discard it, or carry on.
+- A unit that is open to students now has a shorter tile: no arrows and
+  no empty strip at its foot. A unit that is not open yet still shows
+  **Open to students** there.
+- **An empty unit or deck** no longer shows an amber box with a green
+  button. Under **Cards** there is one line, "No cards yet. Students need
+  some to practise.", and two dotted rows, **New card** and **Add existing
+  cards**, the same kind of button as Add a unit and Add a deck. The three
+  dots with **Restore from a backup file** sit on the same line as
+  "Cards", at its right.
+- "Cards you already have" is now called **Add existing cards**
+  everywhere, including in the panel the green + opens.
+- **The student code moved to the People tab**, at the top, above
+  Teachers and Students. The empty Students list now just says "Nobody
+  has joined yet.", since the code and its Copy button are right above it.
+- **The course's first tab is now called Modules** (it said Course), and
+  the "Modules" heading inside it is gone: the course's name is followed
+  directly by "Units, studied in order".
+
+**Trade-off:** moving a unit one place now takes a few more taps (three
+dots, Move unit, an arrow, Apply), in return for calmer tiles and an order
+students only see once it is finished.
+
+**To check by hand:** Move units on a real phone with a long course
+(scrolling, and the buttons at the foot staying in reach), and Copy on the
+student code in People.
+
+## 0.749 — 28 November 2026
+
+**Add a unit and Add a deck now open the same panel.**
+
+- On a course's screen, **Add a unit** used to open a different panel
+  from **Add a deck**: no search, a picture on each row, and a tap that
+  added one unit and closed the panel. It now works exactly like Add a
+  deck.
+- Both panels have a line saying what happens, a search box ("Search
+  units", "Search decks"), **Create a new unit** or **Create a new deck**
+  first, and then every unit or deck you have, each marked Add or Added.
+- The panel stays open, so you can add several in one go. Tapping Added
+  takes one back out of the course, as it does in this panel everywhere
+  else in the app, such as a unit's own list of courses.
+- The rows stay where they are while you tap them.
+- With nothing to choose from, both buttons still go straight to the
+  name box, as in 0.748.
+
+**Trade-off:** a unit can now be taken off a course's path from this
+panel with one tap, as a deck already could. A message says it was taken
+out.
+
+**To check by hand:** on a phone, add two units in one go from Add a
+unit, then tap Added on one to take it out again, and see the path
+update behind the panel.
+
+## 0.748 — 28 November 2026
+
+**A course with no modules yet: a calmer Modules section, and quicker ways to fill it.**
+
+- The tan "Nothing here yet" box and its Create a module button are gone
+  from an empty course. It looked like a warning, and its button did what
+  Add a unit and Add a deck under it already do.
+- Instead, while the course holds nothing, each group says in a line what
+  it is for: "Students work through units one after another" and
+  "Students practise decks whenever they like". The lines go once the
+  course has its first unit or deck. The add buttons stay dotted, as they
+  are on a filled course.
+- **Add a unit**, when you have no unit to choose from, now opens the
+  "New unit" box at once, rather than a panel holding New unit alone.
+- **Add a deck**, when you have no deck to choose from, now opens a
+  "New deck" box at once. It used to take you through a panel with
+  nothing to choose, a "Create a new module" button, and a question
+  asking whether you wanted a deck or a unit.
+- When you do have decks, the panel's first row now reads **Create a new
+  deck** and opens that same box, with no deck-or-unit question.
+- A new deck and a new unit are now named in the same box, and both stay
+  on the course screen once made, with a message saying they were added.
+
+**Trade-off:** a deck made from a course no longer opens by itself
+afterwards; tap it in the list to add its first cards, as with a new unit.
+
+**To check by hand:** on a phone, a new teacher's empty course; Add a unit
+and Add a deck each go straight to the name box, and the two lines under
+the group labels go once something is added.
+
 ## 0.747 — 28 November 2026
 
 **Every message at the foot of the screen is now one size and one look.**

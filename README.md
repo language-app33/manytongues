@@ -1212,8 +1212,12 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   each blank, every word used, one closing scene — were withdrawn by the
   owner in 0.740 because the checklist added complexity and confusion; a
   unit publishes when it has at least one card or word-set part, and
-  `publish-unit` refuses only an empty one, with `unit-empty`. What
-  follows is how it was from 0.614 to 0.737, kept for its history.
+  `publish-unit` refuses only an empty one, with `unit-empty`. The
+  course's unit order is saved by `order-units` (0.750), the whole order
+  at once from the Move units screen, refused with `not-on-path` unless it
+  names exactly the course's units, each once; `move-unit`, one unit to
+  one place, is kept on the server. What follows is how it was from 0.614
+  to 0.737, kept for its history.
 
   **Until 0.740, a unit was published per course once its checklist was clear (0.614).**
   `create-unit`, `move-unit`, `publish-unit` and `open-unit` in
@@ -1259,6 +1263,21 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   while it is a draft, arrows to move it and three dots (Open it early,
   Remove from the course, Delete this unit), and "+ Add a unit"; then
   "Decks, studied in any order", each with three dots, and "+ Add a deck".
+  Since 0.748 an empty course has a line under each label instead of a
+  box above them, and with nothing to choose from either add button goes
+  straight to one shared name box (New unit or New deck).
+  Since 0.749 both add buttons open the same `AddSheet`: a search,
+  Create a new unit or deck, then each one as Add or Added.
+  Since 0.750 the course's first tab is named Modules (the key is still
+  `course`) and the list sits under the course's name with no heading of
+  its own; the student code moved to the top of the People tab. A unit's
+  row has no arrows: Move unit, first in its three dots where the course
+  has more than one unit, opens `MoveUnits`, the units on slim lines with
+  arrows that change nothing until Apply sends the whole order with
+  `order-units`; Cancel leaves it, and the close cross asks first when
+  something was moved. A module with no cards shows one line and two
+  dotted rows, New card and Add existing cards, and its Restore from a
+  backup file moves to dots on the Cards heading's line.
   A unit's own screen is titled "Unit" and lists its courses with its
   place in each; a row opens that course. `countingCards` still feeds the
   unit's quality score. What follows is the screen as it was from 0.616.

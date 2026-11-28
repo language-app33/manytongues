@@ -246,6 +246,7 @@ test("admin actions refuse another space's people, courses and reports", async (
     /* A course's path (0.614): another space's course is not found. */
     ["create-unit", { courseId: b.course.id, title: "x" }],
     ["move-unit", { courseId: b.course.id, deckId: b.deck.id, to: 0 }],
+    ["order-units", { courseId: b.course.id, order: [b.deck.id] }],
     ["publish-unit", { courseId: b.course.id, deckId: b.deck.id }],
     ["open-unit", { courseId: b.course.id, deckId: b.deck.id, open: true }],
   ];
@@ -282,7 +283,7 @@ const PLACED = {
     "admin-new-code", "admin-card", "admin-delete-flags", "assign-student", "assign-teacher",
     "remove-member", "export-plan", "export-chunk", "create-course", "create-deck", "report-flag",
     "admin-create-user", "admin-create-org", "join-space",
-    "create-unit", "move-unit", "publish-unit", "open-unit",
+    "create-unit", "move-unit", "order-units", "publish-unit", "open-unit",
     /* 0.627: a course's switches. */
     "set-course-practice",
     /* 0.629: a personal set. */

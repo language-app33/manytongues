@@ -222,11 +222,27 @@ test("a unit full of sentences publishes; moving, publishing and opening each mo
   const afterMove = await material(student.key);
   assert.notEqual(afterMove.version, published.version);
 
+  /* The whole order at once (0.750). */
+  const ordered = await post("order-units", teacher.key, { courseId: course.id, order: [u1.id, u2.id] });
+  assert.equal(ordered.status, 200, ordered.text);
+  assert.deepEqual(ordered.json.course.path, [u1.id, u2.id]);
+  const afterOrder = await material(student.key);
+  assert.notEqual(afterOrder.version, afterMove.version);
+  for (const order of [[u1.id], [u1.id, u1.id], [u1.id, u2.id, "nope"], [u1.id, "nope"]]) {
+    const bad = await post("order-units", teacher.key, { courseId: course.id, order });
+    assert.equal(bad.status, 404, `${order.join()} answered ${bad.status}`);
+    assert.equal(bad.json.error, "not-on-path");
+  }
+  assert.deepEqual((await courseOf(teacher.key, course.id)).path, [u1.id, u2.id], "a refused order changes nothing");
+  const byStudent = await post("order-units", student.key, { courseId: course.id, order: [u2.id, u1.id] });
+  assert.ok(byStudent.status >= 400, `a student's order answered ${byStudent.status}`);
+  assert.deepEqual((await courseOf(teacher.key, course.id)).path, [u1.id, u2.id]);
+
   const opened = await post("open-unit", teacher.key, { courseId: course.id, deckId: u1.id, open: true });
   assert.equal(opened.status, 200, opened.text);
   assert.deepEqual(opened.json.course.opened, [u1.id]);
   const afterOpen = await material(student.key);
-  assert.notEqual(afterOpen.version, afterMove.version);
+  assert.notEqual(afterOpen.version, afterOrder.version);
   const closed = await post("open-unit", teacher.key, { courseId: course.id, deckId: u1.id, open: false });
   assert.equal(closed.json.course.opened, undefined);
 });

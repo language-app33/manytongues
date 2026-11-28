@@ -10032,3 +10032,106 @@ The "Deleted … Undo" bar (3a: make it the ordinary bar) turned out to be
 unreachable: nothing had set what it shows since the word list's delete
 was reworked, so it was removed rather than restyled. If the word list
 gets an Undo after delete again, it goes through the snackbar's `undo`.
+
+
+## An empty course's Modules section, and its add buttons (0.748)
+
+The tan `Nudge` with Create a module above an empty course's two groups
+read as a warning and was a third button for one job. The owner chose
+(1a) to drop it and give each group a line saying what it is for while
+the course holds nothing (`CourseModules`' `fresh`, `.at-modhint`), and
+(2a) to keep the dotted add buttons, so the screen has one shape empty or
+filled. `TeachSpace` lost `moduleSwitch` and `createHere`; the course
+screen no longer opens the kind sheet.
+
+Reproduced on an emulated phone with a new teacher: Add a unit opened a
+`PickSheet` holding New unit alone, and Add a deck took three taps to
+reach a name (a panel with nothing to tick, "Create a new module", then
+"What kind of module?", where picking Unit made a unit from Add a deck).
+The owner chose (3a, 4a) to go straight to naming when there is nothing
+to choose, (5a) "Create a new deck" in the panel otherwise, and asked
+that the naming be the same for both. So `CourseModules`' `naming` holds
+the kind, and one `ConfirmModal` asks "Unit title" or "Deck title";
+`onCreateDeck(title)` makes the deck in the course's language, attaches
+it, and stays on the course, as `onCreateUnit` always did. The cost: a
+deck made here no longer opens on `NewModule`'s screen and then itself;
+its description is left empty, as a unit's is.
+
+
+## Add a unit and Add a deck are one panel (0.749)
+
+Reproduced on an emulated phone: Add a unit was a `PickSheet` of
+`SheetAction` rows (New unit, then "Units you already have"; a tap added
+one and closed), Add a deck an `AddSheet` (lede, search, create row,
+Add/Added toggles, stays open). The owner chose (6a) the `AddSheet` for
+both. On whether tapping Added takes a unit out (7), the owner asked for
+whatever the panel does elsewhere: `AddSheet` on a unit's Courses and
+every `ModuleSwitch` take one out, so it does here too.
+
+So `CourseModules` lost `onAddUnit` and takes one `onToggle`, which is
+`TeachSpace`'s `toggleModule`; that now takes the reply through
+`tookCourse`, so a unit added or taken out moves on the path at once
+(the server's attach and detach replies carry the whole course). The
+panel lists the course's units, then the spare ones, in the order they
+had when it opened, so a row does not jump as it is toggled. The cost: a
+unit students are working through can be taken off the path from the
+panel with one tap, as it already could from the unit's own Courses.
+
+## Move units, the empty Cards section, the student code, Modules (0.750)
+
+The owner's choices: (1a) a unit's order is changed on a screen of its
+own, Move units, opened from Move unit in a unit's three dots, and the
+arrows leave the tile; (2a) arrows only on that screen, no dragging;
+(3b) nothing changes until Apply, with Cancel beside it, and the button
+says "Apply", not "Done"; (7a) leaving by the close cross with moves not
+applied asks Apply, Discard or Cancel. (4a) An empty module shows one
+line and two dotted rows, the course screen's add buttons, instead of
+the amber box; (5a) its three dots sit on the Cards heading's line,
+since the list draws no toolbar while empty; (6b) "Cards you already
+have" is renamed "Add existing cards". (8a) The student code moved to the
+top of the People tab. (9a) The course's first tab is named Modules and
+its inner Modules heading is dropped; the list is nested in the course's
+name block so no rule falls between them.
+
+Apply sends the whole order with a new action, `order-units`, rather than
+one `move-unit` per step: a save that fails partway cannot leave the path
+half moved, and an order that no longer names exactly the course's units
+(someone added or took one out meanwhile) is refused with `not-on-path`,
+the code `move-unit` already used. `move-unit` stays on the server. The
+phone's own back button is not handled by the app, so it leaves Move units
+without asking; only the screen's cross asks.
+
+
+## The teacher's card tiles, calmer (0.751)
+
+The owner found Material › Cards too busy and was shown five things to
+quieten (the "Calmer Cards screen" proposal), then three follow-ups.
+Chosen: (1a) a card's status as quiet words after a dot, (2a) the meaning
+first and bold with the script under it, (6a) the status said whatever
+filter is on, (7a) in both grids of teacher's tiles, the Cards tab's and
+a module's own, and (8a) "Recording missing" quiet too, in red. Kept as
+they were: (3c) the three dots on a tile, (5c) the count line and the
+chips. Chosen and held back as a change of its own: (4a) slim text tabs,
+which is in `BACKLOG.md`.
+
+On 6a: the first proposal was to leave the status off while a filter
+already said it. No filter does. The chip "Waiting for review" is the
+Review filter, the sentence cards a teacher has still to read, and a card
+under it can be a draft or published; it only looked like the status
+because an imported card starts as Ready for review. So the words are
+always said.
+
+The order is CSS alone: `order` on `.at-minien` under
+`.at-minicard.teach:has(> .at-minien:not(:empty))`. `CardTile`'s markup
+and the learner's tiles are untouched, and a tile with no meaning line
+(a number range) or an empty one keeps its script as the headline.
+`statusNote` in `src/spaces.tsx` draws the status as
+`.at-statusbadge.quiet`; a table row keeps `statusPill`. The "Word set"
+badge is not a status and is left as it was.
+
+This goes back, for the teacher's tiles, on the note beside
+`.at-mininame` that a bold line on top made named tiles the loudest in
+the list: every tile has one now, so none is louder than the rest. The
+cost: the script is smaller here (15px times the script's scale, from
+18), and the order on screen is no longer the order in the markup, so a
+screen reader still hears the script before the meaning.

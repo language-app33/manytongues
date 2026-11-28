@@ -247,6 +247,7 @@ const PLACES: Record<string, [string, string]> = {
   ModuleQuality: [TEACH, "A module's quality · the score, and what would raise it"],
   QualityRow: [TEACH, "A module · the row with its quality score"],
   CourseModules: [TEACH, "A course · its units and decks, in one Modules list"],
+  MoveUnits: [TEACH, "A course · putting its units in order, saved on Apply"],
   AddSheet: [TEACH, "A panel of things to add: decks to a course, or a unit to courses"],
   PracticeSection: [TEACH, "A course · which exercises its students are asked"],
   CourseWordSets: [TEACH, "A course · whose numbers and pronouns its students get"],

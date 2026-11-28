@@ -5914,7 +5914,92 @@ function AddSheet({ title, lede, rows, none, find, create, onToggle, onClose }: 
   );
 }
 
-function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf, busy, saving, onOpen, onCreateUnit, onAddUnit, onPublish, onEmptyPublish, onMove, onOpenForClass, onRemove, onDelete, onToggleDeck, onCreateDeck }: {
+/**
+ * Move units (0.750, the owner's 1a, 2a, 3b, 7a): the course's units on
+ * slim lines with arrows. Nothing is saved as the arrows are tapped; Apply
+ * sends the whole order at once, Cancel leaves it as it was, and leaving by
+ * the cross with moves made asks first.
+ */
+function MoveUnits({ units, startId, busy, error, onApply, onClose }: {
+  /** In path order. */
+  units: Module[];
+  /** The unit whose Move unit was tapped: highlighted, and scrolled to. */
+  startId: string;
+  busy?: boolean;
+  error?: string;
+  onApply: (order: string[]) => void;
+  onClose: () => void;
+}) {
+  const [order, setOrder] = useState<string[]>(() => units.map((u) => u.id));
+  const [asking, setAsking] = useState(false);
+  const changed = order.join() !== units.map((u) => u.id).join();
+  const titleOf = (id: string) => (units.find((u) => u.id === id) || { title: "" }).title;
+  const swap = (i: number, j: number) => setOrder((now) => {
+    const next = now.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
+  /* In state rather than a ref: a Screen draws once in place and again at
+     the app's root, and only the second stays on the page. Each is a new
+     element, so this runs for each, and the last is the one that counts;
+     the row keeps its element as it moves, so it runs at no other time.
+     A frame later, since the Screen puts its own scroll back to the top as
+     it mounts, after this effect. */
+  const [startRow, setStartRow] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!startRow) return undefined;
+    const frame = requestAnimationFrame(() => {
+      if (startRow.isConnected && typeof startRow.scrollIntoView === "function") startRow.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [startRow]);
+  return (
+    <Screen
+      title="Move units"
+      className="at-movescreen"
+      backIcon="close"
+      backLabel="Close"
+      onBack={() => (changed ? setAsking(true) : onClose())}
+      footer={
+        <div className="at-row">
+          <Button onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="primary" disabled={busy || !changed} onClick={() => onApply(order)}>Apply</Button>
+        </div>
+      }
+    >
+      <Notice kind="error">{error}</Notice>
+      <p className="at-hint">Students study units in this order.</p>
+      <div className="at-movelist" data-el="move-units">
+        {order.map((id, i) => {
+          const title = titleOf(id);
+          return (
+            <div className={"at-moverow" + (id === startId ? " on" : "")} data-el="move-unit" key={id}
+              ref={id === startId ? setStartRow : undefined}>
+              <span className="at-movenum">{i + 1}</span>
+              <span className="at-movetitle">{title}</span>
+              <IconButton icon="chevronUp" label={"Move " + title + " up"} disabled={busy || i === 0} onClick={() => swap(i, i - 1)} />
+              <IconButton icon="chevronDown" label={"Move " + title + " down"} disabled={busy || i === order.length - 1} onClick={() => swap(i, i + 1)} />
+            </div>
+          );
+        })}
+      </div>
+      {asking && (
+        <ConfirmModal
+          title="Apply the new order?"
+          body="You moved units but have not applied the change."
+          confirmLabel="Apply"
+          danger={false}
+          onConfirm={() => { setAsking(false); onApply(order); }}
+          altLabel="Discard"
+          onAlt={() => { setAsking(false); onClose(); }}
+          onCancel={() => setAsking(false)}
+        />
+      )}
+    </Screen>
+  );
+}
+
+function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf, busy, saving, onOpen, onCreateUnit, onPublish, onEmptyPublish, onStartMove, onOpenForClass, onRemove, onDelete, onToggle, onCreateDeck }: {
   course: Course;
   /** The course's units in path order, drafts included. */
   units: Module[];
@@ -5930,29 +6015,47 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
   saving: Record<string, "add" | "drop">;
   onOpen: (id: string) => void;
   onCreateUnit: (title: string) => void;
-  onAddUnit: (unitId: string) => void;
   onPublish: (unitId: string) => void;
   /** Publish pressed on a unit with nothing in it. */
   onEmptyPublish: () => void;
-  onMove: (unitId: string, to: number) => void;
+  /** Move unit in a unit's three dots: opens Move units on it (0.750). */
+  onStartMove: (unitId: string) => void;
   onOpenForClass: (unitId: string, open: boolean) => void;
   onRemove: (id: string) => void;
   onDelete: (unitId: string) => void;
-  onToggleDeck: (id: string, on: boolean) => void;
-  onCreateDeck: () => void;
+  /** Puts a unit or deck in the course, or takes it out (on: it is in). */
+  onToggle: (id: string, on: boolean) => void;
+  /** A deck named here: made in the course's language and put in it. */
+  onCreateDeck: (title: string) => void;
 }) {
-  const [naming, setNaming] = useState<string | null>(null);
-  const [addingUnit, setAddingUnit] = useState(false);
+  /* A new unit or deck being named: one box for both (0.748, the owner's
+     3a, 4a, 5a), so making either looks and goes the same way. */
+  const [naming, setNaming] = useState<{ kind: "unit" | "deck"; title: string } | null>(null);
+  /* Open, the panel's units in the order they had when it opened, so a
+     row does not jump away under the finger as it is added or taken out. */
+  const [addingUnit, setAddingUnit] = useState<string[] | null>(null);
+  const allUnits = units.concat(spareUnits);
+  const unitRows = addingUnit
+    ? allUnits.slice().sort((a, b) => {
+      const at = (id: string) => { const i = addingUnit.indexOf(id); return i < 0 ? addingUnit.length : i; };
+      return at(a.id) - at(b.id);
+    })
+    : [];
   const [addingDeck, setAddingDeck] = useState(false);
   const [deleting, setDeleting] = useState<Module | null>(null);
   const opened = new Set(course.opened || []);
   const inCourse = new Set(decks.map((d) => d.id));
+  /* While the course holds nothing at all, each group says in a line what
+     it is for (0.748, the owner's 1a). The dotted add buttons stay as
+     they are once it is filled (2a): the screen keeps one shape throughout. */
+  const fresh = !units.length && !decks.length;
   /* The controls at a row's right: a press on them is theirs alone, not
      the row's, which opens the module. */
   const hold = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
     <>
       <p className="at-eyebrow at-modgroup">Units, studied in order</p>
+      {fresh && <p className="at-hint at-modhint" data-el="course-units-hint">Students work through units one after another.</p>}
       <div className="at-decklist2" data-el="course-units">
         {units.map((u, i) => {
           const live = isLiveIn(course, u.id);
@@ -5961,7 +6064,9 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           return (
             /* Since 0.741 (the owner's wish): no "Unit ·" on the line, which
                the heading above already says; the three dots in the row's
-               top right corner; the arrows, then Publish, along its foot. */
+               top right corner. Since 0.750 the arrows are gone from the
+               tile (Move unit in its dots opens Move units), so its foot
+               holds Open to students alone, and only while it is not open. */
             <div key={u.id} data-el="path-unit" className="at-unitrow">
               <Tile
                 title={`${i + 1} · ${u.title}`}
@@ -5969,16 +6074,12 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
                    a card's Publish is another thing. */
                 meta={`${live ? "Open to students" : "Not open yet"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
                 onOpen={() => onOpen(u.id)}
-                footer={
+                footer={live ? undefined : (
                   <span className="at-unitfoot" onClick={hold}>
-                    <IconButton icon="chevronUp" label={`Move ${u.title} up`} disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)} />
-                    <IconButton icon="chevronDown" label={`Move ${u.title} down`} disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)} />
-                    {!live && (
-                      <Button size="sm" variant="primary" off={empty || undefined} disabled={busy}
-                        onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Open to students</Button>
-                    )}
+                    <Button size="sm" variant="primary" off={empty || undefined} disabled={busy}
+                      onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Open to students</Button>
                   </span>
-                }
+                )}
                 actions={
                   <span className="at-unitacts" onClick={hold}>
                     <MoreMenu
@@ -5986,6 +6087,12 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
                       label={`More for ${u.title}`}
                       title={u.title}
                       items={[
+                        units.length > 1 ? {
+                          label: "Move unit",
+                          note: "Change the order students study units in.",
+                          icon: "sort",
+                          onClick: () => onStartMove(u.id),
+                        } : null,
                         live ? {
                           label: early ? "Stop opening it early" : "Open it early",
                           note: early ? "Students reach this unit in order again." : "Students can start this unit now, without finishing the earlier ones.",
@@ -6003,12 +6110,16 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           );
         })}
       </div>
-      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingUnit(true)}>
+      {/* With no unit to choose from, the panel would hold New unit alone:
+          go straight to naming one (0.748, 3a). Likewise a deck (4a). */}
+      <button type="button" className="at-deckadd at-addwide" disabled={busy}
+        onClick={() => (allUnits.length ? setAddingUnit(allUnits.map((u) => u.id)) : setNaming({ kind: "unit", title: "" }))}>
         <Icon name="add" size={17} />
         Add a unit
       </button>
 
       <p className="at-eyebrow at-modgroup">Decks, studied in any order</p>
+      {fresh && <p className="at-hint at-modhint" data-el="course-decks-hint">Students practise decks whenever they like.</p>}
       <div className="at-decklist2" data-el="course-decks">
         {decks.map((d) => (
           <div key={d.id} data-el="course-deck" className="at-unitrow">
@@ -6034,58 +6145,58 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
           </div>
         ))}
       </div>
-      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingDeck(true)}>
+      <button type="button" className="at-deckadd at-addwide" disabled={busy}
+        onClick={() => (deckChoices.length ? setAddingDeck(true) : setNaming({ kind: "deck", title: "" }))}>
         <Icon name="add" size={17} />
         Add a deck
       </button>
 
+      {/* The same panel as Add a deck (0.749, the owner's 6a): every unit
+          you have, Add or Added, searchable, open while several are added.
+          Tapping Added takes one out, as the panel does wherever else it
+          is used (a unit's Courses, any module picker). */}
       {addingUnit && (
-        <PickSheet title="Add a unit" onClose={() => setAddingUnit(false)}>
-          <div className="at-sheetacts">
-            <SheetAction icon="add" label="New unit" onClick={() => { setAddingUnit(false); setNaming(""); }} />
-          </div>
-          {spareUnits.length > 0 && (
-            <>
-              <p className="at-eyebrow at-modgroup">Units you already have</p>
-              <div className="at-sheetacts">
-                {spareUnits.map((u) => (
-                  <SheetAction key={u.id} icon="layers" label={u.title} note={plural(heldIn(u), "card")}
-                    onClick={() => { setAddingUnit(false); onAddUnit(u.id); }} />
-                ))}
-              </div>
-            </>
-          )}
-        </PickSheet>
+        <AddSheet
+          title="Add a unit"
+          lede={`Choose the units ${course.title} teaches. They join the end of its path.`}
+          find="Search units"
+          create={{ label: "Create a new unit", onCreate: () => { setAddingUnit(null); setNaming({ kind: "unit", title: "" }); } }}
+          rows={unitRows.map((u) => ({ id: u.id, title: u.title, meta: plural(heldIn(u), "card"), on: units.some((x) => x.id === u.id), saving: saving[u.id] }))}
+          onToggle={onToggle}
+          onClose={() => setAddingUnit(null)}
+        />
       )}
       {addingDeck && (
         <AddSheet
           title="Add a deck"
           lede={`Choose the decks ${course.title} teaches. Students see them at their next check.`}
-          find="Search modules"
-          create={{ label: "Create a new module", onCreate: onCreateDeck }}
+          find="Search decks"
+          /* A deck, not "a module" with a kind to choose: this is Add a
+             deck (0.748, 5a). Units are made from Add a unit. */
+          create={{ label: "Create a new deck", onCreate: () => { setAddingDeck(false); setNaming({ kind: "deck", title: "" }); } }}
           rows={deckChoices.map((d) => ({ id: d.id, title: d.title, meta: moduleSize(d), on: inCourse.has(d.id), saving: saving[d.id] }))}
           none="You have no decks yet."
-          onToggle={onToggleDeck}
+          onToggle={onToggle}
           onClose={() => setAddingDeck(false)}
         />
       )}
       {naming !== null && (
         <ConfirmModal
-          title="New unit"
+          title={naming.kind === "unit" ? "New unit" : "New deck"}
           danger={false}
-          confirmLabel="New unit"
+          confirmLabel={naming.kind === "unit" ? "New unit" : "New deck"}
           busy={busy}
           body={
-            <Field label="Unit title">
-              <input className="at-input" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} />
+            <Field label={naming.kind === "unit" ? "Unit title" : "Deck title"}>
+              <input className="at-input" autoFocus value={naming.title} onChange={(e) => setNaming({ ...naming, title: e.target.value })} />
             </Field>
           }
           onCancel={() => setNaming(null)}
           onConfirm={() => {
-            const title = (naming || "").trim();
+            const title = naming.title.trim();
             if (!title) return;
             setNaming(null);
-            onCreateUnit(title);
+            (naming.kind === "unit" ? onCreateUnit : onCreateDeck)(title);
           }}
         />
       )}
@@ -6433,6 +6544,16 @@ const statusWords = (c: Card): string =>
    longest ("Changes ready for review") stays narrow on a phone. */
 const statusPill = (c: Card): React.ReactNode =>
   statusWords(c) ? <span className="at-statuspill">{statusWords(c)}</span> : null;
+
+/* The same words on a teacher's card tile (0.751, the owner's 1a and 6a):
+   quiet text after a dot, where it was an outlined label in capitals, and
+   said whatever filter is on. The dot is brass for a card ready to be
+   looked at and grey for a draft. Tiles only: a table row keeps
+   statusPill. */
+const statusNote = (c: Card): React.ReactNode => {
+  const words = statusWords(c);
+  return words ? <span className={`at-statusbadge quiet${/draft/i.test(words) ? " draft" : ""}`}>{words}</span> : null;
+};
 
 /* A card naming a recording the server does not hold — see clipsMissing on
    the server. Beside the status pill, in the colour of something to fix:
@@ -6936,9 +7057,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
   const [courseView, setCourseView] = useState<any | null>(null);
   /* Which part of the open course is on screen (0.693, the owner's 4b):
-     Course, People or Exercises. Each course opens on Course. */
+     Modules (named Course until 0.750), People or Exercises. Each course
+     opens on Modules. */
   const [courseTab, setCourseTab] = useState("course");
-  useEffect(() => setCourseTab("course"), [courseView]);
+  /* The unit Move units was opened on (0.750), while it is open. */
+  const [movingUnit, setMovingUnit] = useState<string | null>(null);
+  useEffect(() => {
+    setCourseTab("course");
+    setMovingUnit(null);
+  }, [courseView]);
   /* The course a unit's page was opened from (0.616): the course its
      quality is read in. Publishing and the checklist left the unit's
      page in 0.740; its place in each course is said there and arranged
@@ -7741,8 +7868,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
          by it. What is left is only what needs looking at. */
       meta={
         <>
-          {cardLostRecordings(c) ? <span className="at-statusbadge lost">Recording missing</span> : null}
-          {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
+          {cardLostRecordings(c) ? <span className="at-statusbadge quiet lost">Recording missing</span> : null}
+          {statusNote(c)}
         </>
       }
       onClick={() => openCard(c)}
@@ -10148,7 +10275,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             lang={langOfCard(it)}
             className="teach"
             standIn={standIn(it)}
-            meta={statusWords(it) ? <span className="at-statusbadge">{statusWords(it)}</span> : null}
+            meta={statusNote(it)}
             onClick={() => openCard(it)}
             corner={manageMenu(it)}
           />
@@ -10458,7 +10585,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             {/* The cards, word sets among them: read, added, selected and
                 removed here, since Manage cards folded into this screen
                 (0.732, the owner's 1a). */}
-            <Section title="Cards">
+            {/* While the module is empty its list draws no toolbar, so the
+                list's three dots sit on this heading's line instead (0.750,
+                the owner's 5a), labelled as the list's own are. */}
+            <Section title="Cards" action={moduleEmpty ? (
+              <MoreMenu label="More for these cards" title="Cards"
+                items={[{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }]} />
+            ) : undefined}>
             {/* A word set the deck holds that is still being written
                 (0.569): what is missing, and the way straight to the set.
                 Students already get what is written, so it says so rather
@@ -10508,29 +10641,31 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           noun="card"
           items={listed}
           total={listedWhole}
-          /* In the three dots whether or not the module is empty (0.740):
-             the empty box holds the two ways to fill it and nothing else. */
-          more={[{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }]}
+          /* In the list's three dots once it holds cards; while it is empty,
+             in the dots on the Cards heading's line (0.750). The empty box
+             holds the two ways to fill it and nothing else. */
+          more={moduleEmpty ? undefined : [{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }]}
           sort={cardSort}
           filter={cardFilterProp}
           size="small"
           busy={busy}
           empty={filterNote}
           emptyPanel={moduleEmpty ? (
-            <Nudge
-              icon="cards"
-              tone="attention"
-              action={
-                /* Exactly two buttons (0.740, the owner's choice): restoring
-                   from a backup file is in the list's three dots. */
-                <div className="at-row">
-                  <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
-                  <Button icon="add" onClick={() => openAdding(d)}>Cards you already have</Button>
-                </div>
-              }
-            >
-              No cards in this {kindW} yet. Make a new one or add cards you already have, so your students have something to practise.
-            </Nudge>
+            /* One line and the two ways to fill it, as the same dotted rows
+               as Add a unit and Add a deck on the course's screen (0.750,
+               the owner's 4a): no box, no colour. Restoring from a backup
+               file is in the dots on the Cards heading's line. */
+            <div data-el="module-empty">
+              <p className="at-hint">No cards yet. Students need some to practise.</p>
+              <button type="button" className="at-deckadd at-addwide" disabled={!!busy} onClick={newCard}>
+                <Icon name="add" size={17} />
+                New card
+              </button>
+              <button type="button" className="at-deckadd at-addwide" disabled={!!busy} onClick={() => openAdding(d)}>
+                <Icon name="add" size={17} />
+                Add existing cards
+              </button>
+            </div>
           ) : undefined}
           match={matchEntry}
           /* One green + for both ways of filling a module (0.736, the
@@ -10587,7 +10722,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             <div className="at-sheetacts">
               <SheetAction icon="add" label="New card" note={`Write a new card in this ${kindW}`}
                 onClick={() => { setAddingHow(false); newCard(); }} />
-              <SheetAction icon="cards" label="Cards you already have" note="Choose from your other cards"
+              <SheetAction icon="cards" label="Add existing cards" note="Choose from your other cards"
                 onClick={() => { setAddingHow(false); openAdding(d); }} />
             </div>
           </PickSheet>
@@ -10721,18 +10856,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ) : none}
       </Field>
     );
-    /* The student code, copied from where it is wanted (0.725, the owner's
-       2a): the People tab said to go and find it on the Course tab. Where
-       the browser refuses, the code is said in the message instead. */
-    const copyStudentCode = async () => {
-      try {
-        if (!navigator.clipboard || !c.code) throw new Error("no-clipboard");
-        await navigator.clipboard.writeText(c.code);
-        snack("Student code copied", "good");
-      } catch {
-        snack(c.code ? `Couldn't copy it. The student code is ${c.code}` : "This course has no student code yet. Ask your administrator for one.", "warn");
-      }
-    };
     /* A deck put in or taken out of this course. What the server saved
        comes back with the answer — the deck's courses and the course's
        decks — and is put on screen as it is, rather than fetching every
@@ -10740,7 +10863,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        seconds. */
     const toggleModule = (id: string, on: boolean) => {
       if (moduleSaving[id]) return;
-      const title = (modules.find((d) => d.id === id) || { title: "The module" }).title;
+      const title = (modules.find((d) => d.id === id) || allModules.find((d) => d.id === id) || { title: "The module" }).title;
       setModuleSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
       run(
         async () => {
@@ -10749,8 +10872,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           if (saved && Array.isArray(saved.courses))
             setModules((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
           else await refresh(true);
-          if (r && r.course && Array.isArray(r.course.decks))
-            setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, decks: r.course.decks } : x)));
+          /* With its path too: a unit added or taken out moves on it. */
+          tookCourse(r);
         },
         on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
       ).finally(() =>
@@ -10761,36 +10884,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         }),
       );
     };
-    /* A new module made from this course: the kind asked, as New module
-       asks it, then the module is put in this course and opened. */
-    const createHere = () => {
-      setNewKind("deck");
-      setNamingFor(c);
-      setChoosingKind(true);
-    };
-    const moduleSwitch = (empty: boolean) => (
-      <ModuleSwitch
-        modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
-        chosen={mine.map((d) => d.id)}
-        onOpen={(id) => setOpenModule(id)}
-        onToggle={toggleModule}
-        onCreate={createHere}
-        solid={empty}
-        saving={moduleSaving}
-        find={{
-          placeholder: "Search modules",
-          match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
-        }}
-        words={{
-          first: empty ? "Add a module" : "Add a module to this course",
-          another: "Another module",
-          drop: (t) => `Take ${t} out of this course`,
-          lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
-          note: "",
-          none: "You have no modules yet. Make one under Modules, then add it to this course.",
-        }}
-      />
-    );
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -10799,11 +10892,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <Screen title="Course" className="cardform" onBack={() => setCourseView(null)}>
             <Notice kind="error">{error}</Notice>
             {/* Three parts, in the tabs Material's lists are chosen with
-                (0.693, the owner's 4b): what the course is and teaches,
-                who is in it, and what its students are asked. */}
+                (0.693, the owner's 4b): what the course teaches, who is in
+                it, and what its students are asked. The first is named
+                Modules since 0.750 (the owner's 9a); the screen is Course. */}
             <Tabs
-              label="Course, people or exercises"
-              tabs={[["course", "Course", "school"], ["people", "People", "group"], ["exercises", "Exercises", "tune"]]}
+              label="Modules, people or exercises"
+              tabs={[["course", "Modules", "layers"], ["people", "People", "group"], ["exercises", "Exercises", "tune"]]}
               value={courseTab}
               onChange={setCourseTab}
             />
@@ -10819,15 +10913,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   <span className="at-formline">{`${languageName(languages, c.language)} · ${plural(c.students.length, "student")}`}</span>
                 </span>
               </div>
-            </div>
 
             {/* What the course teaches, in one list (0.740, the owner's
                 choice): its units, studied in order, then its decks,
-                studied in any order. See CourseModules. */}
-            <div className="at-formblock" data-el="course-modules">
-              <div className="at-formhead">
-                <span className="at-formnum">Modules</span>
-              </div>
+                studied in any order. See CourseModules. Since 0.750 (the
+                owner's 9a) under the course's name in the same section, with
+                no heading of its own: the tab above already says Modules. */}
+            <div className="at-coursemods" data-el="course-modules">
               {courseOff && (
                 <div className="at-mb3">
                   <Nudge
@@ -10850,23 +10942,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 </div>
               )}
-              {/* Empty, one way to fill it (0.727, the owner's 1a–4a): Add a
-                  module where there are modules to add, whose list can make
-                  a new one too, and Create a module where there are none.
-                  Above both groups while the course has nothing at all. */}
-              {!mine.length && !units.length ? (
-                <div className="at-mb3">
-                  <Nudge
-                    icon="folder"
-                    tone="attention"
-                    action={plainModules.length ? moduleSwitch(true) : (
-                      <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
-                    )}
-                  >
-                    Nothing here yet. Add a module to give your students something to practise.
-                  </Nudge>
-                </div>
-              ) : null}
+              {/* An empty course has no box of its own (0.748): the tan box
+                  read as a warning, and its Create a module repeated what
+                  Add a unit and Add a deck below it already do. Each group
+                  says what it is for instead. See CourseModules. */}
               <CourseModules
                 course={c}
                 units={units}
@@ -10882,17 +10961,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
                   tookCourse(r);
                 }, `${title} added to ${c.title}`)}
-                onAddUnit={(id) => run(async () => {
-                  const r = await API.attachModule(id, c.id);
-                  tookModule(r);
-                  tookCourse(r);
-                })}
                 onPublish={(id) => {
                   const title = (units.find((u) => u.id === id) || { title: "The unit" }).title;
                   run(async () => tookCourse(await API.publishUnit(c.id, id)), `${title} is open to students in ${c.title}`);
                 }}
                 onEmptyPublish={() => snack("Add a card first", "warn")}
-                onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
+                onStartMove={setMovingUnit}
                 onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
                   open ? "Opened early" : "Students reach it in order again")}
                 onRemove={(id) => {
@@ -10907,28 +10981,31 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   await API.deleteModule(id);
                   await refresh(true);
                 })}
-                onToggleDeck={toggleModule}
-                onCreateDeck={createHere}
+                onToggle={toggleModule}
+                onCreateDeck={(title) => run(async () => {
+                  const r = await API.createModule(title, "", c.language as LangId);
+                  if (!(r && r.deck && r.deck.id)) return;
+                  const a = await API.attachModule(r.deck.id, c.id);
+                  tookModule(a);
+                  tookCourse(a);
+                }, `${title} added to ${c.title}`)}
               />
               {kindSheet}
             </div>
-            {/* Only the student code lives here. The teacher code hands over
-                control of the material, so who holds it is the
-                administrator's decision to make, in the admin space. */}
-            <div className="at-formblock">
-              <div className="at-formhead">
-                <span className="at-formnum">Join code</span>
-                <span className="at-formrole">
-                  This is the code students join with. Teacher codes are your
-                  administrator's to hand out.
-                </span>
-              </div>
-              <CodeBox
-                label="Student code"
-                code={c.code}
-                hint="Share this with a class so they can join and study."
-              />
             </div>
+            {movingUnit && (
+              <MoveUnits
+                units={units}
+                startId={movingUnit}
+                busy={busy}
+                error={error}
+                onClose={() => setMovingUnit(null)}
+                onApply={(order) => run(async () => {
+                  tookCourse(await API.orderUnits(c.id, order));
+                  setMovingUnit(null);
+                }, "Unit order changed")}
+              />
+            )}
 
             </div>
             )}
@@ -10937,18 +11014,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             <div className="at-formblock">
               <div className="at-formhead">
                 <span className="at-formnum">People</span>
-                <span className="at-formrole">Your administrator adds and removes people.</span>
+                <span className="at-formrole">Your administrator adds and removes people, and hands out teacher codes.</span>
               </div>
+              {/* Only the student code lives here, first (0.750, the owner's
+                  8a; on the Course tab until then). The teacher code hands
+                  over control of the material, so who holds it is the
+                  administrator's decision to make, in the admin space. */}
+              <CodeBox label="Student code" code={c.code} hint="Share this with a class so they can join." />
               {people("Teachers", c.teachers, "Nobody yet.")}
               {people("Students", c.students, (
-                <Nudge
-                  icon="group"
-                  action={c.code ? (
-                    <Button size="sm" variant="primary" icon="copy" onClick={() => void copyStudentCode()}>Copy student code</Button>
-                  ) : undefined}
-                >
-                  Nobody has joined yet. Share the student code with your class so they can join.
-                </Nudge>
+                <Nudge icon="group">Nobody has joined yet.</Nudge>
               ))}
             </div>
             </div>

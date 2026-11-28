@@ -475,8 +475,9 @@ export const detachModule = (moduleId: string, courseId: string) =>
 /* ---- a course's path (0.616): units, in order, per course ---- */
 export const createUnit = (courseId: string, title: string) =>
   call("create-unit", { body: { courseId, title } });
-export const moveUnit = (courseId: string, moduleId: string, to: number) =>
-  call("move-unit", { body: { courseId, deckId: moduleId, to } });
+/** The whole unit order at once, from Move units' Apply (0.750). */
+export const orderUnits = (courseId: string, order: string[]) =>
+  call("order-units", { body: { courseId, order } });
 /** Refused with "unit-empty" for a unit with nothing in it (0.740: the only rule left). */
 export const publishUnit = (courseId: string, moduleId: string) =>
   call("publish-unit", { body: { courseId, deckId: moduleId } });

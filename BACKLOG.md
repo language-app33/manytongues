@@ -158,3 +158,20 @@ Left out of personal sets (0.629–0.632). The deck check lists what is missing 
 ## Personal sets in someone's own space
 
 Left out of personal sets (0.629–0.632). Only courses a teacher runs; a deck in My space is refused. Waits on someone asking for a set of their own.
+
+## Slim text tabs, everywhere there are tabs
+
+Chosen by the owner on 28 November 2026 (the "Calmer Cards screen"
+proposal, question 4, option a) and held back on purpose. The tab row —
+Modules / Cards / Word sets in Material, and every other row drawn by the
+same component — becomes the words on one line with the chosen one dark
+and underlined, in place of the grey tray with an icon over each word.
+About half the height, and the icons go.
+
+It waits because the tab row is one component used across the whole app:
+it is a change of its own, to be tried on every screen that has tabs, and
+not a rider on the Cards-screen work it was proposed with.
+
+**Remind the owner of this whenever the Cards screen or the tabs are
+worked on, and at the end of that work,** until it is built or a decision
+says it never will be. The owner asked to be reminded.
