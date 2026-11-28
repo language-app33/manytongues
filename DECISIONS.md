@@ -9931,7 +9931,35 @@ other tile; and Publish moved after the arrows, so the arrows stay in the
 same place whether a unit is a draft or published. What the button says is
 an open question to the owner.
 
-**0.742: "Open to students".** A unit's button and status say "Open to
+## Hebrew's ten thousand takes the bound form, once it is written
+
+**28 November 2026** · `src/numbers/he-IL.ts` (`scale`, `HE_SLOTS`),
+`src/numbers/build.ts` (`written`) (0.742)
+
+Since 0.152 Hebrew counted ten thousand the masculine way with the singular
+after it, and the port to systems kept that on purpose, with a note in the
+backlog for whoever read the Hebrew table. It has been read: the written
+language puts the bound form of ten in front of the plural, as three to
+nine already did.
+
+**The bound way is taken only when ten's new box is written.** Ten gets the
+"before thousands" box that three to nine have. A system without it, which
+is every Hebrew system written before this release, says exactly what it
+said, and reports the box as missing (a gap that does not stop anything
+being asked). The alternative, falling back to the masculine ten with the
+plural, would produce a hybrid that is wrong both ways, and would change a
+learner's numbers without their teacher having done anything.
+
+**Thousands only.** Millions and billions count ten the masculine way and
+are untouched; ten million is in the golden table to prove it.
+
+**The cost:** the golden table, which was a fence against any change in
+what a Hebrew learner sees, has one row changed and says so. A student who
+learnt the old wording sees the new one once their teacher writes the box,
+with no warning beyond the teacher's own edit. The composer's version goes
+to 2; nothing compares it yet.
+
+**0.743: "Open to students".** A unit's button and status say "Open to
 students" / "Not open yet" instead of Publish / Published / Draft, the
 owner's 1a, because a card's Publish is a different act. Chosen knowing it
 sits beside "Open it early" and "Open course"; the stored field is still

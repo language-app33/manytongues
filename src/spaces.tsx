@@ -5965,7 +5965,7 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
             <div key={u.id} data-el="path-unit" className="at-unitrow">
               <Tile
                 title={`${i + 1} · ${u.title}`}
-                /* "Open to students" rather than "Publish" (0.742, the owner's 1a):
+                /* "Open to students" rather than "Publish" (0.743, the owner's 1a):
                    a card's Publish is another thing. */
                 meta={`${live ? "Open to students" : "Not open yet"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
                 onOpen={() => onOpen(u.id)}
