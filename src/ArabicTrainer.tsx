@@ -22682,7 +22682,7 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
   return (
     /* A field of When you practise since 0.738, no longer a section of
        its own. */
-    <div className="at-field at-mt3" data-el="device-media">
+    <div className="at-field at-mt3">
       <label className="at-label">Recordings and pictures on this device</label>
       <p className="at-fieldlede">These are the recordings and pictures saved on your device so you can keep practicing without an internet connection.</p>
       <p className="at-devicefigures">

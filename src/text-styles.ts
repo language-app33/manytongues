@@ -215,15 +215,23 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
   ["Controls", [
     {
       name: ".at-btn",
-      size: "16px",
-      what: "Every button. Uppercase, so its words are read as a thing to press rather than as a sentence.",
-      example: "Start session",
+      size: "15px",
+      what: "Every button but the main one, in ordinary letters (0.738, the owner's choice).",
+      example: "Cards you already have",
       cls: "at-btn",
       tag: "span",
     },
     {
+      name: ".at-btn.primary",
+      size: "16px",
+      what: "A screen's one main green button: the only button in capitals, so it is the one that stands out.",
+      example: "Start session",
+      cls: "at-btn primary",
+      tag: "span",
+    },
+    {
       name: ".at-btn.sm",
-      size: "13px",
+      size: "14px",
       what: "The small one, for a button inside a row of content rather than under it.",
       example: "Edit",
       cls: "at-btn sm",

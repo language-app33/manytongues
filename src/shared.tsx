@@ -3211,7 +3211,11 @@ export function ItemList<T>({
     .concat((more || []).filter(Boolean) as MoreItem[])
     .filter(Boolean) as MoreItem[];
   const loneSelect = dotItems.length === 1 && canSelect;
-  const dots = !bare && !selecting && dotItems.length > 0;
+  /* Kept over an empty list's panel too (0.738): the panel holds the ways
+     to make the first one, and the list's own items — Restore from a
+     backup file — stay behind the dots. Select needs items, so it is not
+     among them then. */
+  const dots = !selecting && dotItems.length > 0;
   const closeBtn = selecting && canSelect;
   const barHolds = withNew || box || filterBtn || !!narrow || dots || closeBtn;
 

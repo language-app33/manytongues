@@ -106,6 +106,10 @@ instead; treat it as available rather than established.
 
 Pass `icon` rather than an `<Icon>` child — that way the spacing is consistent.
 
+Only `variant="primary"` is set in capitals (0.738, the owner's choice): it
+is a screen's one main green button. Every other button is in ordinary
+letters, so do not write a label in capitals to make it stand out.
+
 The words are boxed in `.at-btnlabel`, which is `display: contents` and so
 invisible to the layout — except in an `.at-row` or a screen's footer, where
 a label longer than the whole row is wide wraps inside its button instead of
@@ -161,7 +165,7 @@ second argument saves the caller working out which way the tick just went.
 ### `MoreMenu` — 3 uses
 Three dots that open the app's one context menu (0.689; a sheet since
 0.690): the less used things done with a tile or a list — a module's Export
-and Delete, a list's Import — out of the way of the one it is for.
+and Delete, a list's Restore from a backup file — out of the way of the one it is for.
 `label, title, lede, items, ghost=true`
 
 The panel is a `PickSheet` of `SheetAction` rows, the same one a saved
@@ -260,7 +264,7 @@ busy`
 **The bar is one row** (0.728): New (+ alone under 640px, "+ New card"
 from there), the search box taking what is left, Filter (with the count of
 filters on, and its word from 640px), `narrow`, and three dots. The dots hold
-Select first, where there is anything to select, then `more` (Import, where a
+Select first, where there is anything to select, then `more` (Restore from a backup file, where a
 list has it); where Select would be alone in them it is an icon of its own
 and there are no dots. `tools`, a screen's own worded button, is on a row of its own above
 the bar. (A module's screen had one, "Manage this deck's cards", until

@@ -5191,22 +5191,22 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   /* Since 0.520 Edit and Save float in the bottom corner, and the title
      line holds nothing on the right while the card is written. */
   check("Edit opens the card editor, with Save floating in the corner and nothing on its title line",
-    editorOpen() && !!buttonNamed(/^Save$/) && !buttonNamed(/^Save and exit$/) && !buttonNamed(/^Status/) &&
-      (/** @type {Element} */ (buttonNamed(/^Save$/))).classList.contains("at-fab") &&
+    editorOpen() && !!buttonNamed(/^Save as draft$/) && !buttonNamed(/^Save and exit$/) && !buttonNamed(/^Status/) &&
+      (/** @type {Element} */ (buttonNamed(/^Save as draft$/))).classList.contains("at-fab") &&
       !document.querySelector(".at-screen.cardform .at-screenaction button"),
     editorOpen() ? [...document.querySelectorAll(".at-screen.cardform button.at-fab, .at-screen.cardform .at-screenaction button")].map(spokenName).join(" | ") : "(no editor)");
   /* Nothing changed yet, so there is nothing to save. */
-  const saveOff = () => isOff(buttonNamed(/^Save$/));
+  const saveOff = () => isOff(buttonNamed(/^Save as draft$/));
   check("Save is off until something changes", !!saveOff(),
-    `Save ${isOff(buttonNamed(/^Save$/)) ? "off" : "on"}`);
+    `Save ${isOff(buttonNamed(/^Save as draft$/)) ? "off" : "on"}`);
   /* And beside it, Save and publish: before Save in the row, so Save keeps
      the corner, and off whenever Save is. */
   const fabNames = () => [...document.querySelectorAll(".at-screen.cardform button.at-fab")].map(spokenName);
   check("Save and publish floats beside Save, off with it",
-    fabNames().join(" | ") === "Save and publish | Save" && isOff(buttonNamed(/^Save and publish$/)),
+    fabNames().join(" | ") === "Save as draft | Save and publish" && isOff(buttonNamed(/^Save and publish$/)),
     fabNames().join(" | "));
   /* And a tap on it says so, rather than nothing happening. */
-  clickNamed(/^Save$/);
+  clickNamed(/^Save as draft$/);
   await sleep(150);
   const snackSays = () => ((document.querySelector(".at-snack") || {}).textContent || "").trim();
   check("and tapping it says there is nothing to save", /No changes to save/.test(snackSays()), snackSays() || "(nothing said)");
@@ -5230,11 +5230,11 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("and come on once something has", !!firstBox && !saveOff(), firstBox ? "typed in a box" : "(no box to type in)");
   takeSaves = true;
   const savesBefore = savedCards.length;
-  clickNamed(/^Save$/);
+  clickNamed(/^Save as draft$/);
   await sleep(500);
   /* Saving goes back to reading the card as saved (0.520). */
   check("Save saves the card and goes back to reading it",
-    savedCards.length === savesBefore + 1 && !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
+    savedCards.length === savesBefore + 1 && !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save as draft$/),
     `${savedCards.length - savesBefore} saved · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
   click(cardEdit());
   await sleep(400);
@@ -5261,7 +5261,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("with a change unsaved, the cross asks whether to discard it", asked, asked ? "asked" : "(not asked)");
   clickNamed(/^Cancel$/);
   await sleep(200);
-  clickNamed(/^Save$/);
+  clickNamed(/^Save as draft$/);
   await sleep(500);
   const both = savedCards.slice(savesBefore);
   check("and a second Save saves the same card again",
@@ -5269,7 +5269,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
       (!cardId || both[0].id === cardId),
     both.map((c) => c.id).join(", "));
   check("and with it saved the card is read again, Edit in the corner",
-    !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
+    !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save as draft$/),
     [...document.querySelectorAll(".at-fab")].map(spokenName).join(" | "));
   /* Save and publish: the same save, asking to be published, and back to
      reading the card as Save is. A plain Save never asks. */
@@ -5483,9 +5483,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    answer, and by the button where there is not. At the top level because
    four walks in three blocks ask the same question. */
 const wordKindBtn = () => /** @type {any} */ ([...document.querySelectorAll(".at-choosebtn")]
-  .find((b) => /^What subtype/.test(b.getAttribute("aria-label") || "")) || null);
+  .find((b) => /^(Kind of word|Conversation or text)/.test(b.getAttribute("aria-label") || "")) || null);
 const wordKindPencil = () => /** @type {any} */ ([...document.querySelectorAll("button")]
-  .find((b) => b.getAttribute("aria-label") === "Change what subtype this card is") || null);
+  .find((b) => b.getAttribute("aria-label") === "Change what kind of word this is") || null);
 /* What the word-kind row is showing, read off the row the pencil is on:
    the card's own type wears the same shut row, one section above. */
 const wordKindSaid = () => {
@@ -5522,7 +5522,7 @@ const cardNameField = () => {
     || null);
 };
 const formRows = () => [...document.querySelectorAll(
-  '[role="radiogroup"][aria-label="What subtype"] .at-tickrow')];
+  '[role="radiogroup"][aria-label="Kind of word"] .at-tickrow, [role="radiogroup"][aria-label="Conversation or text"] .at-tickrow')];
 /* The subtype's options are in a sheet since 0.241; the rows are the same
    radio rows, looked for wherever they are drawn. */
 const openWordKind = async () => {
@@ -5705,7 +5705,7 @@ const openPronounTables = async () => {
       foot ? (foot.textContent || "").trim() : "(no foot bar)");
     await openActions();
     check("and Actions opens a panel named for the selection, listing every bulk action with Delete last",
-      actionRows().join(" | ") === "Add to a module | Remove from a module | Add tags | Remove tags | Change status | Export | Delete" &&
+      actionRows().join(" | ") === "Add to a module | Remove from a module | Add to groups | Remove from groups | Change status | Export | Delete" &&
         ((document.querySelector(".at-actionsheet .at-modaltitle") || {}).textContent || "") === "1 selected" &&
         !!document.querySelector(".at-actionsheet .at-sheetact:last-child.danger"),
       actionRows().join(" | ") || "(no panel)");
@@ -5759,10 +5759,10 @@ const openPronounTables = async () => {
   await startSelecting(cardsFrame);
   click(cardsFrame.querySelector(".at-ckbox.pick"));
   await sleep(200);
-  check("the selection offers to add tags", await bulkAction(/^Add tags$/),
+  check("the selection offers to add tags", await bulkAction(/^Add to groups$/),
     [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-160));
   await sleep(300);
-  const tagBox = /** @type {HTMLInputElement | null} */ (document.querySelector('input[aria-label="Name a new tag"]'));
+  const tagBox = /** @type {HTMLInputElement | null} */ (document.querySelector('input[aria-label="Name a new group"]'));
   check("and a tag can be made there", !!tagBox, "no box for a new tag");
   if (tagBox) {
     const setTag = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the input's value descriptor").set;
@@ -6000,7 +6000,7 @@ const openPronounTables = async () => {
   /* A scene is a conversation or a text, asked the way a word's subtype
      is, and nothing is chosen for the teacher. */
   check("a new scene is asked whether it is a conversation or a text",
-    !!wordKindBtn() && /Not set/.test(wordKindBtn().textContent || ""),
+    !!wordKindBtn() && /Choose/.test(wordKindBtn().textContent || ""),
     wordKindBtn() ? (wordKindBtn().textContent || "").trim() : "(nothing asked)");
   await openWordKind();
   check("and the two answers each say what they are",
@@ -6095,9 +6095,9 @@ const openPronounTables = async () => {
       !!fem && fem.classList.contains("main") && !!masc && !masc.classList.contains("main") &&
         (input("Arabic for feminine singular") || {}).value === "قطة" &&
         (input("Arabic for masculine singular") || {}).value === "" &&
-        !!buttonNamed(/^Save$/) && !isOff(buttonNamed(/^Save$/)),
+        !!buttonNamed(/^Save as draft$/) && !isOff(buttonNamed(/^Save as draft$/)),
       `feminine ${fem && fem.classList.contains("main") ? "is" : "is not"} the word · ` +
-        `save ${buttonNamed(/^Save$/) && !isOff(buttonNamed(/^Save$/)) ? "on" : "off"}`);
+        `save ${buttonNamed(/^Save as draft$/) && !isOff(buttonNamed(/^Save as draft$/)) ? "on" : "off"}`);
   }
 
   /* A person's boxes, a side for each gender, all start folded under their
@@ -6175,12 +6175,12 @@ const openPronounTables = async () => {
     !!wordKindBtn(),
     wordKindBtn() ? (wordKindBtn().textContent || "").trim() : "(nothing asked)");
   check("and nothing has been said yet, so the button says so and the list is shut",
-    !!wordKindBtn() && /Not set/.test(wordKindBtn().textContent || "") && !formRows().length,
+    !!wordKindBtn() && /Choose/.test(wordKindBtn().textContent || "") && !formRows().length,
     `${wordKindBtn() ? (wordKindBtn().textContent || "").trim() : "(no button)"} · ${formRows().length} rows`);
   await openWordKind();
   check("the subtypes open in a sheet of their own",
     !!document.querySelector('.at-kindsheet[role="dialog"]') &&
-      !!document.querySelector('.at-kindsheet [role="radiogroup"][aria-label="What subtype"]'),
+      !!document.querySelector('.at-kindsheet [role="radiogroup"][aria-label="Kind of word"]'),
     document.querySelector(".at-kindsheet") ? "open" : "(no sheet)");
   check("and opening it lists what the language lets a word be",
     formRows().length > 2 &&
@@ -6197,7 +6197,7 @@ const openPronounTables = async () => {
   click(/** @type {any} */ (document.querySelector(".at-kindsheet")).closest(".at-modalback"));
   await sleep(200);
   check("and a tap outside puts the sheet away without answering it",
-    !formRows().length && !!wordKindBtn() && /Not set/.test(wordKindBtn().textContent || ""),
+    !formRows().length && !!wordKindBtn() && /Choose/.test(wordKindBtn().textContent || ""),
     wordKindBtn() ? (wordKindBtn().textContent || "").trim() : "(no button)");
 
   /* ---- where the card goes, beside what kind of card it is ----
@@ -6461,18 +6461,23 @@ const openPronounTables = async () => {
      pointed at by name. */
   {
     const idBox = () => /** @type {any} */ (
-      [...document.querySelectorAll("input")].find((i) => i.getAttribute("aria-label") === "The card's ID") || null);
+      [...document.querySelectorAll("input")].find((i) => i.getAttribute("aria-label") === "A name for this exact card") || null);
     const withLabel = (/** @type {string} */ label) => /** @type {any} */ (
       [...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === label) || null);
     const idName = () => (((document.querySelector(".at-idname") || {}).textContent) || "").trim();
 
-    check("a new card is offered an ID", !!idBox(),
-      idBox() ? "offered" : "no such field");
-    check("and says it is optional",
-      /Optional\./.test(((document.querySelector(".at-part") && document.body.textContent) || "")) &&
-        /reaching this one specific card/.test(document.body.textContent || ""),
-      ([...document.querySelectorAll(".at-hint")].map((h) => (h.textContent || "").replace(/\s+/g, " ").trim())
-        .find((t) => /^Optional\./.test(t))) || "(nothing said)");
+    /* Folded away as optional since 0.738 (the owner's choice): one row,
+       its title, "Optional" and Add. */
+    const fold = () => document.querySelector('[data-el="id-fold"]');
+    check("a new card is offered a name for this exact card, folded as optional",
+      !!fold() && !idBox() && /A name for this exact card/.test((fold() || {}).textContent || "") &&
+        /Optional/.test((fold() || {}).textContent || ""),
+      fold() ? (fold().textContent || "") : "no such row");
+    click([...((fold() || document.createElement("div")).querySelectorAll("button"))].find((b) => /Add/.test(b.textContent || "")) || null);
+    await sleep(200);
+    check("and Add opens the box, saying what it is for", !!idBox() &&
+        /Lets a sentence ask for this card and no other\./.test(document.body.textContent || ""),
+      idBox() ? "opened" : "no box");
 
     /* A card is its words, and with those written it can be saved —
        nameless, which is what nearly every card is. */
@@ -6660,7 +6665,7 @@ const openPronounTables = async () => {
      every field at once, so the fields cannot disagree. */
   {
     const blanks = () => [...document.querySelectorAll(".at-formblock")]
-      .find((b) => /^Filling blanks$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
+      .find((b) => /^(Use in sentences|Blanks in this sentence)$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
     /* Which half of the section a thing is in. The block is named
        subsections doing opposite jobs and each has a box and a list, so a
        selector over the whole block would answer about whichever came
@@ -6686,10 +6691,10 @@ const openPronounTables = async () => {
        it — "Examples of this card with filled blanks · 2 examples" — so it
        is matched from the front rather than whole. */
     const SHOWN = /^Examples of this card with filled blanks/;
-    const CARDID = /^The card’s ID$/;
-    const FILLS = /^The card’s tags$/;
+    const CARDID = /^A name for this exact card$/;
+    const FILLS = /^Groups$/;
 
-    check("the section is called Filling blanks, not Variables", !!blanks(),
+    check("the section is called for what it does (0.738), not Variables or Filling blanks", !!blanks(),
       [...document.querySelectorAll(".at-formnum")].map((n) => n.textContent).join(" | "));
     /* The sentences a student will be asked, filled from the cards that
        exist — the explanation that replaced the paragraphs. Each is three
@@ -7104,7 +7109,7 @@ const openPronounTables = async () => {
     check("and stops asking what kind of word it is, because it is not one",
       !wordKindBtn() && !wordKindPencil() &&
         ![...document.querySelectorAll(".at-label")]
-          .some((l) => /^What subtype$/.test((l.textContent || "").trim())),
+          .some((l) => /^Kind of word$/.test((l.textContent || "").trim())),
       wordKindBtn() || wordKindPencil() ? "still asked" : "not asked");
     check("and offers no second form, because another way of saying it is another sentence",
       ![...document.querySelectorAll("button")]
@@ -7258,19 +7263,20 @@ const openPronounTables = async () => {
          is in. The last two are both about being borrowed, which is why
          they are neighbours under one heading rather than a field at the
          top of the screen and a list at the bottom. */
+      /* The card's own name folded to one row while it has none (0.738). */
+      const idFold = () => (blanks() || document).querySelector('[data-el="id-fold"]');
       check("the section is named parts, not one block doing several jobs",
         groups().includes("Blanks in this card") &&
-          groups().includes("The card’s ID") &&
-          groups().includes("The card’s tags"),
+          (groups().includes("A name for this exact card") || !!idFold()) &&
+          groups().includes("Groups"),
         groups().join(" | ") || "(no headings)");
       /* And the ID is one of them rather than a field at the top of the
          screen: what it is for is filling somebody else's blank, so it is
          read beside the groups that do the same job. */
-      const idHalf = () => inHalf(CARDID, ".at-hint, .at-idrow, .at-shutrow")
+      const idHalf = () => idFold() ? (idFold().textContent || "") : inHalf(CARDID, ".at-hint, .at-idrow, .at-shutrow")
         .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim()).join(" · ");
-      check("the ID is one of them, with the line saying what it is for",
-        /reaching this one specific card from another card/.test(idHalf()) &&
-          !!inHalf(CARDID, 'input[aria-label="The card\'s ID"]').length,
+      check("the card's own name is one of them, folded as optional or saying what it is for",
+        (!!idFold() && /Optional/.test(idHalf())) || /Lets a sentence ask for this card and no other/.test(idHalf()),
         idHalf() || "(nothing there)");
       /* A card with a blank of its own fills none — a sentence dropped
          into somebody else's hole is a sentence with a gap where the point
@@ -7281,7 +7287,7 @@ const openPronounTables = async () => {
       const inSheet = (/** @type {string} */ sel) =>
         [...document.querySelectorAll(`.at-tagsheet ${sel}`)];
       const tagsBtn = () => /** @type {any} */ (
-        inHalf(FILLS, "button").find((b) => /^Add custom tags$/.test((b.textContent || "").trim())) || null);
+        inHalf(FILLS, "button").find((b) => /^Add a group$/.test((b.textContent || "").trim())) || null);
       const openTags = async () => {
         if (document.querySelector(".at-tagsheet") || !tagsBtn()) return;
         click(tagsBtn());
@@ -7320,7 +7326,7 @@ const openPronounTables = async () => {
       await openTags();
       check("which opens a sheet of them, titled for what it is",
         !!document.querySelector('.at-tagsheet[role="dialog"]') &&
-          /^Custom tags$/.test(((document.querySelector(".at-tagsheet .at-modaltitle") || {}).textContent || "").trim()),
+          /^Your groups$/.test(((document.querySelector(".at-tagsheet .at-modaltitle") || {}).textContent || "").trim()),
         document.querySelector(".at-tagsheet") ? "open" : "(no sheet)");
       const fillList = () => inSheet(".at-tickrow");
       const fillNames = () => fillList()
@@ -7367,7 +7373,7 @@ const openPronounTables = async () => {
         const runs = () => inHalf(FILLS, ".at-eyebrow")
           .map((n) => (n.textContent || "").trim());
         check("the default tags are listed too, in a run of their own",
-          runs()[0] === "Default tags" && runs().includes("Custom tags") && !runs().includes("Your own tags"),
+          runs()[0] === "From the kind of card" && runs().includes("Your groups") && !runs().includes("Custom tags"),
           runs().join(" | ") || "(no runs)");
         /* And each run says what it is directly under its own heading. */
         const underHead = (/** @type {string} */ head) => {
@@ -7375,9 +7381,9 @@ const openPronounTables = async () => {
           return h && h.nextElementSibling ? (h.nextElementSibling.textContent || "").replace(/\s+/g, " ").trim() : "";
         };
         check("each run of tags is explained right under its heading",
-          /follow from the kind of card this is/.test(underHead("Default tags")) &&
-            /custom tag that already exists/.test(underHead("Custom tags")),
-          `${underHead("Default tags")} | ${underHead("Custom tags")}`);
+          /follow from the kind of card this is/.test(underHead("From the kind of card")) &&
+            /group that already exists/.test(underHead("Your groups")),
+          `${underHead("From the kind of card")} | ${underHead("Your groups")}`);
         /* Only the ones this card has: it is a word nobody has said the
            kind of, so {{word}} and no kind of word. */
         check("and only the ones this card actually has are shown",
@@ -7453,7 +7459,7 @@ const openPronounTables = async () => {
          over the default tags it has nothing to do with. */
       {
         const customHead = inHalf(FILLS, ".at-eyebrow")
-          .find((e) => (e.textContent || "").trim() === "Custom tags");
+          .find((e) => (e.textContent || "").trim() === "Your groups");
         check("and the button is under the Custom tags heading",
           !!tagsBtn() && !!customHead && !!(customHead.compareDocumentPosition(tagsBtn()) & 4),
           customHead ? "compared" : "(no heading)");
@@ -7757,7 +7763,7 @@ const openPronounTables = async () => {
        screen. And it has to be opened first — see openWordKind. */
     const formsRow = (/** @type {RegExp} */ re) =>
       /** @type {any} */ ([...document.querySelectorAll(
-        '[role="radiogroup"][aria-label="What subtype"] .at-tickrow')]
+        '[role="radiogroup"][aria-label="Kind of word"] .at-tickrow')]
         .find((r) => re.test((r.textContent || "").trim())) || null);
     const kindBtn = (/** @type {RegExp} */ re) => {
       const row = formsRow(re);
@@ -7781,7 +7787,7 @@ const openPronounTables = async () => {
     await openWordKind();
     check("and the pencil opens it again, on the answer",
       !!kindBtn(/^Verb/) && kindBtn(/^Verb/).checked,
-      [...document.querySelectorAll('[aria-label="What subtype"] .at-tickrow input')]
+      [...document.querySelectorAll('[aria-label="Kind of word"] .at-tickrow input')]
         .map((/** @type {any} */ b) => b.checked).join(" "));
     click(document.querySelector(".at-screenhead h2"));
     await sleep(200);
@@ -7824,7 +7830,7 @@ const openPronounTables = async () => {
        standing between the card and its table. */
     const heads = [...document.querySelectorAll(".at-formnum")].map((n) => (n.textContent || "").trim());
     check("and it is asked first in This card, before what subtype it is",
-      /^Card name$/.test(thisCardAsks()[0] || "") && thisCardAsks().indexOf("What subtype") > 0 &&
+      /^Card name$/.test(thisCardAsks()[0] || "") && thisCardAsks().indexOf("Kind of word") > 0 &&
         !heads.includes("What to call it"),
       `${thisCardAsks().join(" | ")} · ${heads.join(" | ")}`);
     /* And it says what it is for, and nothing more: a verb's name carries
@@ -8312,12 +8318,12 @@ const openPronounTables = async () => {
   openFormsAsDrawn = true;
 
   const saved = () => [...document.querySelectorAll(
-    '[role="radiogroup"][aria-label="What subtype"] .at-tickrow')];
+    '[role="radiogroup"][aria-label="Kind of word"] .at-tickrow')];
   /* A card written before the question existed says nothing about what
      kind of word it is and holds no table to be read as one, so it opens
      unanswered — the button, saying so, with the list behind it. */
   check("a card written weeks ago opens with the question unanswered rather than guessed at",
-    !!wordKindBtn() && /Not set/.test(wordKindBtn().textContent || "") && !saved().length,
+    !!wordKindBtn() && /Choose/.test(wordKindBtn().textContent || "") && !saved().length,
     wordKindBtn() ? (wordKindBtn().textContent || "").trim() : "(nothing offered)");
   await openWordKind();
   check("and is still asked what kind of word it is",
@@ -8528,12 +8534,12 @@ const openPronounTables = async () => {
     !wordKindBtn() && !formRows().length,
     wordKindBtn() ? "a list is offered" : "nothing is offered");
   check("but the subtype is still on the screen, under its own heading",
-    thisCardAsks().includes("What subtype"),
+    thisCardAsks().includes("Kind of word"),
     thisCardAsks().join(" | ") || "(nothing asked)");
   const subtypeRow = () => {
     const block = kindBlock();
     const field = block && [...block.querySelectorAll(".at-field")].find(
-      (f) => /^What subtype$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
+      (f) => /^Kind of word$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
     return /** @type {any} */ (field ? field.querySelector(".at-shutrow") : null);
   };
   check("and it says Verb",
@@ -8612,7 +8618,7 @@ const openPronounTables = async () => {
       return [];
     }
   };
-  const saveFab = () => /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save"]'));
+  const saveFab = () => /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save as draft"]'));
   /** Write into the card's name box, as a teacher would. */
   const setName = async (/** @type {string} */ v) => {
     const screen = cardOnScreen();
@@ -8763,7 +8769,7 @@ const openPronounTables = async () => {
   const afterBox = /** @type {HTMLInputElement | null} */ (after ? after.querySelector("input") : null);
   check("what was typed is still there", !!afterBox && afterBox.value === "Typed before reviewing",
     afterBox ? afterBox.value : "no name box");
-  const save = /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save"]'));
+  const save = /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save as draft"]'));
   check("and Save is still on", !!save && !isOff(save), save ? "off" : "no Save");
   check("and nothing asked to discard it", !buttonNamed(/^Discard changes$/), "a Discard question is up");
   /* Out: Cancel and Discard, which puts the card back to being read, then
@@ -9626,8 +9632,8 @@ const openPronounTables = async () => {
   /* The app's one context menu (0.690): the sheet a saved session's dots
      open, named for what it acts on, a row per action — Select first. */
   const moreLines = () => [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
-  check("and the three dots open a sheet named Cards, holding Select and Import",
-    moreLines().join(" | ") === "Select | Import" &&
+  check("and the three dots open a sheet named Cards, holding Select and Restore from a backup file",
+    moreLines().join(" | ") === "Select | Restore from a backup file" &&
       ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Cards",
     moreLines().join(" | ") || "(no sheet)");
   click(document.querySelector('.at-moresheet [aria-label="Close"]'));
@@ -10803,7 +10809,7 @@ const openPronounTables = async () => {
   const tags = [...up().querySelectorAll(".at-tagchips .at-tagchip")].map((t) => t.textContent);
   check("the part shows the tags it fills blanks under, as a card shows its default tags, counting's too",
     JSON.stringify(tags) === JSON.stringify(["0-9", "number", "count-0-9", "count"]) &&
-      /Filling blanks/.test(up().textContent || ""),
+      /Use in sentences/.test(up().textContent || ""),
     tags.join(" | ") || "(no tags)");
   check("and they cannot be changed", !boxNamed("A blank this part fills") && !buttonIn(/^Add$/));
 
@@ -13388,16 +13394,27 @@ const openPronounTables = async () => {
   r.render(React.createElement(App));
   await sleep(2500);
   const here = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+  let settingsChecked = false;
   const logOut = async () => {
     click(host.querySelector(".at-cornerbtn"));
     await sleep(300);
     /* The menu's lines carry an icon's name before their words. */
     click([...host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
     await sleep(400);
-    click(here(/^Log out$/));
+    /* Settings in the owner's order (0.738): your account first, Sign out
+       at its end; the practising settings under When you practise. */
+    if (!settingsChecked) {
+      settingsChecked = true;
+      const heads = [...host.querySelectorAll(".at-screen.cardform .at-formnum")].map((h) => (h.textContent || "").trim());
+      check("Settings starts with Your account, and groups the practising settings under When you practise",
+        heads[0] === "Your account" && heads.includes("When you practise") && heads.indexOf("When you practise") < heads.indexOf("Appearance") &&
+          !/Log out/.test(host.textContent || ""),
+        heads.join(" | "));
+    }
+    click(here(/^Sign out$/));
     await sleep(200);
     /* The confirmation's, which is the last button of that name. */
-    click([...host.querySelectorAll("button")].filter((b) => /^Log out$/.test((b.textContent || "").trim())).pop());
+    click([...host.querySelectorAll("button")].filter((b) => /^Sign out$/.test((b.textContent || "").trim())).pop());
     await sleep(1500);
   };
   const signIn = async (/** @type {string} */ key) => {
@@ -14284,6 +14301,38 @@ const openPronounTables = async () => {
     click(document.querySelector('.at-moresheet [aria-label="Close"]'));
     await sleep(150);
   }
+  /* Material's line over the list shows only under five items (0.738):
+     here there are five modules, so it is gone. */
+  check("with five modules, Material's line of explanation is gone",
+    !/A module is a group of cards/.test(frame().textContent || ""), "still said");
+  /* A unit in no course (0.738): titled Unit, the amber box under Courses
+     with "Add it to a course"; and, empty, two buttons and Restore from a
+     backup file behind the list's three dots. */
+  {
+    const spare = [...document.querySelectorAll(".at-deckcard")].find((t) =>
+      /^Spare unit$/.test(((t.querySelector(".at-decktitle") || {}).textContent || "").trim()));
+    click(spare || null);
+    await sleep(600);
+    const scr = [...document.querySelectorAll(".at-screen.cardform")].pop();
+    const txt = ((scr && scr.textContent) || "").replace(/\s+/g, " ");
+    check("a unit in no course shows the amber box with Add it to a course",
+      ((scr && scr.querySelector("h2")) || {}).textContent === "Unit" && /Not in a course yet/.test(txt) &&
+        !!scr && [...scr.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Add it to a course"),
+      txt.slice(0, 200));
+    const box = scr ? [...scr.querySelectorAll(".at-nudge")].find((n) => /No cards in this/.test(n.textContent || "")) : null;
+    const boxBtns = box ? [...box.querySelectorAll("button")].map((b) => (b.textContent || "").trim()) : [];
+    check("an empty module's box holds exactly New card and Cards you already have",
+      boxBtns.join(" | ") === "New card | Cards you already have", boxBtns.join(" | ") || "(no box)");
+    click(scr ? [...scr.querySelectorAll(".at-toolbar .at-morebtn, .at-listbar .at-morebtn")].pop() || null : null);
+    await sleep(200);
+    const dotRows2 = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+    check("and its list's three dots offer Restore from a backup file", dotRows2.includes("Restore from a backup file"),
+      dotRows2.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+    await sleep(150);
+    click(scr ? scr.querySelector('[aria-label="Back"]') : null);
+    await sleep(300);
+  }
   withPath = false;
   pathOrder = ["u1", "u2", "u3"];
   pathLive = { u1: 1 };
@@ -14468,7 +14517,7 @@ const openPronounTables = async () => {
     }
   };
   const save = async () => {
-    click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
+    click([...document.querySelectorAll('.at-fab[aria-label="Save as draft"]')].pop() || null);
     await sleep(700);
   };
   await openSheet();

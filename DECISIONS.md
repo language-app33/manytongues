@@ -8297,6 +8297,14 @@ already gives "cards before sentences" without a second rule.
 a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
 hundreds of lines for nothing; the new thing is a *path unit* in code.
 
+**0.738: the checklist is withdrawn.** The owner withdrew rules R7, R9
+and R10 — five sentences with a blank, enough approved cards for each
+blank, every word used, one closing scene — because the checklist added
+complexity and confusion. A unit now publishes when it holds at least one
+card (or word-set part); the server refuses only an empty one. The text
+below records why the rules were shaped as they were while they stood;
+see "The audit round" at the end for the rest of what changed with them.
+
 **0.614: the checklist counts what the path has taught, and only what a
 teacher approved.** A blank needs five different cards (R10), and a card
 counts only where a teacher approved a sentence it fills (R11) and it
@@ -9834,3 +9842,58 @@ All chosen by the owner on a page of mock-ups.
   run of numbers with the same explanation and the same number of boxes
   shares one explanation above it. The boxes keep their names
   (`"3, counting"`), which the tests and screen readers go by.
+
+## The audit round: course, unit, card status and wording
+
+**28 November 2026** · `src/spaces.tsx`, `src/card-editor.tsx`, `src/path.ts`,
+`server/api/courses.js`, the two stylesheets (0.738)
+
+Every choice here was made by the owner on a page of mock-ups.
+
+**One Modules list on a course.** A course's screen had a Modules section
+of chips with crosses and a separate Path section below the join code, so
+what a course teaches was in two places that looked unlike each other. Now
+one Modules section holds everything, as rows of one kind: the units
+under "Units, studied in order", then the decks under "Decks, studied in
+any order". The labels say the one thing a teacher has to know about the
+difference, in the words a student would use. The course's name is the
+heading, with its language and number of students under it.
+
+**Publish is on the unit's row.** An unpublished unit is one no student
+sees, so the button that changes that sits where the unit is listed,
+beside its arrows and its three dots. On an empty unit it is grey and says
+"Add a card first" when pressed, rather than being a dead button.
+
+**The checklist is withdrawn** (see "Units: a course's path", 0.738). With
+it went the two pieces of advice that stood beside it on a unit's screen:
+how many of its cards were still drafts, and which blanks always took the
+same form.
+
+**A unit's screen reports; the course arranges.** A unit can be in several
+courses, each placing and publishing it separately, and its screen used to
+carry a block of controls per course. Now it says where it stands in each
+("Beginners A1 · Unit 1 of 3 · Draft") and each row opens that course,
+where it is ordered and published. A unit in no course says so in the
+amber box, with "Add it to a course".
+
+**The status panel is today's choices with a line each, and no Unpublish
+step.** A published card goes straight to Draft or Ready for review; Draft
+there is what Unpublish was, with its confirmation, and Ready for review is
+that followed by marking it for review, made as two calls in order — the
+same two the Select panel's Change status already made. No row is red;
+Discard changes still asks first.
+
+**"Groups" for tags, and "a name for this exact card" for its ID.** A
+teacher reads "group" wherever the screen meant a set of words a blank can
+take any of. Nothing stored, no CSS class and no `{{…}}` a teacher types
+changed. The ID is folded away as optional until Add is pressed.
+
+**Capitals for the one main button.** Every button was in capitals, so no
+button stood out. Now only the primary variant keeps them; every other
+button, on both sides of the app, is in ordinary letters at 15px.
+
+**What the owner chose to leave alone:** where the student code sits; a
+module's line in the Modules list; the length of a card's Advanced tab;
+the recording screen; student flags, student progress and adding many
+cards at once.
+

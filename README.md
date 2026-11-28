@@ -1205,7 +1205,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   yet reached, so a word also in an ordinary deck, or in an open unit,
   arrives as it always did.
 
-  **A unit is published per course, once its checklist is clear (0.614).**
+  **A unit is published per course once it holds a card (0.738).** Rules
+  R7, R9 and R10 — five sentences with a blank, enough approved cards for
+  each blank, every word used, one closing scene — were withdrawn by the
+  owner in 0.738 because the checklist added complexity and confusion; a
+  unit publishes when it has at least one card or word-set part, and
+  `publish-unit` refuses only an empty one, with `unit-empty`. What
+  follows is how it was from 0.614 to 0.737, kept for its history.
+
+  **Until 0.738, a unit was published per course once its checklist was clear (0.614).**
   `create-unit`, `move-unit`, `publish-unit` and `open-unit` in
   `server/api/courses.js`; `attach-deck` puts an existing unit at the end
   of another course's path as a draft, and `detach-deck` and `delete-deck`
@@ -1243,6 +1251,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   newer settings, and the sync endpoint does the same against what it
   holds before it writes. `installIndexes` takes the courses and decks, so
   a test can deal a session with a path.
+
+  **Since 0.738 a course's screen holds one Modules list** (`CourseModules`
+  in `src/spaces.tsx`): "Units, studied in order", each a row with Publish
+  while it is a draft, arrows to move it and three dots (Open it early,
+  Remove from the course, Delete this unit), and "+ Add a unit"; then
+  "Decks, studied in any order", each with three dots, and "+ Add a deck".
+  A unit's own screen is titled "Unit" and lists its courses with its
+  place in each; a row opens that course. `countingCards` still feeds the
+  unit's quality score. What follows is the screen as it was from 0.616.
 
   **A teacher builds the path on the course's page (0.616).** `PathSection`
   in `src/spaces.tsx` lists a course's units in path order above its decks

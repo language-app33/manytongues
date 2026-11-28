@@ -1614,23 +1614,23 @@ function PartTags({ range, open, counts }: { range: Range; open: boolean; counts
           ? `A number in its counting form, from ${spanWords(range)}`
           : `A number from ${spanWords(range)}`;
   return (
-    <PartBlock title="Filling blanks" role="How this part can be used to fill blanks in sentence cards">
+    <PartBlock title="Use in sentences" role="A sentence can leave a gap for any word in a group, like colours or foods.">
       <div className="at-part">
-        <p className="at-groupline">The part&rsquo;s tags</p>
+        <p className="at-groupline">Groups</p>
         <Help>
-          Wherever a sentence card has a blank for one of these tags, this part fills it with one of
+          Wherever a sentence card has a blank for one of these groups, this part fills it with one of
           its numbers, written out
-          {counting.length ? <>, or for the counting tags in the form a number takes before a noun</> : null}.
+          {counting.length ? <>, or for the counting groups in the form a number takes before a noun</> : null}.
           {counting.length ? (
             <>
-              {" "}A counting tag brings no noun: write the noun yourself. Put a noun blank straight after it, as in{" "}
+              {" "}A counting group brings no noun: write the noun yourself. Put a noun blank straight after it, as in{" "}
               <span className="at-blankname">{`{{${counting[0]}}} {{animal}}`}</span>, and the number counts that
               noun, in the form the number calls for: &ldquo;3 dogs&rdquo;.
             </>
           ) : null}
         </Help>
         <div className="at-ticklist at-cardtags">
-          <p className="at-eyebrow">Default tags</p>
+          <p className="at-eyebrow">From the kind of card</p>
           <Help>These follow from the part, and are the same in every language.</Help>
           <div className="at-tagchips">
             {[own, general, ...counting].map((name) => (

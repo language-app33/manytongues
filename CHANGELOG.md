@@ -8,6 +8,96 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.738 — 28 November 2026
+
+**The audit round: a course, a unit, a card's status, and plainer words**,
+as chosen on the page of mock-ups.
+
+**A course's screen**
+
+- The course's name is the heading, with "Palestinian Arabic · 3 students"
+  under it.
+- **One "Modules" section** holds everything the course teaches, as rows of
+  one kind. First "Units, studied in order": the units, numbered, each
+  with small up and down arrows and three dots. A draft unit's row has a
+  green **Publish** button; on an empty unit it is grey and says "Add a
+  card first". Under the units, "+ Add a unit" opens a panel: "New unit"
+  first, then units you already have. Then "Decks, studied in any order":
+  the decks, each with three dots, and "+ Add a deck".
+- A unit's three dots hold "Open it early" (or "Stop opening it early"),
+  "Remove from" the course, and "Delete this unit", each with a line
+  saying what it does.
+- The student code stays where it is.
+
+**Publishing a unit has no checklist.** Publish always works, except on a
+unit with no cards. The four rules that used to block it are gone. With
+the checklist went the two pieces of advice beside it on a unit's screen:
+how many of its cards are still drafts, and which blanks always take the
+same form.
+
+**A unit's screen**
+
+- The bar at the top says "Unit". Under the name, "Courses" and one row
+  per course it is in ("Beginners A1 · Unit 1 of 3 · Draft"); a row opens
+  that course. In no course, an amber box says so, with "Add it to a
+  course". Order and publishing are done on the course's screen.
+- An empty unit or deck offers two buttons, "New card" and "Cards you
+  already have". Restoring from a backup file is in the three dots.
+
+**People:** a person's code is in ordinary small grey text on a plain row.
+
+**Material:** the line of explanation above each list shows only while the
+list has fewer than five items.
+
+**A card**
+
+- Being read, its name shows only when it differs from the English, as
+  "Listed as: …".
+- The status panel's rows each have a line saying what they do, and a
+  published card goes straight to Draft or Ready for review (each asks
+  first). Not published: Draft, Ready for review, Publish. Published:
+  Published, Draft, Ready for review. Published then edited: Changes in
+  draft, Changes ready for review, Publish changes, Discard changes, Draft.
+- While writing, "Save and publish" is the green main button; the other
+  reads "Save as draft".
+- The three kinds of card each have a picture and one line: "One thing to
+  learn, like “house” or “good morning”."; "A full sentence with a gap,
+  like “I am from ___”. Your other cards take turns filling it."; "Several
+  lines in order: a conversation between people, or a short text to
+  read."
+- "What subtype" is "Kind of word" (or "Conversation or text" on a
+  scene), says what choosing gives you, and its button reads "Choose".
+- "Filling blanks" is "Use in sentences" on a word and "Blanks in this
+  sentence" on a sentence. "Tags" are "groups" everywhere a teacher reads
+  the word. "The card's ID" is "A name for this exact card", folded away
+  as optional.
+- On a sentence, each explanation about blanks is one line, and a box that
+  does not apply is not shown.
+- "Words this teaches" is "Words in this sentence": "Ticked words are
+  learnt on their own first, then practised inside this sentence."
+
+**Elsewhere**
+
+- "Import" is called "Restore from a backup file".
+- Settings starts with your account, with Sign out at its end; the
+  practising settings are grouped under "When you practise"; then
+  Appearance.
+- "Sign out" everywhere, never "Log out".
+- Only a screen's green main button is in capitals. Every other button is
+  in ordinary letters, on the learner's side too.
+
+**Left as it is, by your choice:** where the student code sits; a module's
+line in the Modules list; the Advanced tab's length; the recording screen;
+student flags, student progress and adding many cards at once.
+
+**Trade-offs.** Publishing and reordering a unit mean going to its course;
+an edited card's status panel is five rows; teachers used to "tags" meet
+"groups"; every screen shifts slightly as buttons leave capitals.
+
+**To check by hand.** On a real phone: that the small arrows and three dots
+on a unit's row are easy to hit, and that buttons in ordinary letters still
+fit on the narrowest phones.
+
 ## 0.737 — 27 November 2026
 
 **The cross that closes a sheet is just the cross**, as chosen on the page
