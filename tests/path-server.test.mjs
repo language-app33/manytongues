@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { holedParts, sentencesOf } from "../src/review.ts";
 import { LANGUAGES } from "../src/languages.ts";
+import { pathRows } from "../src/path.ts";
 
 const dir = await mkdtemp(path.join(tmpdir(), "manytongues-path-"));
 process.env.DATA_DIR = dir;
@@ -96,8 +97,10 @@ const courseOf = async (key, id) => (await raw(`/api/courses?action=course-decks
 const vi = LANGUAGES["vi"];
 
 /**
- * A unit that clears its checklist: five words that fill `{{food}}` and
- * five sentences, each approved for all five words.
+ * A unit with something in it: five words that fill `{{food}}` and five
+ * sentences, each approved for all five words. Once the checklist this
+ * cleared (withdrawn in 0.738); the tests that use it are about publishing,
+ * moving and opening, which still want a unit of some size.
  * @param {string} key @param {string} moduleId @param {string} tag
  */
 async function fillUnit(key, moduleId, tag) {
@@ -141,14 +144,16 @@ test("a new unit is on the course's decks and path, and a draft reaches no stude
   assert.ok(!m.decks.some((/** @type {any} */ d) => d.id === u.id), "a draft unit was sent");
 });
 
-test("publishing an empty unit is refused with what is missing, and it stays a draft", async () => {
+/* 0.738: the checklist is withdrawn (the owner's choice). The one rule
+   left is that a unit holds something: a card or a word-set part. */
+test("publishing an empty unit is refused as empty, and it stays a draft", async () => {
   const teacher = await anAdmin("Hoa");
   const course = await aCourse(teacher.key, "Vietnamese 2");
   const u = await aUnit(teacher.key, course.id, "Empty");
   const r = await post("publish-unit", teacher.key, { courseId: course.id, deckId: u.id });
   assert.equal(r.status, 409, r.text);
-  assert.equal(r.json.error, "unit-not-ready");
-  assert.deepEqual(r.json.problems.find((/** @type {any} */ p) => p.kind === "few-sentences"), { kind: "few-sentences", have: 0, need: 5 });
+  assert.equal(r.json.error, "unit-empty");
+  assert.equal(r.json.problems, undefined, "no checklist comes back");
   const c = await courseOf(teacher.key, course.id);
   assert.equal((c.pathLive || {})[u.id], undefined);
   const early = await post("open-unit", teacher.key, { courseId: course.id, deckId: u.id, open: true });
@@ -156,7 +161,35 @@ test("publishing an empty unit is refused with what is missing, and it stays a d
   assert.equal(early.json.error, "unit-draft");
 });
 
-test("a unit that clears its checklist publishes; moving, publishing and opening each move the version", async () => {
+test("a unit with one card and no sentences publishes, and reaches students in path order", async () => {
+  const teacher = await anAdmin("Lien");
+  const course = await aCourse(teacher.key, "Vietnamese 2b");
+  const u1 = await aUnit(teacher.key, course.id, "First");
+  const u2 = await aUnit(teacher.key, course.id, "Second");
+  for (const [u, w] of [[u1, "nha"], [u2, "cua"]]) {
+    const r = await post("save-card", teacher.key, {
+      card: { id: "", lang: "vi", category: "noun", forms: [{ ar: w, en: `${w} (en)`, lat: "" }] },
+      decks: [u.id],
+    });
+    assert.equal(r.status, 200, r.text);
+  }
+  const pub1 = await post("publish-unit", teacher.key, { courseId: course.id, deckId: u1.id });
+  assert.equal(pub1.status, 200, pub1.text);
+  assert.ok(pub1.json.course.pathLive[u1.id] > 0);
+  assert.equal((await post("publish-unit", teacher.key, { courseId: course.id, deckId: u2.id })).status, 200);
+  const student = await someone("Tam");
+  await enrol(teacher.key, course.id, student.handle);
+  const m = await material(student.key);
+  assert.ok(m.decks.some((/** @type {any} */ d) => d.id === u1.id));
+  assert.ok(m.decks.some((/** @type {any} */ d) => d.id === u2.id));
+  const sentCourse = m.courses.find((/** @type {any} */ c) => c.id === course.id);
+  assert.deepEqual(sentCourse.path, [u1.id, u2.id], "the units arrive in their order");
+  /* And are reached in that order: the second waits for the first. */
+  const { rows } = pathRows(sentCourse, m.decks, () => false, []);
+  assert.deepEqual(rows.map((r) => r.state), ["open", "locked"]);
+});
+
+test("a unit full of sentences publishes; moving, publishing and opening each move the version", async () => {
   const teacher = await anAdmin("Minh");
   const course = await aCourse(teacher.key, "Vietnamese 3");
   const u1 = await aUnit(teacher.key, course.id, "Food");

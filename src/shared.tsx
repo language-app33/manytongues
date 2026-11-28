@@ -5069,8 +5069,8 @@ export function useScrollTop(key: unknown) {
  * guessing.
  */
 /* A floating button. Most screens have one; the card editor has two —
-   Save and publish beside Save — and the first of a pair is the quieter
-   (`second`), so the corner keeps the button it always had. `busyLabel` is
+   Save as draft beside Save and publish (0.738) — and the first of a pair
+   is the quieter (`second`), so the corner keeps the main button. `busyLabel` is
    what it reads while its own request is out. */
 export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean; busyLabel?: string; second?: boolean };
 
@@ -7473,7 +7473,7 @@ export function ChoiceSwitch<T extends string>({ ask, label, lede, icon, name, o
             onClick={() => setOpen(true)}
           >
             <Icon name={icon} size={16} />
-            <span className="at-choosemark">Not set</span>
+            <span className="at-choosemark">Choose</span>
             <Icon name="chevronDown" size={16} />
           </button>
         </div>

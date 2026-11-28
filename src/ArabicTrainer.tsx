@@ -1169,7 +1169,7 @@ const STUDENT_COLUMNS = [
   { key: "word", label: "Card" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
-  { key: "subtype", label: "Subtype" },
+  { key: "subtype", label: "Kind of word" },
   { key: "level", label: "Level" },
 ];
 function studentViews(

@@ -20,8 +20,6 @@
    read as part of the title. */
 .at-formacts { display:flex; align-items:baseline; gap:8px; flex-shrink:0;
   margin-inline-start:auto; }
-/* A fact held still on a screen with nothing to edit, at a field's size. */
-.at-fieldvalue { margin:0; font-size:15px; font-weight:600; color: var(--text); }
 /* A blank the card leaves: what it is named — which is what another card
    has to say it fills — and, on hovering it, the words that will be put in
    it. The name alone was the least of what a teacher wants to know about
@@ -287,11 +285,12 @@
 .at-drop.off { opacity:.55; cursor:default; }
 .at-drop strong { display:block; font-size: var(--fs-md); color: var(--ink); }
 .at-drop-sub { display:block; font-size: var(--fs-sm); color: var(--muted); margin-top:2px; }
-/* People in a course: a name, a role, and nothing pretending to be tappable. */
-.at-person { display:flex; align-items:center; gap:10px; padding:10px 12px;
-  border:2px solid var(--line); border-radius: var(--r-sm); background: var(--raised);
-  margin-bottom:6px; }
-.at-person:last-child { margin-bottom:0; }
+/* People in a course: a name, a role, and nothing pretending to be
+   tappable. Plain rows since 0.738 (the owner's choice): no ground, no
+   box, a rule between one person and the next. */
+.at-person { display:flex; align-items:center; gap:10px; padding:10px 2px;
+  border-bottom:1px solid var(--line); }
+.at-person:last-child { border-bottom:none; }
 .at-avatar { width:30px; height:30px; border-radius:999px; flex:0 0 auto;
   display:flex; align-items:center; justify-content:center; font-size:12px;
   font-weight:800; background: var(--surface); border:2px solid var(--line);
@@ -348,11 +347,10 @@
   text-transform:uppercase; color: var(--jade); }
 /* A deck's quality: the number in its colour — green from 80, amber from
    50, red below — on the deck's tile and, large, on its own page. */
-.at-quality { font-weight:700; white-space:nowrap; }
-.at-quality.good, .at-qualityscore.good b { color: var(--jade); }
-.at-quality.fair, .at-qualityscore.fair b { color: var(--brass); }
+.at-qualityscore.good b { color: var(--jade); }
+.at-qualityscore.fair b { color: var(--brass); }
 /* A low score is never red (0.709): neutral, as the ring's track is. */
-.at-quality.poor, .at-qualityscore.poor b { color: var(--text); }
+.at-qualityscore.poor b { color: var(--text); }
 .at-qualityscore { margin:0 0 6px; display:flex; align-items:baseline; gap:6px; }
 .at-qualityscore b { font-size: var(--fs-stat); font-weight:800; line-height:1.1; letter-spacing:-.02em; }
 .at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }
@@ -1004,8 +1002,7 @@ fieldset.at-cardlock:disabled :is(input, textarea, select):disabled,
 fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] {
   color: var(--text-soft); -webkit-text-fill-color: var(--text-soft); opacity:1; cursor:default;
   border-color: var(--lock-line); background: var(--lock-well); }
-/* Read, a field is plain words under its label, as a course's name and
-   language are (.at-fieldvalue): no box, no ground. Empty, it says "None",
+/* Read, a field is plain words under its label: no box, no ground. Empty, it says "None",
    faintly — see TabPanel. */
 fieldset.at-cardlock:disabled :is(input:not([type=checkbox]):not([type=radio]), textarea, select):disabled,
 fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] {
@@ -1105,10 +1102,6 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
   .at-dimpicks { gap:10px; }
 }
 
-/* A course's path (0.616): each unit a row to open, with its moves under
-   it, and a unit's checklist as a plain list. */
-.at-pathrow { margin-bottom:12px; }
-.at-pathacts { flex-wrap:wrap; gap:4px; margin-top:4px; }
 .at-checklist { margin:0 0 12px; padding-left:20px; line-height:1.45; }
 .at-checklist li { margin-bottom:4px; }
 
@@ -1150,6 +1143,8 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-cardheroword { margin:0 40px; font-size:40px; line-height:1.3; font-weight:600; overflow-wrap:anywhere; }
 .at-cardherolat { margin:6px 0 0; font-style:italic; color: var(--muted); }
 .at-cardheroen { margin:6px 0 0; font-weight:700; }
+/* The card's name under it, small and quiet, where it differs from the English (0.738). */
+.at-cardherolisted { margin:8px 0 0; font-size:13px; color: var(--muted); }
 /* Read, nothing is to be filled in, so no field is marked as needing it. */
 fieldset.at-cardlock:disabled .at-reqstar { display:none; }
 /* "What is practised" on a card being read: a row per form saying in
@@ -1190,3 +1185,12 @@ fieldset.at-cardlock:disabled .at-reqstar { display:none; }
 @media (prefers-reduced-motion: reduce) {
   .at-numjust > * { animation:none; }
 }
+
+/* The three kinds of card, each with its picture before its name (0.738). */
+.at-shapename { display:inline-flex; align-items:center; gap:8px; }
+.at-shapename > svg { color: var(--jade); flex:none; }
+/* A name for this exact card, folded away as optional (0.738). */
+.at-idfold { display:flex; align-items:center; gap:12px; justify-content:space-between; }
+.at-idfoldtext { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.at-idfoldtext b { font-size:15px; }
+.at-idfoldtext i { font-style:normal; font-size:13px; color: var(--muted); }

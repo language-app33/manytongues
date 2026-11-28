@@ -1156,8 +1156,10 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   letter-spacing:0; text-transform:none; color: var(--ink); }
 
 .at-personname { font-size:14px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
-/* A course's People tab (0.707): the name, and the handle under it. */
-.at-personname .at-handle { display:block; font-size:12px; font-weight:400; color: var(--muted); }
+/* A course's People tab (0.707): the name, and the handle under it, in
+   the ordinary font as other small muted text is (0.738), not the
+   typewriter font a code is written in. */
+.at-personname .at-handle { display:block; font-family: var(--ui); font-size:13px; font-weight:400; color: var(--muted); }
 .at-panel .at-decklist2 .at-deckcard { background: var(--raised); }
 /* Dialog titles and screen titles are the same rank, so they are the same
    size — a modal is a small screen, not a different species. */
@@ -1252,6 +1254,30 @@ button.at-filterchip:hover, button.at-filterchip:focus-visible { border-color: v
   font-size:16px; }
 .at-deckacts .at-btn { flex:0 0 auto; }
 
+/* A course's Modules (0.738): the two groups' small capital labels, a
+   unit row's controls at its right, and the dashed full-width add buttons
+   under each group. On a phone a unit row with Publish, two arrows and
+   three dots puts its controls on a line of their own under the name. */
+.at-modgroup { margin:18px 0 8px; }
+.at-formhead + .at-modgroup { margin-top:4px; }
+.at-unitacts { display:flex; align-items:center; gap:2px; }
+.at-unitacts > .at-icon { min-width:40px; width:40px; height:40px; padding:0; border:none; background:none; }
+.at-unitacts > .at-btn { margin-right:6px; }
+@media (max-width: 480px) {
+  .at-deckrow2:has(> .at-deckacts > .at-unitacts > :nth-child(4)) { flex-wrap:wrap; }
+  .at-deckrow2:has(> .at-deckacts > .at-unitacts > :nth-child(4)) > .at-deckmain { flex-basis:100%; }
+}
+.at-addwide { display:flex; width:100%; justify-content:center; margin-top:10px; }
+/* A unit's courses (0.738): one plain row per course, its place under the
+   name, and the words "Open course" with an arrow at the right. */
+.at-unitcourses { display:flex; flex-direction:column; gap:8px; }
+.at-unitcourse { display:flex; align-items:center; gap:12px; width:100%; text-align:left; font:inherit; color:inherit;
+  border:2px solid var(--line); border-radius: var(--r-lg); background: var(--raised); padding:12px 14px; cursor:pointer; }
+.at-unitcourse:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.at-unitcoursetext { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-unitcoursetext i { font-style:normal; font-size:13px; color: var(--muted); }
+.at-unitcoursego { flex:none; display:inline-flex; align-items:center; gap:2px; font-size:14px; font-weight:700; color: var(--accent); }
+.at-unitcoursego svg { transform: rotate(-90deg); }
 .at-keyfield { letter-spacing:.02em; }
 /* Whether a deck is reaching anyone, at a glance. */
 /* No rule above it (0.715, the owner's 2b): it sits under the tile's text

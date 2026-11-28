@@ -477,7 +477,7 @@ export const createUnit = (courseId: string, title: string) =>
   call("create-unit", { body: { courseId, title } });
 export const moveUnit = (courseId: string, moduleId: string, to: number) =>
   call("move-unit", { body: { courseId, deckId: moduleId, to } });
-/** Refused with "unit-not-ready" and the server's `problems` on the error's `data`. */
+/** Refused with "unit-empty" for a unit with nothing in it (0.738: the only rule left). */
 export const publishUnit = (courseId: string, moduleId: string) =>
   call("publish-unit", { body: { courseId, deckId: moduleId } });
 export const openUnit = (courseId: string, moduleId: string, open: boolean) =>
@@ -763,7 +763,7 @@ export function explain(err: unknown): string {
       "no-deck": "That module no longer exists.",
       "deck-locked": "That module is locked. Unlock it in its settings first.",
       "unit-draft": "This unit isn't published in this course yet",
-      "unit-not-ready": "This unit isn't ready to publish yet. The checklist says what is missing.",
+      "unit-empty": "Add a card first",
       "not-on-path": "That unit is no longer on this course's path.",
       "no-user": "No account with that handle.",
       "no-card": "That card no longer exists.",

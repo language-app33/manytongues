@@ -63,7 +63,6 @@ import {
   levelOf,
   LEVEL_NAME,
   scriptVars,
-  dimsOf,
   TYPES,
   verbOf } from "./languages.ts";
 import {
@@ -98,8 +97,7 @@ import { moduleQuality, FIXES_SHOWN, qualityTone, qualityShown } from "./module-
 import { moduleKind, moduleKindCap } from "./modules.ts";
 import type { ModuleKind } from "./modules.ts";
 import type { Quality } from "./module-quality.ts";
-import { blankFills, countingCards, deleteUnitLine, draftsLine, isLiveIn, isPathUnit, pathUnits, problemLine, sameFormBlanks, unitProblems } from "./path.ts";
-import type { UnitProblem } from "./path.ts";
+import { countingCards, deleteUnitLine, isLiveIn, isPathUnit, pathUnits } from "./path.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 import type { ReviewState } from "./review.ts";
@@ -5813,93 +5811,235 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
    that would raise it most, folded away until asked for.
    ------------------------------------------------------------------ */
 
-function QualityMark({ quality }: { quality?: Quality | null }) {
-  if (!quality || quality.score === null || !qualityShown(quality)) return null;
+
+/* ------------------------------------------------------------------
+   A course's Modules (0.738, the owner's choice)
+
+   One list of everything a course teaches, as rows of one kind: its units
+   first, "studied in order", each with Publish while it is a draft, small
+   arrows to move it and three dots for the rest; then its decks and
+   personal sets, "studied in any order", each with three dots. The labels
+   say the one difference between the two groups a teacher has to know.
+   Publish is on the row because an unpublished unit is one no student
+   sees, and nothing else has to be cleared first: the checklist was
+   withdrawn in the same release.
+   ------------------------------------------------------------------ */
+
+/* Material's line of explanation over each list shows while the list is
+   shorter than this (0.738, the owner's choice). */
+const EXPLAIN_UNDER = 5;
+
+/* How many cards a module holds, as its tile says it. */
+const heldIn = (m: Module): number => (typeof m.cardCount === "number" ? m.cardCount : (m.cardIds || []).length);
+
+/*
+ * A panel of things to add, each a row that says what tapping it does:
+ * "Add", or "Added" for one already in (tapping takes it out again).
+ * Stays open while several are picked; a row being saved says so and
+ * waits. The course's "+ Add a deck" and a unit's course picker (0.738).
+ */
+function AddSheet({ title, lede, rows, none, find, create, onToggle, onClose }: {
+  title: string;
+  lede?: string;
+  rows: { id: string; title: string; meta?: string; on: boolean; saving?: "add" | "drop" }[];
+  /** Said where there is nothing to list. */
+  none?: string;
+  /** A search box over the list, with this placeholder. */
+  find?: string;
+  /** A first row that makes a new one: closes the panel and hands over. */
+  create?: { label: string; onCreate: () => void };
+  onToggle: (id: string, on: boolean) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const wanted = q.trim().toLowerCase();
+  const listed = wanted ? rows.filter((r) => r.title.toLowerCase().includes(wanted)) : rows;
   return (
-    <span className={`at-quality ${qualityTone(quality.score)}`} title="Quality, out of 100">
-      {` · Quality ${quality.score}`}
-    </span>
+    <PickSheet title={title} lede={lede} className="at-decksheet" onClose={onClose}>
+      {find && rows.length > 0 && (
+        <SearchBox boxClassName="at-mb3" placeholder={find} aria-label={find} value={q} dir="auto" onChange={setQ} />
+      )}
+      <div className="at-deckpicks">
+        {create && (
+          <button className="at-deckpick new" onClick={() => { onClose(); create.onCreate(); }}>
+            <Icon name="add" size={18} />
+            <span className="at-tickbody"><b>{create.label}</b></span>
+          </button>
+        )}
+        {!rows.length && none ? <Help>{none}</Help> : null}
+        {wanted && rows.length > 0 && !listed.length && <Help>Nothing matches that.</Help>}
+        {listed.map((r) => (
+          <button
+            className={`at-deckpick${r.on ? " on" : ""}${r.saving ? " saving" : ""}`}
+            key={r.id}
+            aria-pressed={r.on}
+            aria-busy={r.saving ? true : undefined}
+            disabled={!!r.saving}
+            onClick={() => !r.saving && onToggle(r.id, r.on)}
+          >
+            <span className="at-tickbody">
+              <b>{r.title}</b>
+              {r.meta ? <i>{r.meta}</i> : null}
+            </span>
+            <span className="at-deckmark">
+              {r.saving ? (
+                <span className="at-decksaving" role="status">
+                  <span className="at-spin" aria-hidden="true" />
+                  {r.saving === "add" ? "Adding…" : "Removing…"}
+                </span>
+              ) : r.on ? "Added" : "Add"}
+            </span>
+          </button>
+        ))}
+      </div>
+    </PickSheet>
   );
 }
 
-/* ------------------------------------------------------------------
-   A course's path (0.616)
-
-   Above a course's decks: its units, in order, drafts included — each with
-   whether it is published in this course, a warning where it is published
-   and its checklist is no longer clear (R17), and its quality. Every rule
-   is in src/path.ts; this only shows it and calls the server.
-   ------------------------------------------------------------------ */
-
-function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, busy, onOpen, onCreate, onAdd, onMove, onOpenForClass, onRemove, onDelete }: {
+function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf, busy, saving, onOpen, onCreateUnit, onAddUnit, onPublish, onEmptyPublish, onMove, onOpenForClass, onRemove, onDelete, onToggleDeck, onCreateDeck }: {
   course: Course;
   /** The course's units in path order, drafts included. */
   units: Module[];
-  problemsOf: (unitId: string) => UnitProblem[];
-  qualityOf: (unit: Module) => Quality | null;
+  /** Its decks and personal sets. */
+  decks: Module[];
   /** The teacher's units not in this course, to add. */
-  spare: Module[];
+  spareUnits: Module[];
+  /** Every deck and personal set that could be in it, for "+ Add a deck". */
+  deckChoices: Module[];
   /** How many other courses hold a unit. */
   othersOf: (unitId: string) => number;
   busy?: boolean;
-  onOpen: (unitId: string) => void;
-  onCreate: (title: string) => void;
-  onAdd: (unitId: string) => void;
+  saving: Record<string, "add" | "drop">;
+  onOpen: (id: string) => void;
+  onCreateUnit: (title: string) => void;
+  onAddUnit: (unitId: string) => void;
+  onPublish: (unitId: string) => void;
+  /** Publish pressed on a unit with nothing in it. */
+  onEmptyPublish: () => void;
   onMove: (unitId: string, to: number) => void;
   onOpenForClass: (unitId: string, open: boolean) => void;
-  onRemove: (unitId: string) => void;
+  onRemove: (id: string) => void;
   onDelete: (unitId: string) => void;
+  onToggleDeck: (id: string, on: boolean) => void;
+  onCreateDeck: () => void;
 }) {
   const [naming, setNaming] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [addingUnit, setAddingUnit] = useState(false);
+  const [addingDeck, setAddingDeck] = useState(false);
   const [deleting, setDeleting] = useState<Module | null>(null);
   const opened = new Set(course.opened || []);
+  const inCourse = new Set(decks.map((d) => d.id));
+  /* The controls at a row's right: a press on them is theirs alone, not
+     the row's, which opens the module. */
+  const hold = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
-    <div className="at-formblock" data-el="course-path">
-      <div className="at-formhead">
-        <span className="at-formnum">Path</span>
-        <span className="at-formrole">
-          {units.length
-            ? "Students open these units in order. Tap one to open it."
-            : "Units your students open one after another, in the order you set."}
-        </span>
-      </div>
-      {units.map((u, i) => {
-        const live = isLiveIn(course, u.id);
-        const attention = live && problemsOf(u.id).length > 0;
-        return (
-          <div className="at-pathrow" key={u.id} data-el="path-unit">
-            <OpenRow
-              title={`${i + 1}. ${u.title}`}
-              label={`Open unit ${i + 1}, ${u.title}`}
-              meta={
-                <>
-                  {live ? "Published" : "Draft"}
-                  {attention ? <span className="at-notreach">{" · Needs attention"}</span> : null}
-                  {live && opened.has(u.id) ? " · Open for the class" : null}
-                  <QualityMark quality={qualityOf(u)} />
-                </>
-              }
-              onOpen={() => onOpen(u.id)}
-            />
-            <div className="at-row at-pathacts">
-              <Button size="sm" variant="ghost" icon="chevronUp" disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)}>Move up</Button>
-              <Button size="sm" variant="ghost" icon="chevronDown" disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)}>Move down</Button>
-              {live ? (
-                <Button size="sm" variant="ghost" disabled={busy} onClick={() => onOpenForClass(u.id, !opened.has(u.id))}>
-                  {opened.has(u.id) ? "Close for the class" : "Open for the class"}
-                </Button>
-              ) : null}
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(u.id)}>Remove from this course</Button>
-              <Button size="sm" variant="ghost" icon="delete" disabled={busy} onClick={() => setDeleting(u)}>Delete unit</Button>
+    <>
+      <p className="at-eyebrow at-modgroup">Units, studied in order</p>
+      <div className="at-decklist2" data-el="course-units">
+        {units.map((u, i) => {
+          const live = isLiveIn(course, u.id);
+          const early = live && opened.has(u.id);
+          const empty = heldIn(u) === 0 && !(u.parts || []).length;
+          return (
+            <div key={u.id} data-el="path-unit">
+              <Tile
+                title={`${i + 1} · ${u.title}`}
+                meta={`Unit · ${live ? "Published" : "Draft"}${early ? " · Opened early" : ""} · ${plural(heldIn(u), "card")}`}
+                onOpen={() => onOpen(u.id)}
+                actions={
+                  <span className="at-unitacts" onClick={hold}>
+                    {!live && (
+                      <Button size="sm" variant="primary" off={empty || undefined} disabled={busy}
+                        onClick={() => (empty ? onEmptyPublish() : onPublish(u.id))}>Publish</Button>
+                    )}
+                    <IconButton icon="chevronUp" label={`Move ${u.title} up`} disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)} />
+                    <IconButton icon="chevronDown" label={`Move ${u.title} down`} disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)} />
+                    <MoreMenu
+                      bare
+                      label={`More for ${u.title}`}
+                      title={u.title}
+                      items={[
+                        live ? {
+                          label: early ? "Stop opening it early" : "Open it early",
+                          note: early ? "Students reach this unit in order again." : "Students can start this unit now, without finishing the earlier ones.",
+                          icon: early ? "lock" : "unlock",
+                          onClick: () => onOpenForClass(u.id, !early),
+                        } : null,
+                        { label: `Remove from ${course.title}`, note: "It stays in Material, and in any other course it is in.", icon: "folderRemove", onClick: () => onRemove(u.id) },
+                        { label: "Delete this unit", note: "From every course, for good. You will be asked to confirm.", icon: "delete", danger: true, onClick: () => setDeleting(u) },
+                      ]}
+                    />
+                  </span>
+                }
+              />
             </div>
-          </div>
-        );
-      })}
-      <div className="at-row at-mt3">
-        <Button icon="add" disabled={busy} onClick={() => setNaming("")}>New unit</Button>
-        <Button icon="add" disabled={busy || !spare.length} onClick={() => setAdding(true)}>Add an existing unit</Button>
+          );
+        })}
       </div>
+      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingUnit(true)}>
+        <Icon name="add" size={17} />
+        Add a unit
+      </button>
+
+      <p className="at-eyebrow at-modgroup">Decks, studied in any order</p>
+      <div className="at-decklist2" data-el="course-decks">
+        {decks.map((d) => (
+          <div key={d.id} data-el="course-deck">
+            <Tile
+              title={d.title}
+              meta={`${d.set ? "Personal set" : "Deck"} · ${plural(heldIn(d), "card")}`}
+              onOpen={() => onOpen(d.id)}
+              actions={
+                <span className="at-unitacts" onClick={hold}>
+                  <MoreMenu
+                    bare
+                    label={`More for ${d.title}`}
+                    title={d.title}
+                    items={[
+                      { label: `Remove from ${course.title}`, note: "It stays in Material, and in any other course it is in.", icon: "folderRemove", onClick: () => onRemove(d.id) },
+                    ]}
+                  />
+                </span>
+              }
+            />
+          </div>
+        ))}
+      </div>
+      <button type="button" className="at-deckadd at-addwide" disabled={busy} onClick={() => setAddingDeck(true)}>
+        <Icon name="add" size={17} />
+        Add a deck
+      </button>
+
+      {addingUnit && (
+        <PickSheet title="Add a unit" onClose={() => setAddingUnit(false)}>
+          <div className="at-sheetacts">
+            <SheetAction icon="add" label="New unit" onClick={() => { setAddingUnit(false); setNaming(""); }} />
+          </div>
+          {spareUnits.length > 0 && (
+            <>
+              <p className="at-eyebrow at-modgroup">Units you already have</p>
+              <div className="at-sheetacts">
+                {spareUnits.map((u) => (
+                  <SheetAction key={u.id} icon="layers" label={u.title} note={plural(heldIn(u), "card")}
+                    onClick={() => { setAddingUnit(false); onAddUnit(u.id); }} />
+                ))}
+              </div>
+            </>
+          )}
+        </PickSheet>
+      )}
+      {addingDeck && (
+        <AddSheet
+          title="Add a deck"
+          lede={`Choose the decks ${course.title} teaches. Students see them at their next check.`}
+          find="Search modules"
+          create={{ label: "Create a new module", onCreate: onCreateDeck }}
+          rows={deckChoices.map((d) => ({ id: d.id, title: d.title, meta: moduleSize(d), on: inCourse.has(d.id), saving: saving[d.id] }))}
+          none="You have no decks yet."
+          onToggle={onToggleDeck}
+          onClose={() => setAddingDeck(false)}
+        />
+      )}
       {naming !== null && (
         <ConfirmModal
           title="New unit"
@@ -5916,25 +6056,8 @@ function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, bu
             const title = (naming || "").trim();
             if (!title) return;
             setNaming(null);
-            onCreate(title);
+            onCreateUnit(title);
           }}
-        />
-      )}
-      {adding && (
-        <ConfirmModal
-          title="Add an existing unit"
-          danger={false}
-          confirmLabel="Done"
-          body={
-            <div>
-              {spare.map((u) => (
-                <OpenRow key={u.id} title={u.title} label={`Add ${u.title}`} meta="Add to the end of the path"
-                  onOpen={() => { setAdding(false); onAdd(u.id); }} />
-              ))}
-            </div>
-          }
-          onCancel={() => setAdding(false)}
-          onConfirm={() => setAdding(false)}
         />
       )}
       {deleting && (
@@ -5957,40 +6080,7 @@ function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, bu
           }}
         />
       )}
-    </div>
-  );
-}
-
-/*
- * A unit's checklist in one course (0.616): what stands between it and
- * publishing there, in the teacher's words, and the button. The server
- * judges published cards only, so it can be stricter than this; what it
- * answered is shown in place of this screen's own reading when it does.
- */
-function UnitChecklist({ live, problems, drafts, textOf, busy, onPublish }: {
-  live: boolean;
-  problems: UnitProblem[];
-  drafts: number;
-  textOf: (cardId: string) => string;
-  busy?: boolean;
-  onPublish: () => void;
-}) {
-  return (
-    <Field label="Checklist">
-      {problems.length ? (
-        <ul className="at-checklist" data-el="unit-checklist">
-          {problems.map((p, i) => <li key={i}>{problemLine(p, textOf)}</li>)}
-        </ul>
-      ) : !live ? (
-        <Notice kind="ok">Ready to publish</Notice>
-      ) : null}
-      {drafts > 0 ? <Help>{draftsLine(drafts)}</Help> : null}
-      {!live && (
-        <Button variant="primary" icon="check" disabled={busy || problems.length > 0} onClick={onPublish}>
-          Publish unit
-        </Button>
-      )}
-    </Field>
+    </>
   );
 }
 
@@ -6328,32 +6418,39 @@ const SAVE_BOOKKEEPING = new Set([
   "status", "changes", "changed", "review",
 ]);
 
-type StatusTo = "draft" | "review" | "published" | "discard" | "unpublish";
+type StatusTo = "draft" | "review" | "published" | "discard" | "unpublish" | "unpublish:review";
 
-/** The status menu's choices, by what the card is now. */
-function statusChoices(card: Card): { value: string; label: string }[] {
+/**
+ * The status menu's choices, by what the card is now, each with a line
+ * saying what it does (0.738, the owner's choice). A published card goes
+ * straight to Draft or Ready for review: there is no Unpublish step of
+ * its own. "Draft" there is what Unpublish was; "Ready for review" is
+ * that and then marked to be checked, one action with one confirmation.
+ */
+function statusChoices(card: Card): { value: string; label: string; note: string }[] {
   if (card.status && card.status !== "published") {
     return [
-      { value: "draft", label: "Draft" },
-      { value: "review", label: "Ready for review" },
-      { value: "published", label: "Publish" },
+      { value: "draft", label: "Draft", note: "Only teachers see it." },
+      { value: "review", label: "Ready for review", note: "Only teachers see it. Marked to be checked." },
+      { value: "published", label: "Publish", note: "Students see it." },
     ];
   }
   if (!card.changes) {
     return [
-      { value: "published", label: "Published" },
-      { value: "unpublish", label: "Unpublish…" },
+      { value: "published", label: "Published", note: "Students see it." },
+      { value: "unpublish", label: "Draft", note: "Takes it back from students." },
+      { value: "unpublish:review", label: "Ready for review", note: "Takes it back from students. Marked to be checked." },
     ];
   }
   return [
     /* Short, because it is what the menu reads as while it is shut, on a
        phone, beside the card's name. A card with changes is published:
        "changes" says both. */
-    { value: "changes:draft", label: "Changes in draft" },
-    { value: "changes:review", label: "Changes ready for review" },
-    { value: "published", label: "Publish changes" },
-    { value: "discard", label: "Discard changes…" },
-    { value: "unpublish", label: "Unpublish…" },
+    { value: "changes:draft", label: "Changes in draft", note: "Students still see the old version." },
+    { value: "changes:review", label: "Changes ready for review", note: "Students still see the old version. Marked to be checked." },
+    { value: "published", label: "Publish changes", note: "Students see the new version." },
+    { value: "discard", label: "Discard changes", note: "The card goes back to what students see." },
+    { value: "unpublish", label: "Draft", note: "Takes the whole card back from students, with its changes." },
   ];
 }
 /* Which icon the status menu wears while it is shut: out, a draft not
@@ -6372,7 +6469,8 @@ const CHOICE_ICON: Record<string, string> = {
   "changes:draft": "draft",
   "changes:review": "view",
   discard: "refresh",
-  unpublish: "block",
+  unpublish: "draft",
+  "unpublish:review": "view",
 };
 /* The status as the menu reads while it is shut — "Published", "Draft",
    "Changes in draft". */
@@ -6399,7 +6497,7 @@ function StatusMenu({ card, disabled, onStatus }: {
   disabled?: boolean;
   onStatus: (to: StatusTo) => void;
 }) {
-  const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
+  const [asking, setAsking] = useState<"discard" | "unpublish" | "unpublish:review" | null>(null);
   const [open, setOpen] = useState(false);
   const now = statusNow(card);
   const choices = statusChoices(card);
@@ -6407,7 +6505,7 @@ function StatusMenu({ card, disabled, onStatus }: {
   const pick = (value: string) => {
     setOpen(false);
     if (value === now) return;
-    if (value === "discard" || value === "unpublish") {
+    if (value === "discard" || value === "unpublish" || value === "unpublish:review") {
       setAsking(value);
       return;
     }
@@ -6444,8 +6542,8 @@ function StatusMenu({ card, disabled, onStatus }: {
                 <SheetAction
                   key={c.value}
                   icon={CHOICE_ICON[c.value] || "verify"}
-                  label={c.label.replace(/…$/, "")}
-                  danger={c.value === "discard" || c.value === "unpublish"}
+                  label={c.label}
+                  note={c.note}
                   on={c.value === now}
                   onClick={() => pick(c.value)}
                 />
@@ -6466,20 +6564,23 @@ function StatusMenu({ card, disabled, onStatus }: {
           }}
         />
       )}
-      {asking === "unpublish" && (
+      {(asking === "unpublish" || asking === "unpublish:review") && (
         <ConfirmModal
-          title="Unpublish this card?"
+          title="Take this card back from students?"
           body={
             <p>
               Students stop seeing it. Their progress on it is kept, and comes back if you publish it
-              again. {card.changes ? "Your changes are kept, as a draft." : "The card is kept, as a draft."}
+              again. {asking === "unpublish:review"
+                ? "The card is kept, marked ready for review."
+                : card.changes ? "Your changes are kept, as a draft." : "The card is kept, as a draft."}
             </p>
           }
-          confirmLabel="Unpublish"
+          confirmLabel="Take it back"
           onCancel={() => setAsking(null)}
           onConfirm={() => {
+            const to = asking;
             setAsking(null);
-            onStatus("unpublish");
+            onStatus(to);
           }}
         />
       )}
@@ -6809,12 +6910,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      Course, People or Exercises. Each course opens on Course. */
   const [courseTab, setCourseTab] = useState("course");
   useEffect(() => setCourseTab("course"), [courseView]);
-  /* The course a unit's page was opened from (0.616): its checklist, its
-     number and its Publish are that course's. And what the server last
-     answered when publishing was refused, which may be stricter than this
-     screen's reading — it judges published cards only. */
+  /* The course a unit's page was opened from (0.616): the course its
+     quality is read in. Publishing and the checklist left the unit's
+     page in 0.738; its place in each course is said there and arranged
+     on the course's screen. */
   const [unitCourse, setUnitCourse] = useState<string | null>(null);
-  const [serverProblems, setServerProblems] = useState<{ unitId: string; courseId: string; problems: UnitProblem[] } | null>(null);
+  /* The course picker on a unit's page: its amber box's button, or Add
+     to another course in its three dots (0.738). */
+  const [pickingCourse, setPickingCourse] = useState(false);
   /* The decks a course is still saving, and which way: shown on the
      deck's row as "Adding…" or "Removing…" until the server answers, and
      not tappable meanwhile, so a second tap cannot undo the first. */
@@ -7364,15 +7467,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       null,
     [courses, unitCourse],
   );
-  /* A unit's checklist in a course, as this screen reads it. */
-  const problemsIn = useCallback(
-    (unitId: string, course: Course): UnitProblem[] => {
-      const unit = allModules.find((d) => d.id === unitId);
-      const held = cards.filter((c) => (c.decks || []).includes(unitId));
-      return unitProblems({ cards: held, counting: countingFor(unitId, course), lang: unit ? langOfModule(unit) : null });
-    },
-    [allModules, cards, countingFor, langOfModule],
-  );
   const qualityOf = useCallback(
     (module: Module, pending = false): Quality => {
       const held = cards.filter((c) => (c.decks || []).includes(module.id));
@@ -7409,17 +7503,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const d = openModule ? modules.find((x) => x.id === openModule) : null;
     return d ? qualityOf(d, true) : null;
   }, [openModule, modules, qualityOf]);
-  /* The checklist of every unit on the course on screen, and of the unit
-     open, worked out once per change rather than on every render. */
-  const pathChecks: Map<string, UnitProblem[]> = useMemo(() => {
-    const out: Map<string, UnitProblem[]> = new Map();
-    const course = courseView ? courses.find((c) => c.id === courseView) : null;
-    if (course) for (const u of pathUnits(course, allModules)) out.set(u.id, problemsIn(u.id, course));
-    const open = openModule ? allModules.find((d) => d.id === openModule) : null;
-    const at = open && isPathUnit(open) ? courseOfUnit(open.id) : null;
-    if (open && at && !out.has(open.id)) out.set(open.id, problemsIn(open.id, at));
-    return out;
-  }, [courseView, courses, allModules, openModule, problemsIn, courseOfUnit]);
   /* Narrowed then ordered. ItemList's own search runs after this, over what
      is left, so a search inside a filter behaves the way it reads. */
   const shownCards = useMemo(
@@ -7795,7 +7878,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         out.push({ id: k.id, label: k.label, n: used.get(k.id) || 0 });
       }
     }
-    out.push({ id: "none", label: "No subtype", n: used.get("none") || 0 });
+    out.push({ id: "none", label: "Kind not set", n: used.get("none") || 0 });
     return out;
   }, [onCards, langOfCard]);
 
@@ -8330,7 +8413,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const setStatus = (card: Card, to: StatusTo) =>
     run(
       async () => {
-        const r = await API.cardStatus(card.id, to);
+        /* Off a published card, Draft and Ready for review are taken back
+           from students first, then given the status asked for: two calls
+           in order, as the Select panel's Change status makes them. */
+        let r = await API.cardStatus(card.id, to === "unpublish:review" ? "unpublish" : to);
+        const want = to === "unpublish:review" ? "review" : to === "unpublish" ? "draft" : null;
+        if (want && r.card.status !== want) r = await API.cardStatus(card.id, want);
         absorbSaved(r);
         /* The card on screen is the card as the server answered, drawn
            afresh — discarding changes or unpublishing changes its words. */
@@ -8345,7 +8433,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         : to === "discard"
           ? "Changes discarded"
           : to === "unpublish"
-            ? "Unpublished — students no longer see it"
+            ? "Taken back from students — it is a draft"
+            : to === "unpublish:review"
+              ? "Taken back from students — ready for review"
             : to === "review"
               ? "Marked ready for review"
               : "Marked as a draft",
@@ -9187,9 +9277,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <>
         {/* One line per tab, matching Modules and Cards (0.725). That any
             teacher here can edit a set is said inside the set instead. */}
-        <Help className="at-mb3">
-          A word set is a ready-made group of cards taught together, like numbers. Fill it in once per language, then add it to a module.
-        </Help>
+        {/* Only while the list is short (0.738, the owner's choice): once
+            there are five, the teacher knows what a word set is. */}
+        {wordSetLangsOn.reduce((n, id) => n + wordSetsOf(id, account.handle).length, 0) < EXPLAIN_UNDER ? (
+          <Help className="at-mb3">
+            A word set is a ready-made group of cards taught together, like numbers. Fill it in once per language, then add it to a module.
+          </Help>
+        ) : null}
         {!mineSide && !spaceSets ? <Help>Fetching the shared word sets…</Help> : null}
         {several
           ? wordSetLangsOn.map((id) => (
@@ -9739,8 +9833,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         if (saved && Array.isArray(saved.courses))
           setModules((prev) => prev.map((x) => (x.id === d.id ? { ...x, courses: saved.courses } : x)));
         else await refresh(true);
+        /* A unit's place in the course's path comes back too, which its
+           page's Courses rows read (0.738). */
         if (r && r.course && Array.isArray(r.course.decks))
-          setCourses((prev) => prev.map((x) => (x.id === courseId ? { ...x, decks: r.course.decks } : x)));
+          setCourses((prev) => prev.map((x) => (x.id === courseId
+            ? { ...x, decks: r.course.decks, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
+            : x)));
         setModuleDraft((dd) => (dd ? {
           ...dd,
           courses: on ? dd.courses.filter((x) => x !== courseId) : dd.courses.concat([courseId]),
@@ -10063,71 +10161,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
     /* A new card made from the deck's screen goes straight into it. */
     const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
-    /* A path unit (0.616): its page is a deck's, headed with its number on
-       the path of the course it was opened from, with that course's
-       checklist and Publish above its cards. */
-    const unitIn = isPathUnit(d) ? courseOfUnit(d.id) : null;
-    const unitNo = unitIn ? pathUnits(unitIn, allModules).findIndex((u) => u.id === d.id) + 1 : 0;
-    /* Every course whose path holds it (0.688, the owner's 3a): each gets
-       its own place, checklist and publishing, since a unit is placed,
-       published and opened early separately in each. The course it was
-       opened from comes first. */
-    const unitCourses = isPathUnit(d)
-      ? courses
-        .filter((x) => (x.path || []).includes(d.id))
-        .sort((a, b) => (a.id === (unitIn && unitIn.id) ? -1 : b.id === (unitIn && unitIn.id) ? 1 : 0))
-      : [];
-    const cardText = (id: string) => {
-      const card = lentById.get(id);
-      return card ? String(leadOf(card as never).ar || card.name || "").trim() : id;
+    /* A path unit's page (0.738, the owner's choice): it says where the
+       unit stands in each course whose path holds it, and each of those
+       rows opens the course, where the unit is published, put in order
+       and opened early. The checklist, and the per-course blocks that
+       carried it, are gone (see DECISIONS.md, "The audit round"). */
+    const unitCourses = isPathUnit(d) ? courses.filter((x) => (x.path || []).includes(d.id)) : [];
+    const openCourse = (id: string) => {
+      setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setQualityOpen(false); setAddingHow(false);
+      setCourseView(id);
     };
-    const unitDrafts = held.filter((c) => c.status && c.status !== "published").length;
-    const unitLang = langOfModule(d) || null;
-    /* One course's checklist: what the server said, where it said it of
-       this course; else this screen's reading. */
-    const checksIn = (course: Course): UnitProblem[] => {
-      if (serverProblems && serverProblems.unitId === d.id && serverProblems.courseId === course.id) return serverProblems.problems;
-      if (unitIn && course.id === unitIn.id && pathChecks.has(d.id)) return pathChecks.get(d.id) || [];
-      return problemsIn(d.id, course);
-    };
-    /* Advice, not points (A6): blanks whose approved cards are all of one form. */
-    const sameFormIn = (course: Course) => unitLang
-      ? sameFormBlanks(
-        blankFills(held, countingFor(d.id, course), unitLang),
-        (id) => lentById.get(id),
-        dimsOf(unitLang).map((dim) => dim.field),
-      )
-      : [];
-    /* What the server saved of a course's path, put on screen as it is. */
-    const tookPath = (courseId: string, r: any) => {
-      if (r && r.course) {
-        setCourses((prev) => prev.map((x) => (x.id === courseId
-          ? { ...x, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
-          : x)));
-      }
-    };
-    const publishUnit = (course: Course) => {
-      run(async () => {
-        try {
-          const r: any = await API.publishUnit(course.id, d.id);
-          setServerProblems(null);
-          tookPath(course.id, r);
-        } catch (e) {
-          const data = e && typeof e === "object" && "data" in e ? (e as { data?: any }).data : null;
-          if (data && data.error === "unit-not-ready" && Array.isArray(data.problems)) {
-            setServerProblems({ unitId: d.id, courseId: course.id, problems: data.problems });
-            return;
-          }
-          throw e;
-        }
-      }, `${d.title} published in ${course.title}`);
-    };
-    const moveUnit = (course: Course, to: number) =>
-      run(async () => tookPath(course.id, await API.moveUnit(course.id, d.id, to)),
-        `${d.title} is now unit ${to + 1} in ${course.title}`);
-    const openForClass = (course: Course, open: boolean) =>
-      run(async () => tookPath(course.id, await API.openUnit(course.id, d.id, open)),
-        open ? `Opened for ${course.title}` : `Closed for ${course.title}`);
     /* Read and edited on one screen, as a card is: what is shown is the
        saved deck until Edit is pressed, and the draft after. */
     const editing = !!moduleDraft;
@@ -10157,7 +10200,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       <Screen
         /* What is being done, not which deck: its name is the first
            thing on the screen. */
-        title={unitIn ? `Unit ${unitNo} · ${d.title}` : KindW}
+        title={isPathUnit(d) ? "Unit" : KindW}
         scrollKey={d.id}
         /* Laid out like a card's screen — see .at-screen.cardform: one
            sheet ruled into sections, each headed at the editor's size with
@@ -10166,7 +10209,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* Back asks first only while a rename is half typed (0.732). */
         onBack={() => {
           if (editing && changed) { setDiscardingModule(true); return; }
-          setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setServerProblems(null); setQualityOpen(false); setAddingHow(false);
+          setOpenModule(null); setModuleDraft(null); setSelCards(new Set()); setCardAction(null); setTagAction(null); setAdding(null); setQualityOpen(false); setAddingHow(false);
         }}
         backIcon="back"
         backLabel="Back"
@@ -10180,6 +10223,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             label={`More for this ${kindW}`}
             title={d.title}
             items={[
+              /* The course picker, once the unit is in a course: the
+                 page's Courses rows open courses rather than add them. */
+              isPathUnit(d) && unitCourses.length ? { label: "Add to another course", icon: "school", onClick: () => setPickingCourse(true) } : null,
               { label: "Export", icon: "download", onClick: () => exportModules([d.id]) },
               { label: `Delete this ${kindW}`, icon: "delete", danger: true, onClick: askDelete },
             ]}
@@ -10244,7 +10290,58 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     taken out is saved as it is tapped (0.725). */}
                 {/* A My space deck is in no course; in their place, whether its
                     owner practises it (0.545, 59b, 61a). */}
-                {d.personal ? null : (
+                {d.personal ? null : isPathUnit(d) ? (
+                /* A unit's courses, each with its place there (0.738): a
+                   row opens that course, where the unit is arranged. */
+                <Field label="Courses">
+                  {unitCourses.length ? (
+                    <div className="at-unitcourses">
+                      {unitCourses.map((course) => {
+                        const path = pathUnits(course, allModules);
+                        const at = path.findIndex((u) => u.id === d.id);
+                        const live = isLiveIn(course, d.id);
+                        const opened = live && (course.opened || []).includes(d.id);
+                        return (
+                          <button type="button" className="at-unitcourse" key={course.id} data-el="unit-course"
+                            aria-label={`Open ${course.title}`} onClick={() => openCourse(course.id)}>
+                            <span className="at-unitcoursetext">
+                              <b>{course.title}</b>
+                              <i data-el="unit-place">{`Unit ${at + 1} of ${path.length} · ${live ? "Published" : "Draft"}${opened ? " · Opened early" : ""}`}</i>
+                            </span>
+                            <span className="at-unitcoursego" aria-hidden="true">
+                              Open course
+                              <Icon name="chevronDown" size={18} />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <Nudge
+                      icon="school"
+                      tone="attention"
+                      action={
+                        <button type="button" className="at-deckadd" onClick={() => setPickingCourse(true)}>
+                          <Icon name="add" size={17} />
+                          Add it to a course
+                        </button>
+                      }
+                    >
+                      Not in a course yet, so no students can see it. Add it to a course to share it.
+                    </Nudge>
+                  )}
+                  {pickingCourse && (
+                    <AddSheet
+                      title="Courses"
+                      lede="Choose the courses whose students see this unit."
+                      rows={courses.map((c) => ({ id: c.id, title: c.title, on: shown.courses.includes(c.id), saving: moduleSaving[c.id] }))}
+                      none="You aren't teaching a course yet."
+                      onToggle={(id, on) => saveModuleCourse(d, id, on)}
+                      onClose={() => setPickingCourse(false)}
+                    />
+                  )}
+                </Field>
+                ) : (
                 <Field label="Courses" lede={`Students in these courses see this ${kindW}.`}>
                   {!shown.courses.length ? (
                     <Nudge
@@ -10329,51 +10426,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               />
             )}
 
-            {unitCourses.map((course) => {
-              const path = pathUnits(course, allModules);
-              const at = path.findIndex((u) => u.id === d.id);
-              const live = isLiveIn(course, d.id);
-              const isOpen = live && (course.opened || []).includes(d.id);
-              const sameForm = sameFormIn(course);
-              return (
-                <div className="at-formblock" data-el="unit-checklist-block" key={course.id}>
-                  <div className="at-formhead">
-                    <span className="at-formnum">{course.title}</span>
-                    <span className="at-formrole" data-el="unit-place">
-                      {`Unit ${at + 1} of ${path.length} · ${live ? "Published" : "Draft"}${isOpen ? " · Open for the class" : ""}`}
-                    </span>
-                  </div>
-                  <div className="at-row at-pathacts at-mb3" data-el="unit-path-actions">
-                    <Button size="sm" variant="ghost" icon="chevronUp" disabled={!!busy || at <= 0}
-                      onClick={() => moveUnit(course, at - 1)}>Move earlier</Button>
-                    <Button size="sm" variant="ghost" icon="chevronDown" disabled={!!busy || at < 0 || at >= path.length - 1}
-                      onClick={() => moveUnit(course, at + 1)}>Move later</Button>
-                    {live ? (
-                      <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => openForClass(course, !isOpen)}>
-                        {isOpen ? "Close for the class" : "Open for the class"}
-                      </Button>
-                    ) : null}
-                  </div>
-                  <UnitChecklist
-                    live={live}
-                    problems={checksIn(course)}
-                    drafts={unitDrafts}
-                    textOf={cardText}
-                    busy={busy}
-                    onPublish={() => publishUnit(course)}
-                  />
-                  {sameForm.length ? (
-                    <Field label="Forms">
-                      <Help>These blanks always take the same form. Adding cards of another gender or number would give more practice:</Help>
-                      <ul className="at-checklist">
-                        {sameForm.map((b, i) => <li key={i}>{`"${cardText(b.cardId)}": ${b.slot}`}</li>)}
-                      </ul>
-                    </Field>
-                  ) : null}
-                </div>
-              );
-            })}
-
             {/* The cards, word sets among them: read, added, selected and
                 removed here, since Manage cards folded into this screen
                 (0.732, the owner's 1a). */}
@@ -10427,8 +10479,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           noun="card"
           items={listed}
           total={listedWhole}
-          /* With the deck empty, Import is in the box below instead. */
-          more={moduleEmpty ? [] : [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }]}
+          /* In the three dots whether or not the module is empty (0.738):
+             the empty box holds the two ways to fill it and nothing else. */
+          more={[{ label: "Restore from a backup file", icon: "upload", onClick: () => setImporting(true) }]}
           sort={cardSort}
           filter={cardFilterProp}
           size="small"
@@ -10439,14 +10492,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               icon="cards"
               tone="attention"
               action={
-                /* Import, icon-only, beside the two worded buttons while
-                   the deck is empty; the toolbar holds it once it is not. */
-                <div className="at-nudgeacts">
-                  <div className="at-row">
-                    <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
-                    <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
-                  </div>
-                  <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
+                /* Exactly two buttons (0.738, the owner's choice): restoring
+                   from a backup file is in the list's three dots. */
+                <div className="at-row">
+                  <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
+                  <Button icon="add" onClick={() => openAdding(d)}>Cards you already have</Button>
                 </div>
               }
             >
@@ -10618,40 +10668,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ? prev.map((d) => (d.id === saved.id ? { ...d, ...saved, courses: saved.courses || d.courses } : d))
         : prev.concat([{ ...saved, cardCount: (saved.cardIds || []).length }])));
     };
-    const pathSection = (
-      <PathSection
-        course={c}
-        units={units}
-        problemsOf={(id) => pathChecks.get(id) || []}
-        qualityOf={(u) => qualities.get(u.id) || qualityOf(u)}
-        spare={allModules.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
-        othersOf={(id) => courses.filter((x) => x.id !== c.id && (x.decks || []).includes(id)).length}
-        busy={busy}
-        onOpen={(id) => { setUnitCourse(c.id); setOpenModule(id); }}
-        onCreate={(title) => run(async () => {
-          const r = await API.createUnit(c.id, title);
-          tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
-          tookCourse(r);
-        }, `${title} added to the path`)}
-        onAdd={(id) => run(async () => {
-          const r = await API.attachModule(id, c.id);
-          tookModule(r);
-          tookCourse(r);
-        })}
-        onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
-        onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
-          open ? "Opened for the class" : "Closed for the class")}
-        onRemove={(id) => run(async () => {
-          const r = await API.detachModule(id, c.id);
-          tookModule(r);
-          tookCourse(r);
-        })}
-        onDelete={(id) => run(async () => {
-          await API.deleteModule(id);
-          await refresh(true);
-        })}
-      />
-    );
     const people = (title: string, list: string[], none: Node) => (
       <Field label={`${title} · ${list.length}`}>
         {list.length ? (
@@ -10765,29 +10781,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             {courseTab === "course" && (
             <div role="tabpanel" aria-label="course">
 
-            <div className="at-formblock">
+            {/* The course's name is the heading, with its language and how
+                many students it has under it (0.738, the owner's choice). */}
+            <div className="at-formblock" data-el="course-head">
               <div className="at-formhead">
-                <span className="at-formnum">This course</span>
+                <span className="at-formnum">{c.title}</span>
+                <span className="at-formrole">
+                  <span className="at-formline">{`${languageName(languages, c.language)} · ${plural(c.students.length, "student")}`}</span>
+                </span>
               </div>
-              <Field label="Course name">
-                <p className="at-fieldvalue">{c.title}</p>
-              </Field>
-              <Field label="Language">
-                <p className="at-fieldvalue">{languageName(languages, c.language)}</p>
-              </Field>
             </div>
 
-            {/* What the course teaches, as a deck says which courses carry
-                it: the names, each with its way out, and the way to add
-                another on the end of the row. A name opens its deck. */}
-            <div className="at-formblock">
+            {/* What the course teaches, in one list (0.738, the owner's
+                choice): its units, studied in order, then its decks,
+                studied in any order. See CourseModules. */}
+            <div className="at-formblock" data-el="course-modules">
               <div className="at-formhead">
                 <span className="at-formnum">Modules</span>
-                <span className="at-formrole">
-                  {mine.length
-                    ? "Students in this course see these modules. Tap one to open it."
-                    : "Students in this course see the modules you add here."}
-                </span>
               </div>
               {courseOff && (
                 <div className="at-mb3">
@@ -10811,24 +10821,66 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 </div>
               )}
-              {/* The course's modules as a row of names, or, empty, one way to
-                  fill it (0.727, the owner's 1a–4a): Add a module where there
-                  are modules to add, whose list can make a new one too, and
-                  Create a module where there are none. Either way a new one
-                  is asked its kind, put in this course and opened. */}
-              {mine.length ? (
-                moduleSwitch(false)
-              ) : (
-                <Nudge
-                  icon="folder"
-                  tone="attention"
-                  action={plainModules.length ? moduleSwitch(true) : (
-                    <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
-                  )}
-                >
-                  Nothing here yet. Add a module to give your students something to practise.
-                </Nudge>
-              )}
+              {/* Empty, one way to fill it (0.727, the owner's 1a–4a): Add a
+                  module where there are modules to add, whose list can make
+                  a new one too, and Create a module where there are none.
+                  Above both groups while the course has nothing at all. */}
+              {!mine.length && !units.length ? (
+                <div className="at-mb3">
+                  <Nudge
+                    icon="folder"
+                    tone="attention"
+                    action={plainModules.length ? moduleSwitch(true) : (
+                      <Button size="sm" variant="primary" icon="add" onClick={createHere}>Create a module</Button>
+                    )}
+                  >
+                    Nothing here yet. Add a module to give your students something to practise.
+                  </Nudge>
+                </div>
+              ) : null}
+              <CourseModules
+                course={c}
+                units={units}
+                decks={mine}
+                spareUnits={allModules.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
+                deckChoices={plainModules}
+                othersOf={(id) => courses.filter((x) => x.id !== c.id && (x.decks || []).includes(id)).length}
+                busy={busy}
+                saving={moduleSaving}
+                onOpen={(id) => { if (units.some((u) => u.id === id)) setUnitCourse(c.id); setOpenModule(id); }}
+                onCreateUnit={(title) => run(async () => {
+                  const r = await API.createUnit(c.id, title);
+                  tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
+                  tookCourse(r);
+                }, `${title} added to ${c.title}`)}
+                onAddUnit={(id) => run(async () => {
+                  const r = await API.attachModule(id, c.id);
+                  tookModule(r);
+                  tookCourse(r);
+                })}
+                onPublish={(id) => {
+                  const title = (units.find((u) => u.id === id) || { title: "The unit" }).title;
+                  run(async () => tookCourse(await API.publishUnit(c.id, id)), `${title} published in ${c.title}`);
+                }}
+                onEmptyPublish={() => snack("Add a card first", "warn")}
+                onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
+                onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
+                  open ? "Opened early" : "Students reach it in order again")}
+                onRemove={(id) => {
+                  const title = (modules.find((d) => d.id === id) || allModules.find((d) => d.id === id) || { title: "The module" }).title;
+                  run(async () => {
+                    const r = await API.detachModule(id, c.id);
+                    tookModule(r);
+                    tookCourse(r);
+                  }, `${title} taken out of ${c.title}`);
+                }}
+                onDelete={(id) => run(async () => {
+                  await API.deleteModule(id);
+                  await refresh(true);
+                })}
+                onToggleDeck={toggleModule}
+                onCreateDeck={createHere}
+              />
               {kindSheet}
             </div>
             {/* Only the student code lives here. The teacher code hands over
@@ -10848,9 +10900,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 hint="Share this with a class so they can join and study."
               />
             </div>
-
-            {pathSection}
-
 
             </div>
             )}
@@ -11144,7 +11193,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   filter still finds the sentences. A line saying what a card
                   is, taken off in 0.714, is back in 0.725 as one of three
                   matching lines, one per tab (the owner's wording). */}
-              <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
+              {/* Counted over the whole list, not what a search or filter
+                  leaves (0.738). */}
+              {onListed < EXPLAIN_UNDER ? (
+                <Help>A card is something students learn: a word, sentence, conversation or text. Add it to a module to teach it.</Help>
+              ) : null}
 
               <ItemList
                 noun="card"
@@ -11394,7 +11447,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 />
               )}
 
-              {mineSide ? null : (
+              {mineSide || onModules.length >= EXPLAIN_UNDER ? null : (
                 <Help>A module is a group of cards. Add it to a course to teach it.</Help>
               )}
 

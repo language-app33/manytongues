@@ -109,7 +109,7 @@ export function droppedByBasic(
   if (more) out.push(more === 1 ? "1 other form" : `${more} other forms`);
   if (hasGrammar(word.forms[0])) out.push("the grammar");
   if ((word.tableCells || []).some((c) => some(c.ar) || some(c.en))) out.push("the table");
-  if (some(word.category)) out.push("the subtype");
+  if (some(word.category)) out.push("the kind of word");
   if (some(word.writtenExamples)) out.push("the examples");
   if (some(word.fills) || some(word.refName)) out.push("the blanks it fills");
   if (some(word.uses)) out.push("the words it teaches");

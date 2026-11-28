@@ -49,7 +49,7 @@ test("unticking says what saving would drop, and nothing when there is nothing",
   assert.deepEqual(droppedByBasic(/** @type {any} */ (blank), "", "word"), []);
   const full = { ...blank, forms: [...blank.forms, { ar: "b", en: "b" }], category: "noun", fills: ["x"] };
   assert.deepEqual(droppedByBasic(/** @type {any} */ (full), "a building", "sentence"), [
-    "the sentence", "1 other form", "the subtype", "the blanks it fills", "the clue for its other meanings",
+    "the sentence", "1 other form", "the kind of word", "the blanks it fills", "the clue for its other meanings",
   ]);
 });
 

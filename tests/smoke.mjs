@@ -288,9 +288,13 @@ let teachesTwo = false;
    to the teacher's screens only while a walk below sets it. */
 let withPath = false;
 /** The path's order as the stub server holds it, and the moves asked of it (0.688). */
-let pathOrder = ["u1", "u2"];
+let pathOrder = ["u1", "u2", "u3"];
 /** @type {any[]} */
 const movedUnits = [];
+/** The units published in the course, and those asked to publish (0.738). */
+let pathLive = /** @type {Record<string, number>} */ ({ u1: 1 });
+/** @type {any[]} */
+const publishedUnits = [];
 /** What the course's Exercises tab asked the server to save (0.735). @type {any[]} */
 const practiceSaves = [];
 /** Lesson 1's name as the stub server holds it, and the renames it was sent (0.732). */
@@ -538,8 +542,8 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         courses: [
-          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: pathOrder.slice(), pathLive: { u1: 1 },
-            students: [], teachers: [account.handle], role: "teacher" },
+          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2", "u3"], path: pathOrder.slice(), pathLive: { ...pathLive },
+            students: ["s-1", "s-2", "s-3"], teachers: [account.handle], role: "teacher" },
         ],
       });
     }
@@ -549,7 +553,14 @@ const fakeFetch = async (input, opts = {}) => {
       const rest = pathOrder.filter((x) => x !== body.deckId);
       rest.splice(body.to, 0, body.deckId);
       pathOrder = rest;
-      return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { u1: 1 }, opened: [] } });
+      return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { ...pathLive }, opened: [] } });
+    }
+    /* Publishing a unit (0.738): no checklist, so the stub publishes. */
+    if (action === "publish-unit" && withPath) {
+      const body = JSON.parse(opts.body || "{}");
+      publishedUnits.push(body);
+      pathLive = { ...pathLive, [body.deckId]: 2 };
+      return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { ...pathLive }, opened: [] } });
     }
     if (action === "my-decks" && withPath) {
       return json({
@@ -558,6 +569,8 @@ const fakeFetch = async (input, opts = {}) => {
           { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
           { id: "u1", unit: true, title: "Greetings unit", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
           { id: "u2", unit: true, title: "Family unit", owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: "c1", addedAt: 3 }] },
+          { id: "u3", unit: true, title: "Travel unit", owner: account.handle, lang: "ar-PS", cardIds: [phrase.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] },
+          { id: "u4", unit: true, title: "Spare unit", owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [] },
         ],
       });
     }
@@ -14020,18 +14033,100 @@ const openPronounTables = async () => {
   check("the teacher's course is listed", !!courseTile, "no Arabic 101 tile");
   click(courseTile || null);
   await sleep(500);
-  const pathBlock = [...document.querySelectorAll('[data-el="course-path"]')].pop();
-  const rows = pathBlock ? [...pathBlock.querySelectorAll('[data-el="path-unit"]')].map((x) => (x.textContent || "").replace(/\s+/g, " ")) : [];
-  check("a course page shows its path above its decks, in order, each published or a draft",
-    rows.length === 2 && /^1\. Greetings unit/.test(rows[0]) && /Published/.test(rows[0]) && /^2\. Family unit/.test(rows[1]) && /Draft/.test(rows[1]),
-    rows.join(" | ") || "no path section");
-  check("a published unit can be opened for the class; a draft cannot",
-    /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
-  /* The Modules block itself (0.707: it now sits above the path, so the
-     text after the word is no longer only its own). */
-  const modulesBlock = [...(((pathBlock && pathBlock.closest(".at-screen")) || document).querySelectorAll(".at-formblock"))]
-    .find((b) => ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Modules");
-  const modulesPart = (modulesBlock && modulesBlock.textContent) || "";
+  /* A course's screen (0.738, the owner's choice): its name is the
+     heading, with its language and students under it; one Modules section
+     holds its units, studied in order, then its decks, studied in any
+     order, as rows of one kind. No Path section, and no deck as a chip
+     with a cross. */
+  const courseScreen0 = () => [...document.querySelectorAll(".at-screen.cardform")].pop() || document.body;
+  const pathBlock = courseScreen0().querySelector('[data-el="course-modules"]');
+  const heads = [...courseScreen0().querySelectorAll(".at-formnum")].map((h) => (h.textContent || "").trim());
+  const headLine = ((courseScreen0().querySelector('[data-el="course-head"] .at-formrole') || {}).textContent || "").trim();
+  check("a course's first heading is its name, with its language and students under it",
+    heads[0] === "Arabic 101" && /^Palestinian Arabic · 3 students$/.test(headLine) && !heads.includes("This course") && !heads.includes("Path"),
+    `${heads.join(" | ")} · ${headLine}`);
+  const groupLabels = pathBlock ? [...pathBlock.querySelectorAll(".at-modgroup")].map((l) => (l.textContent || "").trim()) : [];
+  check("one Modules section, its two labels word for word",
+    groupLabels.join(" | ") === "Units, studied in order | Decks, studied in any order", groupLabels.join(" | ") || "no Modules section");
+  const unitRows = () => [...((courseScreen0().querySelector('[data-el="course-units"]')) || document.createElement("div")).querySelectorAll('[data-el="path-unit"]')];
+  const rows = unitRows().map((x) => (x.textContent || "").replace(/\s+/g, " "));
+  check("the units in order, each with its number, whether it is published and its size",
+    rows.length === 3 && /^1 · Greetings unit/.test(rows[0]) && /Unit · Published · 1 card/.test(rows[0]) &&
+      /^2 · Family unit/.test(rows[1]) && /Unit · Draft · 0 cards/.test(rows[1]) && /^3 · Travel unit/.test(rows[2]),
+    rows.join(" | ") || "no unit rows");
+  const deckRows = pathBlock ? [...pathBlock.querySelectorAll('[data-el="course-deck"]')].map((x) => (x.textContent || "").replace(/\s+/g, " ")) : [];
+  check("the decks under them, each with its kind and size, and no chip with a cross",
+    deckRows.length === 1 && /^Lesson 1Deck · 2 cards/.test(deckRows[0]) && !courseScreen0().querySelector(".at-deckpill") &&
+      !/Greetings unit|Family unit/.test(deckRows.join(" ")),
+    deckRows.join(" | ") || "no deck rows");
+  const unitRow = (/** @type {RegExp} */ re) => unitRows().find((x) => re.test(x.textContent || ""));
+  const publishOf = (/** @type {RegExp} */ re) => [...(unitRow(re) || document.createElement("div")).querySelectorAll("button.at-btn")]
+    .find((b) => (b.textContent || "").trim() === "Publish");
+  check("only a draft unit's row has Publish; an empty one's is grey",
+    !publishOf(/Greetings unit/) && !!publishOf(/Family unit/) && !!publishOf(/Family unit/)?.classList.contains("off") &&
+      !!publishOf(/Travel unit/) && !publishOf(/Travel unit/)?.classList.contains("off"),
+    rows.join(" | "));
+  click(publishOf(/Family unit/) || null);
+  await sleep(300);
+  const said = ((document.querySelector(".at-snack") || {}).textContent || "").trim();
+  check("an empty unit's Publish says Add a card first, and asks nothing of the server",
+    /Add a card first/.test(said) && publishedUnits.length === 0, said || "(nothing said)");
+  click(document.querySelector(".at-snackx"));
+  click(publishOf(/Travel unit/) || null);
+  await sleep(600);
+  check("a draft unit's Publish publishes it, with no checklist on the way",
+    publishedUnits.length === 1 && publishedUnits[0].deckId === "u3" && !publishOf(/Travel unit/) &&
+      /Unit · Published/.test((unitRow(/Travel unit/) || {}).textContent || "") && !document.querySelector('[data-el="unit-checklist"]'),
+    `${JSON.stringify(publishedUnits)} · ${((unitRow(/Travel unit/) || {}).textContent || "").replace(/\s+/g, " ")}`);
+  /* A published unit's three dots: three rows, each with its line. */
+  click((unitRow(/Greetings unit/) || document.createElement("div")).querySelector(".at-morebtn"));
+  await sleep(200);
+  const dotRows = [...document.querySelectorAll(".at-moresheet .at-sheetact")].map((b) =>
+    `${((b.querySelector("b") || {}).textContent || "").trim()} = ${((b.querySelector("i") || {}).textContent || "").trim()}`);
+  check("a published unit's three dots: Open it early, Remove from the course and Delete this unit, each with its line",
+    dotRows.join(" | ") === "Open it early = Students can start this unit now, without finishing the earlier ones. | " +
+      "Remove from Arabic 101 = It stays in Material, and in any other course it is in. | " +
+      "Delete this unit = From every course, for good. You will be asked to confirm." && !document.querySelector(".at-screen.cardform .at-unitcourse"),
+    dotRows.join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+  await sleep(150);
+  /* The arrows: the first cannot go up; down moves it. */
+  const arrow = (/** @type {RegExp} */ re, /** @type {string} */ label) =>
+    /** @type {HTMLButtonElement | null} */ ((unitRow(re) || document.createElement("div")).querySelector(`[aria-label="${label}"]`));
+  check("the arrows are there, the first unit's up arrow off",
+    !!arrow(/Greetings unit/, "Move Greetings unit up")?.disabled && !arrow(/Greetings unit/, "Move Greetings unit down")?.disabled,
+    unitRows().map((r) => [...r.querySelectorAll("[aria-label]")].map((b) => b.getAttribute("aria-label")).join(",")).join(" | "));
+  click(arrow(/Greetings unit/, "Move Greetings unit down"));
+  await sleep(700);
+  const order = unitRows().map((x) => ((x.querySelector(".at-decktitle") || {}).textContent || "").trim());
+  check("and the down arrow asks the server and the list then shows the new order",
+    movedUnits.length === 1 && movedUnits[0].courseId === "c1" && movedUnits[0].deckId === "u1" && movedUnits[0].to === 1 &&
+      order[0] === "1 · Family unit" && order[1] === "2 · Greetings unit",
+    `${JSON.stringify(movedUnits)} · ${order.join(" | ")}`);
+  /* + Add a unit: a panel whose first row is New unit, then the units
+     already made that are not in the course. */
+  click([...courseScreen0().querySelectorAll("button.at-addwide")].find((b) => /Add a unit/.test(b.textContent || "")) || null);
+  await sleep(200);
+  const addRows = [...document.querySelectorAll(".at-sheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  const addTitle = ((document.querySelector(".at-sheet .at-modaltitle") || {}).textContent || "").trim();
+  check("+ Add a unit opens a panel whose first row is New unit, then the units you already have",
+    addTitle === "Add a unit" && addRows[0] === "New unit" && addRows.includes("Spare unit") && !addRows.includes("Greetings unit") &&
+      /Units you already have/.test((document.querySelector(".at-sheet") || {}).textContent || ""),
+    `${addTitle} · ${addRows.join(" | ")}`);
+  click(document.querySelector('.at-sheet [aria-label="Close"]'));
+  await sleep(150);
+  click([...courseScreen0().querySelectorAll("button.at-addwide")].find((b) => /Add a deck/.test(b.textContent || "")) || null);
+  await sleep(200);
+  const deckSheet = document.querySelector(".at-sheet");
+  check("+ Add a deck opens the deck panel, with a way to make one first",
+    ((deckSheet && deckSheet.querySelector(".at-modaltitle")) || {}).textContent === "Add a deck" &&
+      /Create a new module/.test((deckSheet && deckSheet.textContent) || "") && /Lesson 1/.test((deckSheet && deckSheet.textContent) || "") &&
+      !/Greetings unit/.test((deckSheet && deckSheet.textContent) || ""),
+    ((deckSheet && deckSheet.textContent) || "(no panel)").slice(0, 200));
+  click(document.querySelector('.at-sheet [aria-label="Close"]'));
+  await sleep(150);
+  /* The Modules block itself: a unit is never among the decks. */
+  const modulesPart = (((courseScreen0().querySelector('[data-el="course-decks"]')) || {}).textContent) || "";
   check("a unit is not among the course's ordinary decks", /Lesson 1/.test(modulesPart) && !/Greetings unit|Family unit/.test(modulesPart),
     modulesPart.replace(/\s+/g, " ").slice(0, 200));
   /* The Exercises tab (0.708): the four presets and a line; the switches
@@ -14098,34 +14193,34 @@ const openPronounTables = async () => {
     click(tabNamed("Course") || null);
     await sleep(300);
   }
-  /* Found again: the Course tab was drawn afresh. */
-  const pathAgain = [...document.querySelectorAll('[data-el="course-path"]')].pop();
-  click(pathAgain ? pathAgain.querySelector('[data-el="path-unit"] button') : null);
+  /* Found again: the Course tab was drawn afresh. A unit's page (0.738):
+     titled Unit, a Courses label with a row per course saying its place,
+     and no publishing, ordering or checklist on it. */
+  click((unitRows().find((x) => /Greetings unit/.test(x.textContent || "")) || document.createElement("div")).querySelector(".at-deckcard"));
   await sleep(600);
   const unitScreen = [...document.querySelectorAll(".at-screen.cardform")].pop();
   const unitText = unitScreen ? (unitScreen.textContent || "").replace(/\s+/g, " ") : "";
-  check("a unit's page is headed with its number and shows its checklist",
-    /Unit 1 · Greetings unit/.test(unitText) && /Checklist/.test(unitText) && /Add 5 more sentences with a blank \(0 of 5\)/.test(unitText),
-    unitText.slice(0, 300));
-  /* Its place on the path, and moving it, on its own screen (0.688). */
+  const barTitle = ((unitScreen && unitScreen.querySelector(".at-screentitle, h1, h2")) || {}).textContent || "";
+  check("a unit's page is titled Unit, with no checklist, Publish or moves on it",
+    /^Unit$/.test(barTitle.trim()) && !/Checklist|Publish unit|Move earlier|Move later|Open for the class/.test(unitText) &&
+      !unitScreen?.querySelector('[data-el="unit-checklist-block"]'),
+    `${barTitle} · ${unitText.slice(0, 300)}`);
   const place = unitScreen ? (unitScreen.querySelector('[data-el="unit-place"]') || {}).textContent || "" : "";
-  check("a unit's page says its place on the course's path", /^Unit 1 of 2 · Published$/.test(place), place || "no place line");
-  const acts = unitScreen ? [...unitScreen.querySelectorAll('[data-el="unit-path-actions"] button')] : [];
-  const actNamed = (/** @type {RegExp} */ re) => acts.find((b) => re.test((b.textContent || "").trim()));
-  check("the first unit cannot move earlier, can move later, and can be opened for the class",
-    !!actNamed(/^Move earlier$/) && /** @type {HTMLButtonElement} */ (actNamed(/^Move earlier$/)).disabled
-      && !!actNamed(/^Move later$/) && !/** @type {HTMLButtonElement} */ (actNamed(/^Move later$/)).disabled
-      && !!actNamed(/^Open for the class$/),
-    acts.map((b) => `${(b.textContent || "").trim()}${/** @type {HTMLButtonElement} */ (b).disabled ? " (off)" : ""}`).join(", ") || "no actions");
-  click(actNamed(/^Move later$/) || null);
-  await sleep(800);
-  const placeAfter = (([...document.querySelectorAll(".at-screen.cardform")].pop() || document.body).querySelector('[data-el="unit-place"]') || {}).textContent || "";
-  check("Move later asks the server and the page then says Unit 2 of 2",
-    movedUnits.length === 1 && movedUnits[0].courseId === "c1" && movedUnits[0].deckId === "u1" && movedUnits[0].to === 1 && /^Unit 2 of 2/.test(placeAfter),
-    `${JSON.stringify(movedUnits)} · ${placeAfter}`);
+  const courseRow = unitScreen ? unitScreen.querySelector('[data-el="unit-course"]') : null;
+  check("a Courses label with a row per course, saying the unit's place there",
+    /Courses/.test(unitText) && /^Unit 2 of 3 · Published$/.test(place) && /Arabic 101/.test((courseRow && courseRow.textContent) || "") &&
+      /Open course/.test((courseRow && courseRow.textContent) || ""),
+    place || "no place line");
+  click(courseRow);
+  await sleep(500);
+  const backOnCourse = [...document.querySelectorAll(".at-screen.cardform")].pop();
+  check("pressing the row opens the course",
+    ((backOnCourse && backOnCourse.querySelector(".at-formnum")) || {}).textContent === "Arabic 101" &&
+      !!(backOnCourse && backOnCourse.querySelector('[data-el="course-modules"]')),
+    ((backOnCourse && backOnCourse.textContent) || "").slice(0, 120));
   /* And in Material's Modules, a unit is labelled one; a deck is not. */
   /* Back from the unit to its course, and back from the course. */
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 1; i++) {
     click([...document.querySelectorAll(".at-screen.cardform")].pop()?.querySelector('[aria-label="Back"]') || null);
     await sleep(400);
   }
@@ -14183,7 +14278,8 @@ const openPronounTables = async () => {
     await sleep(150);
   }
   withPath = false;
-  pathOrder = ["u1", "u2"];
+  pathOrder = ["u1", "u2", "u3"];
+  pathLive = { u1: 1 };
   r.unmount();
   host.remove();
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));

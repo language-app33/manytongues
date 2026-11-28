@@ -712,7 +712,7 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "category",
     on: "card",
-    label: "What subtype",
+    label: "Kind of word",
     what: "What the teacher says the word is — a noun, a verb, a name. It decides which table the card is offered and which blanks it fills without anybody ticking one.",
     reader: "both",
     shown: (value, ctx) => {

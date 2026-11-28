@@ -346,6 +346,22 @@ test("unpublishing takes a card from students and keeps the teacher's work as a 
   assert.equal(edited.json.card.changes, undefined, "a draft has no second version");
 });
 
+/* 0.738: the status panel has no Unpublish step. "Ready for review" on a
+   published card takes it back from students and marks it to be checked,
+   as two calls in order: unpublish, then review. */
+test("Ready for review on a published card takes it from students and marks it for review", async () => {
+  const { key, deckId: moduleId, studentKey } = await classroom("Yara");
+  const card = (await api("save-card", { key, body: { card: word("قطة", "cat"), decks: [moduleId] } })).json.card;
+  assert.ok((await material(studentKey)).cards.some((/** @type {any} */ c) => c.id === card.id));
+  const off = await api("card-status", { key, body: { cardId: card.id, to: "unpublish" } });
+  assert.equal(off.status, 200, off.text);
+  assert.equal(off.json.card.status, "draft");
+  const review = await api("card-status", { key, body: { cardId: card.id, to: "review" } });
+  assert.equal(review.status, 200, review.text);
+  assert.equal(review.json.card.status, "review");
+  assert.ok(!(await material(studentKey)).cards.some((/** @type {any} */ c) => c.id === card.id), "gone from the student");
+});
+
 test("a draft fills no student's blank", async () => {
   const { key, deckId: moduleId, studentKey } = await classroom("Rana");
   await api("save-card", {
