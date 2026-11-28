@@ -5914,7 +5914,7 @@ function AddSheet({ title, lede, rows, none, find, create, onToggle, onClose }: 
   );
 }
 
-function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf, busy, saving, onOpen, onCreateUnit, onAddUnit, onPublish, onEmptyPublish, onMove, onOpenForClass, onRemove, onDelete, onToggleDeck, onCreateDeck }: {
+function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf, busy, saving, onOpen, onCreateUnit, onPublish, onEmptyPublish, onMove, onOpenForClass, onRemove, onDelete, onToggle, onCreateDeck }: {
   course: Course;
   /** The course's units in path order, drafts included. */
   units: Module[];
@@ -5930,7 +5930,6 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
   saving: Record<string, "add" | "drop">;
   onOpen: (id: string) => void;
   onCreateUnit: (title: string) => void;
-  onAddUnit: (unitId: string) => void;
   onPublish: (unitId: string) => void;
   /** Publish pressed on a unit with nothing in it. */
   onEmptyPublish: () => void;
@@ -5938,14 +5937,24 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
   onOpenForClass: (unitId: string, open: boolean) => void;
   onRemove: (id: string) => void;
   onDelete: (unitId: string) => void;
-  onToggleDeck: (id: string, on: boolean) => void;
+  /** Puts a unit or deck in the course, or takes it out (on: it is in). */
+  onToggle: (id: string, on: boolean) => void;
   /** A deck named here: made in the course's language and put in it. */
   onCreateDeck: (title: string) => void;
 }) {
   /* A new unit or deck being named: one box for both (0.748, the owner's
      3a, 4a, 5a), so making either looks and goes the same way. */
   const [naming, setNaming] = useState<{ kind: "unit" | "deck"; title: string } | null>(null);
-  const [addingUnit, setAddingUnit] = useState(false);
+  /* Open, the panel's units in the order they had when it opened, so a
+     row does not jump away under the finger as it is added or taken out. */
+  const [addingUnit, setAddingUnit] = useState<string[] | null>(null);
+  const allUnits = units.concat(spareUnits);
+  const unitRows = addingUnit
+    ? allUnits.slice().sort((a, b) => {
+      const at = (id: string) => { const i = addingUnit.indexOf(id); return i < 0 ? addingUnit.length : i; };
+      return at(a.id) - at(b.id);
+    })
+    : [];
   const [addingDeck, setAddingDeck] = useState(false);
   const [deleting, setDeleting] = useState<Module | null>(null);
   const opened = new Set(course.opened || []);
@@ -6014,7 +6023,7 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
       {/* With no unit to choose from, the panel would hold New unit alone:
           go straight to naming one (0.748, 3a). Likewise a deck (4a). */}
       <button type="button" className="at-deckadd at-addwide" disabled={busy}
-        onClick={() => (spareUnits.length ? setAddingUnit(true) : setNaming({ kind: "unit", title: "" }))}>
+        onClick={() => (allUnits.length ? setAddingUnit(allUnits.map((u) => u.id)) : setNaming({ kind: "unit", title: "" }))}>
         <Icon name="add" size={17} />
         Add a unit
       </button>
@@ -6052,35 +6061,32 @@ function CourseModules({ course, units, decks, spareUnits, deckChoices, othersOf
         Add a deck
       </button>
 
+      {/* The same panel as Add a deck (0.749, the owner's 6a): every unit
+          you have, Add or Added, searchable, open while several are added.
+          Tapping Added takes one out, as the panel does wherever else it
+          is used (a unit's Courses, any module picker). */}
       {addingUnit && (
-        <PickSheet title="Add a unit" onClose={() => setAddingUnit(false)}>
-          <div className="at-sheetacts">
-            <SheetAction icon="add" label="New unit" onClick={() => { setAddingUnit(false); setNaming({ kind: "unit", title: "" }); }} />
-          </div>
-          {spareUnits.length > 0 && (
-            <>
-              <p className="at-eyebrow at-modgroup">Units you already have</p>
-              <div className="at-sheetacts">
-                {spareUnits.map((u) => (
-                  <SheetAction key={u.id} icon="layers" label={u.title} note={plural(heldIn(u), "card")}
-                    onClick={() => { setAddingUnit(false); onAddUnit(u.id); }} />
-                ))}
-              </div>
-            </>
-          )}
-        </PickSheet>
+        <AddSheet
+          title="Add a unit"
+          lede={`Choose the units ${course.title} teaches. They join the end of its path.`}
+          find="Search units"
+          create={{ label: "Create a new unit", onCreate: () => { setAddingUnit(null); setNaming({ kind: "unit", title: "" }); } }}
+          rows={unitRows.map((u) => ({ id: u.id, title: u.title, meta: plural(heldIn(u), "card"), on: units.some((x) => x.id === u.id), saving: saving[u.id] }))}
+          onToggle={onToggle}
+          onClose={() => setAddingUnit(null)}
+        />
       )}
       {addingDeck && (
         <AddSheet
           title="Add a deck"
           lede={`Choose the decks ${course.title} teaches. Students see them at their next check.`}
-          find="Search modules"
+          find="Search decks"
           /* A deck, not "a module" with a kind to choose: this is Add a
              deck (0.748, 5a). Units are made from Add a unit. */
           create={{ label: "Create a new deck", onCreate: () => { setAddingDeck(false); setNaming({ kind: "deck", title: "" }); } }}
           rows={deckChoices.map((d) => ({ id: d.id, title: d.title, meta: moduleSize(d), on: inCourse.has(d.id), saving: saving[d.id] }))}
           none="You have no decks yet."
-          onToggle={onToggleDeck}
+          onToggle={onToggle}
           onClose={() => setAddingDeck(false)}
         />
       )}
@@ -10755,7 +10761,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        seconds. */
     const toggleModule = (id: string, on: boolean) => {
       if (moduleSaving[id]) return;
-      const title = (modules.find((d) => d.id === id) || { title: "The module" }).title;
+      const title = (modules.find((d) => d.id === id) || allModules.find((d) => d.id === id) || { title: "The module" }).title;
       setModuleSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
       run(
         async () => {
@@ -10764,8 +10770,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           if (saved && Array.isArray(saved.courses))
             setModules((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
           else await refresh(true);
-          if (r && r.course && Array.isArray(r.course.decks))
-            setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, decks: r.course.decks } : x)));
+          /* With its path too: a unit added or taken out moves on it. */
+          tookCourse(r);
         },
         on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
       ).finally(() =>
@@ -10854,11 +10860,6 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
                   tookCourse(r);
                 }, `${title} added to ${c.title}`)}
-                onAddUnit={(id) => run(async () => {
-                  const r = await API.attachModule(id, c.id);
-                  tookModule(r);
-                  tookCourse(r);
-                })}
                 onPublish={(id) => {
                   const title = (units.find((u) => u.id === id) || { title: "The unit" }).title;
                   run(async () => tookCourse(await API.publishUnit(c.id, id)), `${title} is open to students in ${c.title}`);
@@ -10879,7 +10880,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   await API.deleteModule(id);
                   await refresh(true);
                 })}
-                onToggleDeck={toggleModule}
+                onToggle={toggleModule}
                 onCreateDeck={(title) => run(async () => {
                   const r = await API.createModule(title, "", c.language as LangId);
                   if (!(r && r.deck && r.deck.id)) return;

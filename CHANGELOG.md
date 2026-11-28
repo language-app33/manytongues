@@ -8,6 +8,32 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.749 — 28 November 2026
+
+**Add a unit and Add a deck now open the same panel.**
+
+- On a course's screen, **Add a unit** used to open a different panel
+  from **Add a deck**: no search, a picture on each row, and a tap that
+  added one unit and closed the panel. It now works exactly like Add a
+  deck.
+- Both panels have a line saying what happens, a search box ("Search
+  units", "Search decks"), **Create a new unit** or **Create a new deck**
+  first, and then every unit or deck you have, each marked Add or Added.
+- The panel stays open, so you can add several in one go. Tapping Added
+  takes one back out of the course, as it does in this panel everywhere
+  else in the app, such as a unit's own list of courses.
+- The rows stay where they are while you tap them.
+- With nothing to choose from, both buttons still go straight to the
+  name box, as in 0.748.
+
+**Trade-off:** a unit can now be taken off a course's path from this
+panel with one tap, as a deck already could. A message says it was taken
+out.
+
+**To check by hand:** on a phone, add two units in one go from Add a
+unit, then tap Added on one to take it out again, and see the path
+update behind the panel.
+
 ## 0.748 — 28 November 2026
 
 **A course with no modules yet: a calmer Modules section, and quicker ways to fill it.**

@@ -10057,3 +10057,23 @@ it, and stays on the course, as `onCreateUnit` always did. The cost: a
 deck made here no longer opens on `NewModule`'s screen and then itself;
 its description is left empty, as a unit's is.
 
+
+## Add a unit and Add a deck are one panel (0.749)
+
+Reproduced on an emulated phone: Add a unit was a `PickSheet` of
+`SheetAction` rows (New unit, then "Units you already have"; a tap added
+one and closed), Add a deck an `AddSheet` (lede, search, create row,
+Add/Added toggles, stays open). The owner chose (6a) the `AddSheet` for
+both. On whether tapping Added takes a unit out (7), the owner asked for
+whatever the panel does elsewhere: `AddSheet` on a unit's Courses and
+every `ModuleSwitch` take one out, so it does here too.
+
+So `CourseModules` lost `onAddUnit` and takes one `onToggle`, which is
+`TeachSpace`'s `toggleModule`; that now takes the reply through
+`tookCourse`, so a unit added or taken out moves on the path at once
+(the server's attach and detach replies carry the whole course). The
+panel lists the course's units, then the spare ones, in the order they
+had when it opened, so a row does not jump as it is toggled. The cost: a
+unit students are working through can be taken off the path from the
+panel with one tap, as it already could from the unit's own Courses.
+

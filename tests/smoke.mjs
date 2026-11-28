@@ -14146,16 +14146,21 @@ const openPronounTables = async () => {
     movedUnits.length === 1 && movedUnits[0].courseId === "c1" && movedUnits[0].deckId === "u1" && movedUnits[0].to === 1 &&
       order[0] === "1 · Family unit" && order[1] === "2 · Greetings unit",
     `${JSON.stringify(movedUnits)} · ${order.join(" | ")}`);
-  /* + Add a unit: a panel whose first row is New unit, then the units
-     already made that are not in the course. */
+  /* + Add a unit: since 0.749 (the owner's 6a) the same panel as Add a
+     deck: a search, Create a new unit, then every unit, Add or Added. */
   click([...courseScreen0().querySelectorAll("button.at-addwide")].find((b) => /Add a unit/.test(b.textContent || "")) || null);
   await sleep(200);
-  const addRows = [...document.querySelectorAll(".at-sheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
-  const addTitle = ((document.querySelector(".at-sheet .at-modaltitle") || {}).textContent || "").trim();
-  check("+ Add a unit opens a panel whose first row is New unit, then the units you already have",
-    addTitle === "Add a unit" && addRows[0] === "New unit" && addRows.includes("Spare unit") && !addRows.includes("Greetings unit") &&
-      /Units you already have/.test((document.querySelector(".at-sheet") || {}).textContent || ""),
-    `${addTitle} · ${addRows.join(" | ")}`);
+  {
+    const sheet = document.querySelector(".at-sheet");
+    const addTitle = (((sheet && sheet.querySelector(".at-modaltitle")) || {}).textContent || "").trim();
+    const picks = [...((sheet && sheet.querySelectorAll(".at-deckpick")) || [])].map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
+    const said = (sheet && sheet.textContent) || "";
+    check("+ Add a unit opens the panel Add a deck uses: search, Create a new unit, then each unit as Add or Added",
+      addTitle === "Add a unit" && !!sheet?.classList.contains("at-decksheet") && !!sheet?.querySelector('input[placeholder="Search units"]') &&
+        /^Create a new unit/.test(picks[0] || "") && picks.some((x) => /^Spare unit.*Add$/.test(x)) && picks.some((x) => /^Greetings unit.*Added$/.test(x)) &&
+        !/Units you already have/.test(said) && !sheet?.querySelector(".at-sheetact"),
+      `${addTitle} · ${picks.join(" | ")}`);
+  }
   click(document.querySelector('.at-sheet [aria-label="Close"]'));
   await sleep(150);
   click([...courseScreen0().querySelectorAll("button.at-addwide")].find((b) => /Add a deck/.test(b.textContent || "")) || null);
@@ -14617,10 +14622,14 @@ const openPronounTables = async () => {
   await sleep(500);
   click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);
   await sleep(500);
-  /* Since 0.740 New unit is the first row of the panel + Add a unit opens. */
+  /* Since 0.749 Create a new unit is the first row of the panel + Add a
+     unit opens; with no unit to list, + Add a unit names one at once. */
   click(buttonNamed(/^Add a unit$/));
   await sleep(200);
-  click(buttonNamed(/^New unit$/));
+  {
+    const make = [...document.querySelectorAll(".at-sheet button")].find((b) => /Create a new unit/.test(b.textContent || ""));
+    if (make) click(make);
+  }
   await sleep(300);
   {
     const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-modal input.at-input, [role=dialog] input.at-input")].pop() || null);

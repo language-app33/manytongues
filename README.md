@@ -1262,6 +1262,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   Since 0.748 an empty course has a line under each label instead of a
   box above them, and with nothing to choose from either add button goes
   straight to one shared name box (New unit or New deck).
+  Since 0.749 both add buttons open the same `AddSheet`: a search,
+  Create a new unit or deck, then each one as Add or Added.
   A unit's own screen is titled "Unit" and lists its courses with its
   place in each; a row opens that course. `countingCards` still feeds the
   unit's quality score. What follows is the screen as it was from 0.616.
