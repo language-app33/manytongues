@@ -9964,6 +9964,7 @@ students" / "Not open yet" instead of Publish / Published / Draft, the
 owner's 1a, because a card's Publish is a different act. Chosen knowing it
 sits beside "Open it early" and "Open course"; the stored field is still
 `pathLive` and the server action still `publish-unit`.
+
 ## Hebrew verbs: one "I", "we" and "they" in the past and future
 
 **28 November 2026** · `src/verbs.ts` (`joinedInRow`, `keepsApartIn`,
